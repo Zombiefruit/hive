@@ -176,6 +176,15 @@ export function cleanupStaleExternalAgents(activeSessionIds: Set<string>): void 
   }
 }
 
+export function updateAgentTask(id: string, task: string, branch?: string): void {
+  const now = new Date().toISOString();
+  if (branch) {
+    db.prepare("UPDATE agents SET task = ?, branch = ?, updatedAt = ? WHERE id = ?").run(task, branch, now, id);
+  } else {
+    db.prepare("UPDATE agents SET task = ?, updatedAt = ? WHERE id = ?").run(task, now, id);
+  }
+}
+
 export function updateAgent(
   id: string,
   updates: Partial<Pick<Agent, "status" | "sessionId" | "pid" | "costUsd" | "inputTokens" | "outputTokens">>

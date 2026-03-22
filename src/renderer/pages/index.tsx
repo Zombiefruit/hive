@@ -35,7 +35,7 @@ export function Dashboard() {
             alignItems: "center",
             paddingInline: "var(--mantine-spacing-md)",
             // Leave space for macOS traffic lights (hiddenInset titlebar)
-            paddingLeft: 80,
+            paddingLeft: 96,
             gap: "var(--mantine-spacing-sm)",
             WebkitAppRegion: "drag",
           }}

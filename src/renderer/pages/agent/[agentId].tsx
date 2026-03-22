@@ -78,7 +78,7 @@ export function AgentDetail() {
         style={{
           gridColumn: "1 / -1",
           padding: "var(--mantine-spacing-sm) var(--mantine-spacing-md)",
-          paddingLeft: 80, // Clear macOS traffic lights
+          paddingLeft: 96, // Clear macOS traffic lights
           borderBottom: "1px solid var(--mantine-color-default-border)",
           WebkitAppRegion: "drag",
         }}
@@ -174,61 +174,38 @@ export function AgentDetail() {
         </div>
       </div>
 
-      {/* Center: Chat or External info */}
+      {/* Center: Chat (shown for ALL agents, external get a banner + read-only) */}
       <div style={{ overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        {isExternal ? (
-          <Stack align="center" justify="center" gap="md" style={{ flex: 1 }} p="xl">
-            <ThemeIcon variant="light" color="gray" size="xl" radius="xl">
-              <IconExternalLink size={24} />
-            </ThemeIcon>
-            <Text size="lg" fw={500} c="dimmed">External Session</Text>
-            <Text size="sm" c="dimmed" ta="center" maw={400}>
-              This Claude Code session was started outside of Claude Deck
-              (from a terminal or IDE). You can monitor it here but cannot
-              send messages or approve commands.
+        {isExternal && (
+          <Group
+            gap="xs"
+            p="xs"
+            style={{
+              borderBottom: "1px solid var(--mantine-color-default-border)",
+              backgroundColor: "var(--mantine-color-dark-7)",
+            }}
+          >
+            <IconExternalLink size={14} color="var(--mantine-color-dimmed)" />
+            <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+              External session — read-only view
             </Text>
-            <Card withBorder p="md" radius="sm" w="100%" maw={400}>
-              <Stack gap="xs">
-                <Group justify="space-between">
-                  <Text size="xs" c="dimmed">Working directory</Text>
-                  <Text size="xs" fw={500}>{cwdShort}</Text>
-                </Group>
-                <Group justify="space-between">
-                  <Text size="xs" c="dimmed">PID</Text>
-                  <Text size="xs" fw={500}>{agent.pid ?? "—"}</Text>
-                </Group>
-                <Group justify="space-between">
-                  <Text size="xs" c="dimmed">Started</Text>
-                  <Text size="xs" fw={500}>{new Date(agent.createdAt).toLocaleTimeString()}</Text>
-                </Group>
-                <Group justify="space-between">
-                  <Text size="xs" c="dimmed">Session</Text>
-                  <Text size="xs" fw={500} truncate style={{ maxWidth: 180 }}>{agent.sessionId ?? "—"}</Text>
-                </Group>
-              </Stack>
-            </Card>
-            <Group gap="sm">
-              {agent.sessionId && (
-                <Button
-                  variant="filled"
-                  size="sm"
-                  onClick={async () => {
-                    if (agent.sessionId) {
-                      await window.deck.resumeSession(agent.id, agent.sessionId, agent.cwd);
-                    }
-                  }}
-                >
-                  Resume &amp; Chat
-                </Button>
-              )}
-              <Button variant="light" size="sm" onClick={() => navigate("/")}>
-                Back to Dashboard
+            {agent.sessionId && (
+              <Button
+                variant="light"
+                size="xs"
+                compact
+                onClick={async () => {
+                  if (agent.sessionId) {
+                    await window.deck.resumeSession(agent.id, agent.sessionId, agent.cwd);
+                  }
+                }}
+              >
+                Resume &amp; Chat
               </Button>
-            </Group>
-          </Stack>
-        ) : (
-          <ChatPanel agentId={agent.id} agentStatus={agent.status} />
+            )}
+          </Group>
         )}
+        <ChatPanel agentId={agent.id} agentStatus={isExternal ? "completed" : agent.status} />
       </div>
 
       {/* Right panel: Context */}
