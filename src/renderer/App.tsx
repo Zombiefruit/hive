@@ -3,10 +3,17 @@ import "@mantine/core/styles.css";
 import { Routes } from "./routes";
 import { theme } from "./theme";
 import { useIpcSync } from "./hooks/useIpcSync";
+import { FloatingTrigger, FloatingPanel } from "./components/ManagerChat";
 
 function AppInner() {
   useIpcSync();
-  return <Routes />;
+  return (
+    <>
+      <Routes />
+      <FloatingTrigger />
+      <FloatingPanel />
+    </>
+  );
 }
 
 export function App() {
