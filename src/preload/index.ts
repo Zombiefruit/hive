@@ -37,6 +37,27 @@ const api = {
   addContextUrl: (agentId: string, url: string) =>
     ipcRenderer.invoke("context:add-url", { agentId, url }),
 
+  // Manager AI
+  sendManagerMessage: (message: string) =>
+    ipcRenderer.invoke("manager:send-message", message),
+  getManagerConversations: () =>
+    ipcRenderer.invoke("manager:list-conversations"),
+  switchManagerConversation: (conversationId: string) =>
+    ipcRenderer.invoke("manager:switch-conversation", conversationId),
+  newManagerConversation: () =>
+    ipcRenderer.invoke("manager:new-conversation"),
+  deleteManagerConversation: (conversationId: string) =>
+    ipcRenderer.invoke("manager:delete-conversation", conversationId),
+  getManagerMessages: () =>
+    ipcRenderer.invoke("manager:get-messages"),
+
+  onManagerStream: (callback: (event: unknown) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: unknown) =>
+      callback(data);
+    ipcRenderer.on("manager:stream", listener);
+    return () => ipcRenderer.removeListener("manager:stream", listener);
+  },
+
   // Approval requests from agents
   onApprovalRequest: (callback: (approval: unknown) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, approval: unknown) =>

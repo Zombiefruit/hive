@@ -6,6 +6,16 @@ import { spawnAgent, sendMessage, interruptAgent, killAgent } from "./agents/age
 import { handleApprovalResponse } from "./agents/approval-handler";
 import { watchSessions } from "./agents/session-discovery";
 import { addContextFromUrl } from "./agents/context-tracker";
+import {
+  initManager,
+  setManagerStreamCallback,
+  sendManagerMessage,
+  getManagerConversations,
+  switchManagerConversation,
+  newManagerConversation,
+  deleteManagerConversation,
+  getActiveManagerMessages,
+} from "./manager/manager-ai";
 import type { StoreState, FleetMetrics, SpawnAgentConfig } from "../shared/types";
 import { ipcMain } from "electron";
 
@@ -100,6 +110,36 @@ app.whenReady().then(() => {
   // Register context URL handler
   ipcMain.handle("context:add-url", (_event, data: { agentId: string; url: string }) => {
     return addContextFromUrl(data.agentId, data.url);
+  });
+
+  // Initialize Manager AI
+  initManager();
+  setManagerStreamCallback((event) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send("manager:stream", event);
+      }
+    }
+  });
+
+  // Manager IPC handlers
+  ipcMain.handle("manager:send-message", async (_event, message: string) => {
+    return await sendManagerMessage(message);
+  });
+  ipcMain.handle("manager:list-conversations", () => {
+    return getManagerConversations();
+  });
+  ipcMain.handle("manager:switch-conversation", (_event, id: string) => {
+    switchManagerConversation(id);
+  });
+  ipcMain.handle("manager:new-conversation", () => {
+    return newManagerConversation();
+  });
+  ipcMain.handle("manager:delete-conversation", (_event, id: string) => {
+    deleteManagerConversation(id);
+  });
+  ipcMain.handle("manager:get-messages", () => {
+    return getActiveManagerMessages();
   });
 
   // Watch for external Claude sessions
