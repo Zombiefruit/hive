@@ -1,6 +1,7 @@
 import { Code, Loader, Paper, ScrollArea, Stack, Text } from "@mantine/core";
 import { useEffect, useRef } from "react";
 import { useManagerStore } from "../../stores/manager-store";
+import { Markdown } from "../Markdown";
 import type { ManagerMessage } from "../../stores/manager-store";
 
 const SUGGESTED_PROMPTS = [
@@ -57,9 +58,13 @@ function MessageBubble({ message }: { message: ManagerMessage }) {
           maxWidth: "90%",
         }}
       >
-        <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
-          {message.content}
-        </Text>
+        {isUser ? (
+          <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
+            {message.content}
+          </Text>
+        ) : (
+          <Markdown content={message.content} />
+        )}
       </Paper>
       {message.toolCalls?.map((call, i) => (
         <ToolCallBlock key={i} call={call} />

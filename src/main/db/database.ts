@@ -136,6 +136,46 @@ export function getAllAgents(): Agent[] {
   return db.prepare("SELECT * FROM agents ORDER BY createdAt DESC").all() as Agent[];
 }
 
+/** Upsert an external (non-deck-spawned) agent from session discovery. */
+export function upsertExternalAgent(
+  sessionId: string,
+  pid: number,
+  cwd: string,
+  startedAt: number,
+  isAlive: boolean,
+): void {
+  const existing = db
+    .prepare("SELECT id FROM agents WHERE sessionId = ? AND source = 'external'")
+    .get(sessionId) as { id: string } | undefined;
+
+  const status = isAlive ? "active" : "completed";
+  const now = new Date().toISOString();
+  const startedAtIso = new Date(startedAt).toISOString();
+
+  if (existing) {
+    db.prepare("UPDATE agents SET pid = ?, status = ?, updatedAt = ? WHERE id = ?")
+      .run(pid, status, now, existing.id);
+  } else {
+    const id = randomUUID();
+    db.prepare(`
+      INSERT INTO agents (id, sessionId, pid, status, source, task, model, cwd, permissionMode, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, 'external', ?, 'unknown', ?, 'default', ?, ?)
+    `).run(id, sessionId, pid, status, `Claude Code session (${cwd.split("/").pop()})`, cwd, startedAtIso, now);
+  }
+}
+
+/** Remove stale external agents whose sessions no longer exist. */
+export function cleanupStaleExternalAgents(activeSessionIds: Set<string>): void {
+  const externals = db
+    .prepare("SELECT id, sessionId FROM agents WHERE source = 'external'")
+    .all() as Array<{ id: string; sessionId: string }>;
+  for (const ext of externals) {
+    if (!activeSessionIds.has(ext.sessionId)) {
+      db.prepare("DELETE FROM agents WHERE id = ?").run(ext.id);
+    }
+  }
+}
+
 export function updateAgent(
   id: string,
   updates: Partial<Pick<Agent, "status" | "sessionId" | "pid" | "costUsd" | "inputTokens" | "outputTokens">>

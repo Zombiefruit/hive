@@ -1,6 +1,6 @@
 import { app, BrowserWindow } from "electron";
 import path from "node:path";
-import { initDatabase, closeDatabase, getAllAgents, getMessages, getPendingApprovals, getAllContextRefs, getRecentEvents } from "./db/database";
+import { initDatabase, closeDatabase, getAllAgents, getMessages, getPendingApprovals, getAllContextRefs, getRecentEvents, upsertExternalAgent, cleanupStaleExternalAgents } from "./db/database";
 import { registerIpcHandlers, startStoreSync, stopStoreSync } from "./ipc/bridge";
 import { spawnAgent, sendMessage, interruptAgent, killAgent } from "./agents/agent-manager";
 import { handleApprovalResponse } from "./agents/approval-handler";
@@ -143,9 +143,20 @@ app.whenReady().then(() => {
     return getActiveManagerMessages();
   });
 
-  // Watch for external Claude sessions
+  // Watch for external Claude sessions and sync them into the agent grid
   const stopWatching = watchSessions((sessions) => {
-    console.log(`[SessionDiscovery] Found ${sessions.length} sessions, ${sessions.filter(s => s.isAlive).length} alive`);
+    const activeSessionIds = new Set<string>();
+    for (const session of sessions) {
+      activeSessionIds.add(session.sessionId);
+      upsertExternalAgent(
+        session.sessionId,
+        session.pid,
+        session.cwd,
+        session.startedAt,
+        session.isAlive
+      );
+    }
+    cleanupStaleExternalAgents(activeSessionIds);
   });
 
   // Start periodic store sync to renderer (every 100ms)

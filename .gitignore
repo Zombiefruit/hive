@@ -94,3 +94,6 @@ out/
 # SQLite
 *.db
 *.sqlite
+
+# demo from lovable
+demo/
