@@ -15,6 +15,7 @@ import {
   newManagerConversation,
   deleteManagerConversation,
   getActiveManagerMessages,
+  stopManager,
 } from "./manager/manager-ai";
 import type { StoreState, FleetMetrics, SpawnAgentConfig } from "../shared/types";
 import { ipcMain } from "electron";
@@ -167,6 +168,7 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   stopStoreSync();
+  stopManager();
   closeDatabase();
 });
 

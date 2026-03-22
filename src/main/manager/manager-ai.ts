@@ -1,13 +1,14 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { query as sdkQuery } from "@anthropic-ai/claude-agent-sdk";
 import { app } from "electron";
 import path from "node:path";
 import fs from "node:fs";
-import { MANAGER_TOOL_SCHEMAS, executeManagerTool } from "./manager-tools";
+import os from "node:os";
+import { executeManagerTool } from "./manager-tools";
 import { getAllAgents, getPendingApprovals } from "../db/database";
 import { broadcastStoreUpdate } from "../ipc/bridge";
 
 const MODEL = "claude-opus-4-6";
-const MAX_TOKENS = 8192;
+const CALL_DIR = path.join(os.tmpdir(), "claude-deck-mcp");
 
 interface ManagerMessage {
   id: string;
@@ -30,9 +31,10 @@ interface ManagerState {
   conversations: ManagerConversation[];
 }
 
-let client: Anthropic | null = null;
 let state: ManagerState = { activeConversationId: null, conversations: [] };
 let onStreamCallback: ((event: ManagerStreamEvent) => void) | null = null;
+let mcpCallWatcher: fs.FSWatcher | null = null;
+let mcpServerScriptPath: string | null = null;
 
 export type ManagerStreamEvent =
   | { type: "message_start"; conversationId: string }
@@ -59,6 +61,80 @@ function loadState(): void {
   }
 }
 
+/**
+ * Write the fleet MCP server script to a temp location.
+ * This script is spawned as a stdio MCP server by the Agent SDK.
+ * It communicates with the main process via file-based IPC in CALL_DIR.
+ */
+function ensureMcpServerScript(): string {
+  if (mcpServerScriptPath && fs.existsSync(mcpServerScriptPath)) {
+    return mcpServerScriptPath;
+  }
+
+  const scriptDir = path.join(app.getPath("userData"), "mcp");
+  fs.mkdirSync(scriptDir, { recursive: true });
+  mcpServerScriptPath = path.join(scriptDir, "fleet-server.mjs");
+
+  // The MCP server script — self-contained, no imports from our codebase
+  const script = `
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+import fs from "node:fs";
+import path from "node:path";
+
+const CALL_DIR = ${JSON.stringify(CALL_DIR)};
+fs.mkdirSync(CALL_DIR, { recursive: true });
+
+async function callMain(toolName, input) {
+  const callId = Date.now() + "-" + Math.random().toString(36).slice(2);
+  const reqFile = path.join(CALL_DIR, callId + ".request.json");
+  const resFile = path.join(CALL_DIR, callId + ".response.json");
+  fs.writeFileSync(reqFile, JSON.stringify({ toolName, input }));
+  const start = Date.now();
+  while (Date.now() - start < 30000) {
+    if (fs.existsSync(resFile)) {
+      const result = fs.readFileSync(resFile, "utf-8");
+      try { fs.unlinkSync(reqFile); } catch {}
+      try { fs.unlinkSync(resFile); } catch {}
+      return result;
+    }
+    await new Promise(r => setTimeout(r, 50));
+  }
+  try { fs.unlinkSync(reqFile); } catch {}
+  return JSON.stringify({ error: "Tool call timed out" });
+}
+
+const server = new McpServer({ name: "claude-deck-fleet", version: "1.0.0" });
+
+const tools = [
+  ["spawn_agent", "Spawn a new Claude Code agent.", { task: z.string(), model: z.string().optional(), cwd: z.string(), branch: z.string().optional(), permissionMode: z.string().optional(), maxBudgetUsd: z.number().optional() }],
+  ["list_agents", "List all agents with status, task, model, cost.", { status_filter: z.string().optional() }],
+  ["get_agent_status", "Get detailed agent status.", { agentId: z.string() }],
+  ["send_message_to_agent", "Send instruction to a running agent.", { agentId: z.string(), message: z.string() }],
+  ["interrupt_agent", "Gracefully interrupt an agent.", { agentId: z.string() }],
+  ["kill_agent", "Force-kill an agent.", { agentId: z.string() }],
+  ["approve_command", "Approve/reject a pending permission request.", { approvalId: z.string(), approved: z.boolean(), reason: z.string().optional() }],
+  ["list_pending_approvals", "Get all pending approvals.", {}],
+  ["add_context_to_agent", "Attach context to an agent.", { agentId: z.string(), type: z.string(), resourceId: z.string(), title: z.string(), url: z.string().optional() }],
+  ["get_fleet_metrics", "Get fleet metrics.", {}],
+];
+
+for (const [name, desc, schema] of tools) {
+  server.tool(name, desc, schema, async (input) => {
+    const result = await callMain(name, input);
+    return { content: [{ type: "text", text: result }] };
+  });
+}
+
+const transport = new StdioServerTransport();
+await server.connect(transport);
+`;
+
+  fs.writeFileSync(mcpServerScriptPath, script);
+  return mcpServerScriptPath;
+}
+
 function buildSystemPrompt(): string {
   const agents = getAllAgents();
   const pending = getPendingApprovals();
@@ -76,37 +152,13 @@ function buildSystemPrompt(): string {
   return `You are the Manager AI for Claude Deck, an orchestration dashboard for Claude Code agents.
 
 ## Your Role
-You manage a fleet of Claude Code agents working on software engineering tasks for Kieran Williams (Senior Engineer at Monte Carlo Data, Vector team).
+You manage a fleet of Claude Code agents for Kieran Williams (Senior Engineer at Monte Carlo Data, Vector team).
 
 ## Capabilities
-- Spawn new agents with appropriate model, working directory, and context
-- Monitor all running agents and their progress
-- Approve or escalate tool permission requests from agents
-- Troubleshoot stuck or errored agents
-- Feed relevant context to agents proactively
-
-## Decision Guidelines
-
-**Model selection:**
-- Haiku: simple fixes, typos, small changes (fast, cheap)
-- Sonnet 4: feature implementation, refactors, code review (balanced)
-- Opus 4: complex architecture, debugging, multi-file changes (deep reasoning)
-
-**Approval delegation:**
-- Auto-approve: file reads, grep, glob, safe bash commands (ls, cat, git status, etc.)
-- Auto-approve with note: file writes, edits, safe bash (npm install, git commit, etc.)
-- ESCALATE to user: destructive operations (rm -rf, git push --force, DROP TABLE, git reset --hard, etc.)
-
-**Budget defaults:**
-- Small task: $1
-- Feature work: $5
-- Complex work: $10
-
-**When agents get stuck:**
-- Check recent messages and events for the agent
-- Identify the blocker (permission denied, error, confusion)
-- Send a helpful message to guide the agent
-- If truly stuck, kill and restart with better instructions
+You have fleet management tools (via MCP). Use them to:
+- Spawn agents, monitor progress, send messages, approve commands
+- Choose models wisely: Haiku (simple), Sonnet (features), Opus (complex)
+- Auto-approve safe operations, escalate destructive ones to the user
 
 ## Current Fleet State
 ${fleetSummary}
@@ -114,15 +166,7 @@ ${fleetSummary}
 ## Pending Approvals
 ${approvalSummary}
 
-## Instructions
-Be concise and action-oriented. Show your reasoning briefly. When you use tools, explain what you're doing and why. Ask for clarification only when genuinely ambiguous.`;
-}
-
-function getAnthropicClient(): Anthropic {
-  if (!client) {
-    client = new Anthropic();
-  }
-  return client;
+Be concise and action-oriented. Use your fleet tools — don't use Read/Write/Bash.`;
 }
 
 function getActiveConversation(): ManagerConversation {
@@ -148,10 +192,47 @@ function createConversation(title?: string): ManagerConversation {
 }
 
 /**
+ * Watch for MCP tool call requests and execute them in the main process.
+ */
+function startMcpCallHandler(): void {
+  fs.mkdirSync(CALL_DIR, { recursive: true });
+
+  mcpCallWatcher = fs.watch(CALL_DIR, async (_eventType, filename) => {
+    if (!filename?.endsWith(".request.json")) return;
+
+    const requestFile = path.join(CALL_DIR, filename);
+    const responseFile = requestFile.replace(".request.json", ".response.json");
+
+    try {
+      // Small delay to let the file write complete
+      await new Promise((r) => setTimeout(r, 10));
+      const raw = fs.readFileSync(requestFile, "utf-8");
+      const { toolName, input } = JSON.parse(raw);
+
+      // Emit tool use event to UI
+      emit({ type: "tool_use", name: toolName, input });
+
+      const result = await executeManagerTool(toolName, input);
+
+      emit({ type: "tool_result", name: toolName, result });
+
+      fs.writeFileSync(responseFile, result);
+    } catch (err) {
+      fs.writeFileSync(responseFile, JSON.stringify({ error: String(err) }));
+    }
+  });
+}
+
+function emit(event: ManagerStreamEvent): void {
+  onStreamCallback?.(event);
+}
+
+/**
  * Initialize the Manager AI. Call on app startup.
  */
 export function initManager(): void {
   loadState();
+  startMcpCallHandler();
 }
 
 /**
@@ -161,17 +242,12 @@ export function setManagerStreamCallback(cb: (event: ManagerStreamEvent) => void
   onStreamCallback = cb;
 }
 
-function emit(event: ManagerStreamEvent): void {
-  onStreamCallback?.(event);
-}
-
 /**
- * Send a message to the Manager AI and get a streamed response.
+ * Send a message to the Manager AI using the Agent SDK (inherits Claude Code SSO auth).
  */
 export async function sendManagerMessage(userMessage: string): Promise<ManagerMessage> {
   const conversation = getActiveConversation();
 
-  // Add user message
   const userMsg: ManagerMessage = {
     id: crypto.randomUUID(),
     role: "user",
@@ -181,83 +257,67 @@ export async function sendManagerMessage(userMessage: string): Promise<ManagerMe
   conversation.messages.push(userMsg);
   conversation.updatedAt = new Date().toISOString();
 
-  // Update title from first message
   if (conversation.messages.filter((m) => m.role === "user").length === 1) {
     conversation.title = userMessage.slice(0, 60);
   }
 
   emit({ type: "message_start", conversationId: conversation.id });
 
-  // Build API messages from conversation history
-  const apiMessages: Anthropic.MessageParam[] = conversation.messages.map((m) => ({
-    role: m.role,
-    content: m.content,
-  }));
+  // Build prompt with conversation history
+  const historyContext = conversation.messages.slice(0, -1).map((m) =>
+    `${m.role === "user" ? "User" : "Manager"}: ${m.content}`
+  ).join("\n\n");
+
+  const fullPrompt = historyContext
+    ? `Previous conversation:\n${historyContext}\n\nUser: ${userMessage}`
+    : userMessage;
+
+  const mcpServerScript = ensureMcpServerScript();
 
   try {
-    const anthropic = getAnthropicClient();
     let assistantContent = "";
     const toolCalls: ManagerMessage["toolCalls"] = [];
 
-    // Agentic loop — keep going while there are tool calls
-    let currentMessages = [...apiMessages];
-
-    while (true) {
-      const response = await anthropic.messages.create({
+    const q = sdkQuery({
+      prompt: fullPrompt,
+      options: {
         model: MODEL,
-        max_tokens: MAX_TOKENS,
-        system: buildSystemPrompt(),
-        tools: MANAGER_TOOL_SCHEMAS as Anthropic.Tool[],
-        messages: currentMessages,
-      });
+        systemPrompt: buildSystemPrompt(),
+        permissionMode: "bypassPermissions",
+        allowDangerouslySkipPermissions: true,
+        maxTurns: 20,
+        maxBudgetUsd: 2,
+        disallowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Agent", "NotebookEdit"],
+        mcpServers: {
+          "claude-deck-fleet": {
+            type: "stdio",
+            command: "node",
+            args: [mcpServerScript],
+          },
+        },
+      },
+    });
 
-      // Process response content
-      let hasToolUse = false;
-      const toolResults: Anthropic.MessageParam[] = [];
-
-      for (const block of response.content) {
-        if (block.type === "text") {
-          assistantContent += block.text;
-          emit({ type: "text_delta", text: block.text });
-        } else if (block.type === "tool_use") {
-          hasToolUse = true;
-          const toolInput = block.input as Record<string, unknown>;
-          emit({ type: "tool_use", name: block.name, input: toolInput });
-
-          // Execute the tool
-          const result = await executeManagerTool(block.name, toolInput);
-          toolCalls.push({ name: block.name, input: toolInput, result });
-          emit({ type: "tool_result", name: block.name, result });
-
-          // Build tool result for next iteration
-          toolResults.push({
-            role: "user" as const,
-            content: [{
-              type: "tool_result" as const,
-              tool_use_id: block.id,
-              content: result,
-            }],
-          });
+    for await (const message of q) {
+      if (message.type === "assistant") {
+        const content = extractTextContent(message.message);
+        if (content) {
+          assistantContent += content;
+          emit({ type: "text_delta", text: content });
+        }
+      } else if (message.type === "result") {
+        const result = message as { subtype?: string; result?: string };
+        if (result.result && !assistantContent) {
+          assistantContent = String(result.result);
+          emit({ type: "text_delta", text: assistantContent });
         }
       }
-
-      if (!hasToolUse || response.stop_reason === "end_turn") {
-        break;
-      }
-
-      // Continue with tool results
-      currentMessages = [
-        ...currentMessages,
-        { role: "assistant" as const, content: response.content },
-        ...toolResults,
-      ];
     }
 
-    // Save assistant message
     const assistantMsg: ManagerMessage = {
       id: crypto.randomUUID(),
       role: "assistant",
-      content: assistantContent,
+      content: assistantContent || "(No response)",
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
       timestamp: new Date().toISOString(),
     };
@@ -276,16 +336,23 @@ export async function sendManagerMessage(userMessage: string): Promise<ManagerMe
   }
 }
 
-/**
- * Get all conversations.
- */
+function extractTextContent(message: unknown): string {
+  if (!message) return "";
+  const msg = message as { content?: unknown };
+  if (typeof msg.content === "string") return msg.content;
+  if (Array.isArray(msg.content)) {
+    return (msg.content as Array<{ type: string; text?: string }>)
+      .filter((b) => b.type === "text" && b.text)
+      .map((b) => b.text!)
+      .join("\n");
+  }
+  return "";
+}
+
 export function getManagerConversations(): ManagerConversation[] {
   return state.conversations;
 }
 
-/**
- * Switch to a different conversation.
- */
 export function switchManagerConversation(conversationId: string): void {
   const conv = state.conversations.find((c) => c.id === conversationId);
   if (conv) {
@@ -294,16 +361,10 @@ export function switchManagerConversation(conversationId: string): void {
   }
 }
 
-/**
- * Start a new conversation.
- */
 export function newManagerConversation(): ManagerConversation {
   return createConversation();
 }
 
-/**
- * Delete a conversation.
- */
 export function deleteManagerConversation(conversationId: string): void {
   state.conversations = state.conversations.filter((c) => c.id !== conversationId);
   if (state.activeConversationId === conversationId) {
@@ -312,12 +373,16 @@ export function deleteManagerConversation(conversationId: string): void {
   saveState();
 }
 
-/**
- * Get the active conversation's messages.
- */
 export function getActiveManagerMessages(): ManagerMessage[] {
   const conv = state.activeConversationId
     ? state.conversations.find((c) => c.id === state.activeConversationId)
     : null;
   return conv?.messages ?? [];
+}
+
+export function stopManager(): void {
+  if (mcpCallWatcher) {
+    mcpCallWatcher.close();
+    mcpCallWatcher = null;
+  }
 }
