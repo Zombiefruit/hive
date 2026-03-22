@@ -6,6 +6,7 @@ import {
   getPendingApprovals,
   getAllContextRefs,
   addContextRef,
+  addMessage,
 } from "../db/database";
 import {
   spawnAgent,
@@ -202,6 +203,8 @@ export async function executeManagerTool(
     }
 
     case "send_message_to_agent": {
+      // Record in DB with manager origin so UI can distinguish
+      addMessage(String(input.agentId), "user", String(input.message), { origin: "manager" });
       sendMessage(String(input.agentId), String(input.message));
       return JSON.stringify({ success: true });
     }

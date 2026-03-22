@@ -30,6 +30,7 @@ export interface Message {
   id: string;
   agentId: string;
   role: "user" | "assistant" | "system" | "tool_use" | "tool_result";
+  origin: "user" | "manager" | "system";
   content: string;
   toolCallsJson: string | null;
   costUsd: number | null;

@@ -56,6 +56,7 @@ function createTables(): void {
       toolCallsJson TEXT,
       costUsd REAL,
       tokenUsageJson TEXT,
+      origin TEXT NOT NULL DEFAULT 'user',
       timestamp TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (agentId) REFERENCES agents(id) ON DELETE CASCADE
     );
@@ -212,13 +213,14 @@ export function addMessage(
   agentId: string,
   role: Message["role"],
   content: string,
-  opts?: { toolCallsJson?: string; costUsd?: number; tokenUsageJson?: string }
+  opts?: { toolCallsJson?: string; costUsd?: number; tokenUsageJson?: string; origin?: Message["origin"] }
 ): Message {
   const id = randomUUID();
   const now = new Date().toISOString();
+  const origin = opts?.origin ?? "user";
   db.prepare(
-    `INSERT INTO messages (id, agentId, role, content, toolCallsJson, costUsd, tokenUsageJson, timestamp)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO messages (id, agentId, role, content, toolCallsJson, costUsd, tokenUsageJson, origin, timestamp)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     agentId,
@@ -227,9 +229,10 @@ export function addMessage(
     opts?.toolCallsJson ?? null,
     opts?.costUsd ?? null,
     opts?.tokenUsageJson ?? null,
+    origin,
     now
   );
-  return { id, agentId, role, content, toolCallsJson: opts?.toolCallsJson ?? null, costUsd: opts?.costUsd ?? null, tokenUsageJson: opts?.tokenUsageJson ?? null, timestamp: now };
+  return { id, agentId, role, content, origin, toolCallsJson: opts?.toolCallsJson ?? null, costUsd: opts?.costUsd ?? null, tokenUsageJson: opts?.tokenUsageJson ?? null, timestamp: now };
 }
 
 export function getMessages(agentId: string): Message[] {

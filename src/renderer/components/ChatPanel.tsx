@@ -20,6 +20,7 @@ interface ChatPanelProps {
 
 function ChatMessage({ message }: { message: Message }) {
   const isUser = message.role === "user";
+  const isManager = message.origin === "manager";
   const isToolUse = message.role === "tool_use";
   const isToolResult = message.role === "tool_result";
   const isSystem = message.role === "system";
@@ -59,18 +60,27 @@ function ChatMessage({ message }: { message: Message }) {
     );
   }
 
+  const bgColor = isManager
+    ? "color-mix(in srgb, var(--mantine-color-violet-5) 15%, transparent)"
+    : isUser
+      ? "color-mix(in srgb, var(--mantine-color-blue-5) 15%, transparent)"
+      : "var(--mantine-color-dark-7)";
+
   return (
     <Paper
       p="sm"
       radius="sm"
       style={{
-        backgroundColor: isUser
-          ? "var(--mantine-color-blue-light)"
-          : "var(--mantine-color-dark-7)",
+        backgroundColor: bgColor,
         alignSelf: isUser ? "flex-end" : "flex-start",
         maxWidth: "85%",
       }}
     >
+      {isManager && (
+        <Text size="xs" c="violet" fw={600} mb={2} style={{ fontSize: "0.65rem", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+          Manager
+        </Text>
+      )}
       <ClaudeContent content={message.content} role={isUser ? "user" : "assistant"} />
       <Text size="xs" c="dimmed" mt={2}>
         {new Date(message.timestamp).toLocaleTimeString()}
