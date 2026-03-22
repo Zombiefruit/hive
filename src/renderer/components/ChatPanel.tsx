@@ -1,0 +1,178 @@
+import {
+  ActionIcon,
+  Code,
+  Group,
+  Paper,
+  ScrollArea,
+  Stack,
+  Text,
+  Textarea,
+} from "@mantine/core";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useAgentStore, selectMessages } from "../stores/agent-store";
+import type { Message } from "../../shared/types";
+
+interface ChatPanelProps {
+  agentId: string;
+  agentStatus: string;
+}
+
+function ChatMessage({ message }: { message: Message }) {
+  const isUser = message.role === "user";
+  const isToolUse = message.role === "tool_use";
+  const isToolResult = message.role === "tool_result";
+  const isSystem = message.role === "system";
+
+  if (isToolUse) {
+    let toolInfo: { name?: string; input?: unknown } = {};
+    try {
+      toolInfo = JSON.parse(message.toolCallsJson ?? "{}");
+    } catch { /* ignore */ }
+
+    return (
+      <Paper
+        p="xs"
+        radius="sm"
+        style={{
+          backgroundColor: "var(--mantine-color-dark-7)",
+          borderLeft: "3px solid var(--mantine-color-violet-5)",
+        }}
+      >
+        <Text size="xs" c="violet" fw={600} mb={2}>
+          Tool: {message.content}
+        </Text>
+        {toolInfo.input && (
+          <Code block style={{ fontSize: "0.7rem", maxHeight: 120, overflow: "auto" }}>
+            {JSON.stringify(toolInfo.input, null, 2)}
+          </Code>
+        )}
+      </Paper>
+    );
+  }
+
+  if (isSystem || isToolResult) {
+    return (
+      <Text size="xs" c="dimmed" ta="center" py={2}>
+        {message.content.slice(0, 200)}
+      </Text>
+    );
+  }
+
+  return (
+    <Paper
+      p="sm"
+      radius="sm"
+      style={{
+        backgroundColor: isUser
+          ? "var(--mantine-color-blue-light)"
+          : "var(--mantine-color-dark-7)",
+        alignSelf: isUser ? "flex-end" : "flex-start",
+        maxWidth: "85%",
+      }}
+    >
+      <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
+        {message.content}
+      </Text>
+      <Text size="xs" c="dimmed" mt={2}>
+        {new Date(message.timestamp).toLocaleTimeString()}
+      </Text>
+    </Paper>
+  );
+}
+
+export function ChatPanel({ agentId, agentStatus }: ChatPanelProps) {
+  const messages = useAgentStore(selectMessages(agentId));
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    if (scrollRef.current) {
+      const viewport = scrollRef.current.querySelector("[data-viewport]");
+      if (viewport) {
+        viewport.scrollTop = viewport.scrollHeight;
+      }
+    }
+  }, [messages.length]);
+
+  const handleSend = useCallback(async () => {
+    if (!input.trim() || sending) return;
+    setSending(true);
+    try {
+      await window.deck.sendMessage(agentId, input.trim());
+      setInput("");
+    } finally {
+      setSending(false);
+    }
+  }, [agentId, input, sending]);
+
+  const handleInterrupt = useCallback(async () => {
+    await window.deck.interruptAgent(agentId);
+  }, [agentId]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const isActive = agentStatus === "active";
+
+  return (
+    <Stack gap={0} h="100%">
+      <ScrollArea ref={scrollRef} style={{ flex: 1 }} offsetScrollbars>
+        <Stack gap="sm" p="md" style={{ display: "flex", flexDirection: "column" }}>
+          {messages.length === 0 ? (
+            <Text c="dimmed" ta="center" py="xl">
+              Conversation will appear here...
+            </Text>
+          ) : (
+            messages.map((msg) => (
+              <ChatMessage key={msg.id} message={msg} />
+            ))
+          )}
+        </Stack>
+      </ScrollArea>
+
+      <Paper p="sm" style={{ borderTop: "1px solid var(--mantine-color-default-border)" }}>
+        <Group gap="xs" align="flex-end">
+          <Textarea
+            placeholder={isActive ? "Send a message..." : "Agent is not active"}
+            value={input}
+            onChange={(e) => setInput(e.currentTarget.value)}
+            onKeyDown={handleKeyDown}
+            disabled={!isActive}
+            autosize
+            minRows={1}
+            maxRows={4}
+            style={{ flex: 1 }}
+          />
+          <ActionIcon
+            variant="filled"
+            color="blue"
+            size="lg"
+            onClick={handleSend}
+            disabled={!input.trim() || !isActive}
+            loading={sending}
+            aria-label="Send"
+          >
+            <Text size="sm" fw={700}>&uarr;</Text>
+          </ActionIcon>
+          {isActive && (
+            <ActionIcon
+              variant="light"
+              color="red"
+              size="lg"
+              onClick={handleInterrupt}
+              aria-label="Interrupt"
+            >
+              <Text size="sm" fw={700}>&times;</Text>
+            </ActionIcon>
+          )}
+        </Group>
+      </Paper>
+    </Stack>
+  );
+}
