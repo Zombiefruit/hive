@@ -1,78 +1,90 @@
 import {
+  ActionIcon,
   AppShell,
   Badge,
-  Card,
+  Divider,
   Group,
-  SimpleGrid,
+  ScrollArea,
   Stack,
   Text,
   Title,
-  useMantineTheme,
 } from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
+import { MetricsBar } from "../components/MetricsBar";
+import { AgentGrid } from "../components/AgentGrid";
+import { ActivityFeed } from "../components/ActivityFeed";
+import { ApprovalSidebar } from "../components/ApprovalSidebar";
+import { NewAgentModal } from "../components/NewAgentModal";
+import { useAgentStore, selectPendingApprovals } from "../stores/agent-store";
 
 export function Dashboard() {
-  const theme = useMantineTheme();
+  const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
+  const pendingCount = useAgentStore(selectPendingApprovals()).length;
 
   return (
-    <AppShell header={{ height: 52 }} padding="md">
-      <AppShell.Header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          paddingInline: theme.spacing.md,
-          gap: theme.spacing.sm,
-          // Allow window drag on macOS
-          WebkitAppRegion: "drag" as unknown as string,
-        }}
+    <>
+      <AppShell
+        header={{ height: 52 }}
+        aside={{ width: 320, breakpoint: "md" }}
+        padding="md"
       >
-        <Title order={3} style={{ WebkitAppRegion: "no-drag" as unknown as string }}>
-          Claude Deck
-        </Title>
-        <Badge variant="light" color="blue" size="sm">
-          v0.1.0
-        </Badge>
-      </AppShell.Header>
+        <AppShell.Header
+          style={{
+            display: "flex",
+            alignItems: "center",
+            paddingInline: "var(--mantine-spacing-md)",
+            gap: "var(--mantine-spacing-sm)",
+            WebkitAppRegion: "drag",
+          }}
+        >
+          <Title order={3} style={{ WebkitAppRegion: "no-drag" }}>
+            Claude Deck
+          </Title>
+          <Badge variant="light" color="blue" size="sm">
+            v0.1.0
+          </Badge>
+          <div style={{ flex: 1 }} />
+          <ActionIcon
+            variant="filled"
+            color="blue"
+            size="lg"
+            onClick={openModal}
+            style={{ WebkitAppRegion: "no-drag" }}
+            aria-label="New Agent"
+          >
+            <Text size="lg" fw={700}>+</Text>
+          </ActionIcon>
+        </AppShell.Header>
 
-      <AppShell.Main>
-        <Stack gap="md">
-          {/* Metrics bar */}
-          <SimpleGrid cols={5}>
-            {[
-              { label: "Active", value: 0, color: "blue" },
-              { label: "Idle", value: 0, color: "gray" },
-              { label: "Errored", value: 0, color: "red" },
-              { label: "Completed", value: 0, color: "ok" },
-              { label: "Tokens", value: "0", color: "violet" },
-            ].map((metric) => (
-              <Card key={metric.label} padding="sm" radius="sm" withBorder>
-                <Text size="xs" c="dimmed" tt="uppercase" fw={600}>
-                  {metric.label}
+        <AppShell.Main>
+          <Stack gap="md">
+            <MetricsBar />
+            <AgentGrid />
+            <Divider label="Activity" labelPosition="left" />
+            <ActivityFeed />
+          </Stack>
+        </AppShell.Main>
+
+        <AppShell.Aside p="md">
+          <ScrollArea h="100%">
+            <Stack gap="md">
+              <Group justify="space-between">
+                <Text size="sm" fw={600}>
+                  Approvals
                 </Text>
-                <Group gap="xs" mt={4}>
-                  <Text size="xl" fw={700}>
-                    {metric.value}
-                  </Text>
-                  <Badge variant="light" color={metric.color} size="xs">
-                    {metric.label}
+                {pendingCount > 0 && (
+                  <Badge variant="filled" color="red" size="sm">
+                    {pendingCount}
                   </Badge>
-                </Group>
-              </Card>
-            ))}
-          </SimpleGrid>
-
-          {/* Agent grid placeholder */}
-          <Card padding="xl" radius="sm" withBorder>
-            <Stack align="center" gap="sm" py="xl">
-              <Text size="lg" fw={500} c="dimmed">
-                No agents running
-              </Text>
-              <Text size="sm" c="dimmed">
-                Click + New Agent to spawn your first Claude Code agent
-              </Text>
+                )}
+              </Group>
+              <ApprovalSidebar />
             </Stack>
-          </Card>
-        </Stack>
-      </AppShell.Main>
-    </AppShell>
+          </ScrollArea>
+        </AppShell.Aside>
+      </AppShell>
+
+      <NewAgentModal opened={modalOpened} onClose={closeModal} />
+    </>
   );
 }
