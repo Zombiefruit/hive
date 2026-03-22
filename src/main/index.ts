@@ -5,7 +5,9 @@ import { registerIpcHandlers, startStoreSync, stopStoreSync } from "./ipc/bridge
 import { spawnAgent, sendMessage, interruptAgent, killAgent } from "./agents/agent-manager";
 import { handleApprovalResponse } from "./agents/approval-handler";
 import { watchSessions } from "./agents/session-discovery";
+import { addContextFromUrl } from "./agents/context-tracker";
 import type { StoreState, FleetMetrics, SpawnAgentConfig } from "../shared/types";
+import { ipcMain } from "electron";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require("electron-squirrel-startup")) {
@@ -93,6 +95,11 @@ app.whenReady().then(() => {
     onApprovalResponse: async (data) => {
       handleApprovalResponse(data.approvalId, data.approved);
     },
+  });
+
+  // Register context URL handler
+  ipcMain.handle("context:add-url", (_event, data: { agentId: string; url: string }) => {
+    return addContextFromUrl(data.agentId, data.url);
   });
 
   // Watch for external Claude sessions

@@ -8,6 +8,7 @@ import {
 } from "../db/database";
 import { broadcastAgentStream, broadcastStoreUpdate } from "../ipc/bridge";
 import { createCanUseTool } from "./approval-handler";
+import { trackContextFromMessage } from "./context-tracker";
 
 interface ActiveAgent {
   id: string;
@@ -122,6 +123,9 @@ async function processAgentStream(
     for await (const message of q) {
       // Forward raw message to renderer for real-time display
       broadcastAgentStream(agentId, message);
+
+      // Track context references from MCP tool calls
+      trackContextFromMessage(agentId, message as { type: string; message?: { content?: unknown } });
 
       switch (message.type) {
         case "assistant": {

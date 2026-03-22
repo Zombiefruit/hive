@@ -33,6 +33,10 @@ const api = {
     return () => ipcRenderer.removeListener("agent:stream", listener);
   },
 
+  // Context management
+  addContextUrl: (agentId: string, url: string) =>
+    ipcRenderer.invoke("context:add-url", { agentId, url }),
+
   // Approval requests from agents
   onApprovalRequest: (callback: (approval: unknown) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, approval: unknown) =>
