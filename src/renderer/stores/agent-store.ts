@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 import type {
   Agent,
   AgentEvent,
@@ -10,16 +11,9 @@ import type {
 } from "../../shared/types";
 
 interface AgentStore extends StoreState {
-  /** Replace the full store state (called on IPC sync from main). */
   syncFromMain: (state: StoreState) => void;
-
-  /** Append a streaming message for an agent. */
   appendMessage: (agentId: string, message: Message) => void;
-
-  /** Add or update a pending approval. */
   setApproval: (approval: Approval) => void;
-
-  /** Remove a resolved approval. */
   removeApproval: (approvalId: string) => void;
 }
 
@@ -31,6 +25,8 @@ const emptyMetrics: FleetMetrics = {
   totalTokens: 0,
   totalCostUsd: 0,
 };
+
+const EMPTY_ARRAY: never[] = [];
 
 export const useAgentStore = create<AgentStore>((set) => ({
   agents: [],
@@ -75,17 +71,19 @@ export const useAgentStore = create<AgentStore>((set) => ({
     })),
 }));
 
-/** Hook: get pending approvals. */
+/** Hook: get pending approvals (shallow compared to prevent infinite loops). */
 export function usePendingApprovals() {
-  return useAgentStore((state) => state.approvals.filter((a) => a.status === "pending"));
+  return useAgentStore(
+    useShallow((state) => state.approvals.filter((a) => a.status === "pending"))
+  );
 }
 
 /** Hook: get messages for an agent. */
 export function useAgentMessages(agentId: string) {
-  return useAgentStore((state) => state.messages[agentId] ?? []);
+  return useAgentStore((state) => state.messages[agentId] ?? EMPTY_ARRAY) as Message[];
 }
 
 /** Hook: get context refs for an agent. */
 export function useAgentContextRefs(agentId: string) {
-  return useAgentStore((state) => state.contextRefs[agentId] ?? []);
+  return useAgentStore((state) => state.contextRefs[agentId] ?? EMPTY_ARRAY) as ContextRef[];
 }

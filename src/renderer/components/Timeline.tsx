@@ -1,5 +1,6 @@
 import { Badge, Group, ScrollArea, Stack, Text } from "@mantine/core";
 import { useAgentStore } from "../stores/agent-store";
+import { useShallow } from "zustand/react/shallow";
 
 const eventIcons: Record<string, string> = {
   task_start: "play",
@@ -28,8 +29,8 @@ interface TimelineProps {
 }
 
 export function Timeline({ agentId }: TimelineProps) {
-  const events = useAgentStore((s) =>
-    s.events.filter((e) => e.agentId === agentId)
+  const events = useAgentStore(
+    useShallow((s) => s.events.filter((e) => e.agentId === agentId))
   );
 
   if (events.length === 0) {
