@@ -1,5 +1,5 @@
 import { ActionIcon, CloseButton, Group, Text, Tooltip, Transition } from "@mantine/core";
-import { IconMessageChatbot, IconRefresh, IconLayoutSidebarRightExpand } from "@tabler/icons-react";
+import { IconMessageChatbot, IconRefresh, IconMinus } from "@tabler/icons-react";
 import { useCallback, useEffect } from "react";
 import { useManagerStore } from "../../stores/manager-store";
 import { ConversationSidebar } from "./ConversationSidebar";
@@ -8,14 +8,12 @@ import { ManagerMessages } from "./ManagerMessages";
 import { ManagerInput } from "./ManagerInput";
 import type { ManagerMessage } from "../../stores/manager-store";
 
-const PANEL_WIDTH = 560;
-const PANEL_HEIGHT = 800;
+const PANEL_WIDTH = 520;
+const PANEL_HEIGHT = 700;
 
 export function FloatingPanel() {
   const isOpen = useManagerStore((s) => s.isOpen);
-  const isPinned = useManagerStore((s) => s.isPinned);
   const setOpen = useManagerStore((s) => s.setOpen);
-  const togglePinned = useManagerStore((s) => s.togglePinned);
   const setStreaming = useManagerStore((s) => s.setStreaming);
   const appendStreamingText = useManagerStore((s) => s.appendStreamingText);
   const clearStreamingText = useManagerStore((s) => s.clearStreamingText);
@@ -37,7 +35,7 @@ export function FloatingPanel() {
   // Subscribe to Manager stream events
   useEffect(() => {
     const unsub = window.deck.onManagerStream((event: unknown) => {
-      const evt = event as { type: string; text?: string; message?: ManagerMessage; error?: string; name?: string };
+      const evt = event as { type: string; text?: string; message?: ManagerMessage; error?: string };
       switch (evt.type) {
         case "message_start":
           setStreaming(true);
@@ -50,7 +48,6 @@ export function FloatingPanel() {
           setStreaming(false);
           clearStreamingText();
           if (evt.message) addMessage(evt.message);
-          // Refresh conversations list
           window.deck.getManagerConversations().then((convos) => {
             if (convos) setConversations(convos);
           });
@@ -66,7 +63,6 @@ export function FloatingPanel() {
 
   const handleSend = useCallback(
     async (message: string) => {
-      // Build context preamble if context items exist
       let fullMessage = message;
       if (contextItems.length > 0) {
         const contextStr = contextItems
@@ -75,7 +71,6 @@ export function FloatingPanel() {
         fullMessage = `[Context: ${contextStr}]\n\n${message}`;
       }
 
-      // Add user message to local store immediately
       addMessage({
         id: crypto.randomUUID(),
         role: "user",
@@ -102,11 +97,6 @@ export function FloatingPanel() {
 
   const handleClose = () => setOpen(false);
 
-  const handlePin = () => {
-    togglePinned();
-    setOpen(false);
-  };
-
   const handleNewConversation = async () => {
     const conv = await window.deck.newManagerConversation();
     if (conv) {
@@ -117,9 +107,6 @@ export function FloatingPanel() {
     }
   };
 
-  // Don't render floating panel when pinned (it renders in AppShell.Aside instead)
-  if (isPinned) return null;
-
   return (
     <Transition mounted={isOpen} transition="slide-up" duration={250}>
       {(styles) => (
@@ -129,13 +116,13 @@ export function FloatingPanel() {
             position: "fixed",
             bottom: 24,
             right: 24,
-            width: PANEL_WIDTH + 40, // + collapsed sidebar
+            width: PANEL_WIDTH + 40,
             height: PANEL_HEIGHT,
             maxHeight: "calc(100vh - 80px)",
             zIndex: 299,
             borderRadius: 12,
             overflow: "hidden",
-            boxShadow: "0 20px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px var(--mantine-color-default-border)",
+            boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--mantine-color-default-border)",
             backgroundColor: "var(--mantine-color-dark-8)",
             display: "flex",
             flexDirection: "row",
@@ -156,7 +143,7 @@ export function FloatingPanel() {
             {/* Header */}
             <div
               style={{
-                padding: "8px 12px",
+                padding: "10px 12px",
                 borderBottom: "1px solid var(--mantine-color-default-border)",
                 display: "flex",
                 alignItems: "center",
@@ -169,23 +156,13 @@ export function FloatingPanel() {
               </Text>
               <Group gap={4}>
                 <Tooltip label="New conversation">
-                  <ActionIcon
-                    variant="subtle"
-                    size="sm"
-                    onClick={handleNewConversation}
-                    aria-label="New conversation"
-                  >
+                  <ActionIcon variant="subtle" size="sm" onClick={handleNewConversation} aria-label="New conversation">
                     <IconRefresh size={14} stroke={1.5} />
                   </ActionIcon>
                 </Tooltip>
-                <Tooltip label="Pin to side">
-                  <ActionIcon
-                    variant="subtle"
-                    size="sm"
-                    onClick={handlePin}
-                    aria-label="Pin"
-                  >
-                    <IconLayoutSidebarRightExpand size={14} stroke={1.5} />
+                <Tooltip label="Minimize">
+                  <ActionIcon variant="subtle" size="sm" onClick={handleClose} aria-label="Minimize">
+                    <IconMinus size={14} stroke={1.5} />
                   </ActionIcon>
                 </Tooltip>
                 <CloseButton size="sm" onClick={handleClose} />

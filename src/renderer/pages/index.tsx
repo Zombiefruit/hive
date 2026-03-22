@@ -16,12 +16,9 @@ import { AgentGrid } from "../components/AgentGrid";
 import { ActivityFeed } from "../components/ActivityFeed";
 import { ApprovalSidebar } from "../components/ApprovalSidebar";
 import { NewAgentModal } from "../components/NewAgentModal";
-import { PinnedPanel } from "../components/ManagerChat";
 import { usePendingApprovals } from "../stores/agent-store";
-import { useManagerStore } from "../stores/manager-store";
 
 export function Dashboard() {
-  const isPinned = useManagerStore((s) => s.isPinned);
   const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
   const pendingCount = usePendingApprovals().length;
 
@@ -29,7 +26,7 @@ export function Dashboard() {
     <>
       <AppShell
         header={{ height: 52 }}
-        aside={{ width: isPinned ? 560 : 280, breakpoint: "lg", collapsed: { desktop: false, mobile: true } }}
+        aside={{ width: 280, breakpoint: "lg", collapsed: { desktop: false, mobile: true } }}
         padding="md"
       >
         <AppShell.Header
@@ -71,29 +68,23 @@ export function Dashboard() {
           </Stack>
         </AppShell.Main>
 
-        <AppShell.Aside p={isPinned ? 0 : "md"}>
-          {isPinned ? (
-            <PinnedPanel />
-          ) : (
-            <ScrollArea h="100%">
-              <Stack gap="md">
-                <Group justify="space-between">
-                  <Group gap="xs">
-                    <IconShieldCheck size={16} stroke={1.5} />
-                    <Text size="sm" fw={600}>
-                      Approvals
-                    </Text>
-                  </Group>
-                  {pendingCount > 0 && (
-                    <Badge variant="filled" color="red" size="sm">
-                      {pendingCount}
-                    </Badge>
-                  )}
+        <AppShell.Aside p="md">
+          <ScrollArea h="100%">
+            <Stack gap="md">
+              <Group justify="space-between">
+                <Group gap="xs">
+                  <IconShieldCheck size={16} stroke={1.5} />
+                  <Text size="sm" fw={600}>Approvals</Text>
                 </Group>
-                <ApprovalSidebar />
-              </Stack>
-            </ScrollArea>
-          )}
+                {pendingCount > 0 && (
+                  <Badge variant="filled" color="red" size="sm">
+                    {pendingCount}
+                  </Badge>
+                )}
+              </Group>
+              <ApprovalSidebar />
+            </Stack>
+          </ScrollArea>
         </AppShell.Aside>
       </AppShell>
 
