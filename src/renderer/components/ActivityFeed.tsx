@@ -1,14 +1,16 @@
-import { Badge, Group, Paper, ScrollArea, Stack, Text } from "@mantine/core";
+import { Group, Paper, ScrollArea, Stack, Text, ThemeIcon } from "@mantine/core";
+import { IconPlayerPlay, IconCheck, IconAlertTriangle, IconTool, IconPlayerPause, IconX, IconLink, IconShield } from "@tabler/icons-react";
 import { useAgentStore } from "../stores/agent-store";
 
-const eventColors: Record<string, string> = {
-  task_start: "blue",
-  completed: "green",
-  error: "red",
-  tool_use: "violet",
-  interrupted: "orange",
-  killed: "red",
-  context_detected: "cyan",
+const eventConfig: Record<string, { color: string; icon: typeof IconPlayerPlay }> = {
+  task_start: { color: "blue", icon: IconPlayerPlay },
+  completed: { color: "green", icon: IconCheck },
+  error: { color: "red", icon: IconAlertTriangle },
+  tool_use: { color: "violet", icon: IconTool },
+  interrupted: { color: "orange", icon: IconPlayerPause },
+  killed: { color: "red", icon: IconX },
+  context_detected: { color: "cyan", icon: IconLink },
+  approval: { color: "yellow", icon: IconShield },
 };
 
 export function ActivityFeed() {
@@ -28,28 +30,33 @@ export function ActivityFeed() {
   return (
     <ScrollArea h={300}>
       <Stack gap="xs">
-        {events.slice(0, 50).map((event) => (
-          <Paper key={event.id} p="xs" radius="sm" withBorder>
-            <Group justify="space-between" wrap="nowrap">
-              <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
-                <Badge
-                  variant="light"
-                  color={eventColors[event.type] ?? "gray"}
-                  size="xs"
-                  style={{ flexShrink: 0 }}
-                >
-                  {event.type}
-                </Badge>
-                <Text size="xs" truncate style={{ minWidth: 0 }}>
-                  {agentNameMap.get(event.agentId) ?? "Unknown"}: {event.summary}
+        {events.slice(0, 50).map((event) => {
+          const config = eventConfig[event.type] ?? { color: "gray", icon: IconTool };
+          return (
+            <Paper key={event.id} p="xs" radius="sm" withBorder>
+              <Group justify="space-between" wrap="nowrap">
+                <Group gap="xs" wrap="nowrap" style={{ minWidth: 0 }}>
+                  <ThemeIcon
+                    variant="light"
+                    color={config.color}
+                    size="xs"
+                    radius="xl"
+                    style={{ flexShrink: 0 }}
+                  >
+                    <config.icon size={10} stroke={1.5} />
+                  </ThemeIcon>
+                  <Text size="xs" truncate style={{ minWidth: 0 }}>
+                    <Text span fw={600}>{agentNameMap.get(event.agentId) ?? "Unknown"}</Text>
+                    {": "}{event.summary}
+                  </Text>
+                </Group>
+                <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
+                  {new Date(event.timestamp).toLocaleTimeString()}
                 </Text>
               </Group>
-              <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
-                {new Date(event.timestamp).toLocaleTimeString()}
-              </Text>
-            </Group>
-          </Paper>
-        ))}
+            </Paper>
+          );
+        })}
       </Stack>
     </ScrollArea>
   );

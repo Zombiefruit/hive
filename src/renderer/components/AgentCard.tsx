@@ -1,4 +1,5 @@
-import { Badge, Card, Group, Stack, Text } from "@mantine/core";
+import { Badge, Card, Group, Stack, Text, ThemeIcon } from "@mantine/core";
+import { IconRobot, IconExternalLink, IconGitBranch } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import type { Agent } from "../../shared/types";
 
@@ -10,8 +11,8 @@ const statusColors: Record<string, string> = {
 };
 
 const modelLabels: Record<string, string> = {
-  "claude-opus-4-6": "Opus 4",
-  "claude-sonnet-4-6": "Sonnet 4",
+  "claude-opus-4-6": "Opus",
+  "claude-sonnet-4-6": "Sonnet",
   "claude-haiku-4-5-20251001": "Haiku",
 };
 
@@ -27,18 +28,34 @@ export function AgentCard({ agent }: AgentCardProps) {
       padding="md"
       radius="sm"
       withBorder
-      style={{ cursor: "pointer" }}
+      style={{ cursor: "pointer", transition: "border-color 0.15s ease" }}
       onClick={() => navigate(`/agent/${agent.id}`)}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = "var(--mantine-color-blue-5)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = "";
+      }}
     >
       <Stack gap="xs">
         <Group justify="space-between">
-          <Badge
-            variant="light"
-            color={statusColors[agent.status] ?? "gray"}
-            size="sm"
-          >
-            {agent.status}
-          </Badge>
+          <Group gap="xs">
+            <ThemeIcon
+              variant="light"
+              color={statusColors[agent.status] ?? "gray"}
+              size="sm"
+              radius="xl"
+            >
+              <IconRobot size={12} stroke={1.5} />
+            </ThemeIcon>
+            <Badge
+              variant="light"
+              color={statusColors[agent.status] ?? "gray"}
+              size="xs"
+            >
+              {agent.status}
+            </Badge>
+          </Group>
           <Badge variant="outline" color="gray" size="xs">
             {modelLabels[agent.model] ?? agent.model}
           </Badge>
@@ -50,25 +67,37 @@ export function AgentCard({ agent }: AgentCardProps) {
 
         <Group gap="xs">
           {agent.branch && (
-            <Badge variant="light" color="violet" size="xs">
+            <Badge
+              variant="light"
+              color="violet"
+              size="xs"
+              leftSection={<IconGitBranch size={10} stroke={1.5} />}
+            >
               {agent.branch}
             </Badge>
           )}
           {agent.source === "external" && (
-            <Badge variant="outline" color="gray" size="xs">
+            <Badge
+              variant="outline"
+              color="gray"
+              size="xs"
+              leftSection={<IconExternalLink size={10} stroke={1.5} />}
+            >
               External
             </Badge>
           )}
+        </Group>
+
+        <Group justify="space-between">
+          <Text size="xs" c="dimmed" lineClamp={1} style={{ flex: 1, minWidth: 0 }}>
+            {agent.cwd.replace(/^\/Users\/\w+\//, "~/")}
+          </Text>
           {agent.costUsd > 0 && (
-            <Text size="xs" c="dimmed">
+            <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
               ${agent.costUsd.toFixed(3)}
             </Text>
           )}
         </Group>
-
-        <Text size="xs" c="dimmed" lineClamp={1}>
-          {agent.cwd}
-        </Text>
       </Stack>
     </Card>
   );

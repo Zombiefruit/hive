@@ -1,4 +1,5 @@
-import { Card, SimpleGrid, Stack, Text } from "@mantine/core";
+import { Card, SimpleGrid, Stack, Text, ThemeIcon } from "@mantine/core";
+import { IconRobotOff } from "@tabler/icons-react";
 import { useAgentStore } from "../stores/agent-store";
 import { AgentCard } from "./AgentCard";
 
@@ -9,6 +10,9 @@ export function AgentGrid() {
     return (
       <Card padding="xl" radius="sm" withBorder>
         <Stack align="center" gap="sm" py="xl">
+          <ThemeIcon variant="light" color="gray" size="xl" radius="xl">
+            <IconRobotOff size={24} stroke={1.5} />
+          </ThemeIcon>
           <Text size="lg" fw={500} c="dimmed">
             No agents running
           </Text>

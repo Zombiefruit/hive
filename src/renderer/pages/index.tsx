@@ -10,6 +10,7 @@ import {
   Title,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
+import { IconPlus, IconShieldCheck } from "@tabler/icons-react";
 import { MetricsBar } from "../components/MetricsBar";
 import { AgentGrid } from "../components/AgentGrid";
 import { ActivityFeed } from "../components/ActivityFeed";
@@ -36,6 +37,8 @@ export function Dashboard() {
             display: "flex",
             alignItems: "center",
             paddingInline: "var(--mantine-spacing-md)",
+            // Leave space for macOS traffic lights (hiddenInset titlebar)
+            paddingLeft: 80,
             gap: "var(--mantine-spacing-sm)",
             WebkitAppRegion: "drag",
           }}
@@ -55,7 +58,7 @@ export function Dashboard() {
             style={{ WebkitAppRegion: "no-drag" }}
             aria-label="New Agent"
           >
-            <Text size="lg" fw={700}>+</Text>
+            <IconPlus size={18} stroke={2} />
           </ActionIcon>
         </AppShell.Header>
 
@@ -75,9 +78,12 @@ export function Dashboard() {
             <ScrollArea h="100%">
               <Stack gap="md">
                 <Group justify="space-between">
-                  <Text size="sm" fw={600}>
-                    Approvals
-                  </Text>
+                  <Group gap="xs">
+                    <IconShieldCheck size={16} stroke={1.5} />
+                    <Text size="sm" fw={600}>
+                      Approvals
+                    </Text>
+                  </Group>
                   {pendingCount > 0 && (
                     <Badge variant="filled" color="red" size="sm">
                       {pendingCount}

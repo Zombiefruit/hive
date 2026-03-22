@@ -1,4 +1,5 @@
 import { query as sdkQuery } from "@anthropic-ai/claude-agent-sdk";
+import { getClaudeCodePath } from "../claude-path";
 import type { SpawnAgentConfig } from "../../shared/types";
 import {
   createAgent,
@@ -87,6 +88,7 @@ export async function spawnAgent(config: SpawnAgentConfig): Promise<string> {
   const q = sdkQuery({
     prompt: messageStream(),
     options: {
+      pathToClaudeCodeExecutable: getClaudeCodePath(),
       cwd: config.cwd,
       model: config.model,
       permissionMode: config.permissionMode as "default" | "acceptEdits" | "bypassPermissions" | "plan" | "dontAsk",

@@ -1,4 +1,5 @@
 import { ActionIcon, CloseButton, Group, Text, Tooltip, Transition } from "@mantine/core";
+import { IconMessageChatbot, IconRefresh, IconLayoutSidebarRightExpand } from "@tabler/icons-react";
 import { useCallback, useEffect } from "react";
 import { useManagerStore } from "../../stores/manager-store";
 import { ConversationSidebar } from "./ConversationSidebar";
@@ -162,7 +163,7 @@ export function FloatingPanel() {
                 gap: 8,
               }}
             >
-              <span style={{ fontSize: 16 }}>&#10024;</span>
+              <IconMessageChatbot size={18} stroke={1.5} color="var(--mantine-color-blue-5)" />
               <Text size="sm" fw={600} style={{ flex: 1 }}>
                 Manager
               </Text>
@@ -174,7 +175,7 @@ export function FloatingPanel() {
                     onClick={handleNewConversation}
                     aria-label="New conversation"
                   >
-                    <Text size="xs">&#8635;</Text>
+                    <IconRefresh size={14} stroke={1.5} />
                   </ActionIcon>
                 </Tooltip>
                 <Tooltip label="Pin to side">
@@ -184,7 +185,7 @@ export function FloatingPanel() {
                     onClick={handlePin}
                     aria-label="Pin"
                   >
-                    <Text size="xs">&#9646;</Text>
+                    <IconLayoutSidebarRightExpand size={14} stroke={1.5} />
                   </ActionIcon>
                 </Tooltip>
                 <CloseButton size="sm" onClick={handleClose} />

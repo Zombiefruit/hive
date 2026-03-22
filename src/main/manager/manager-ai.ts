@@ -3,6 +3,7 @@ import { app } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
+import { getClaudeCodePath } from "../claude-path";
 import { executeManagerTool } from "./manager-tools";
 import { getAllAgents, getPendingApprovals } from "../db/database";
 import { broadcastStoreUpdate } from "../ipc/bridge";
@@ -281,6 +282,7 @@ export async function sendManagerMessage(userMessage: string): Promise<ManagerMe
     const q = sdkQuery({
       prompt: fullPrompt,
       options: {
+        pathToClaudeCodeExecutable: getClaudeCodePath(),
         model: MODEL,
         systemPrompt: buildSystemPrompt(),
         permissionMode: "bypassPermissions",

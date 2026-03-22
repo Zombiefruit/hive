@@ -11,6 +11,7 @@
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "dev:browser": "vite --config vite.renderer.config.ts",
+    "kill": "pkill -f 'electron.*claude-deck' 2>/dev/null; pkill -f 'vite.*claude-deck' 2>/dev/null; echo 'All claude-deck processes killed'",
     "lint": "echo \"No linting configured\""
   },
   "keywords": [],
@@ -24,6 +25,7 @@
     "@mantine/core": "^8.3.18",
     "@mantine/hooks": "^8.3.18",
     "@modelcontextprotocol/sdk": "^1.27.1",
+    "@tabler/icons-react": "^3.40.0",
     "better-sqlite3": "^12.8.0",
     "electron-squirrel-startup": "^1.0.1",
     "react": "^19.2.4",
