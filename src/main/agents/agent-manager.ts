@@ -8,7 +8,7 @@ import {
   addEvent,
 } from "../db/database";
 import { broadcastAgentStream, broadcastStoreUpdate } from "../ipc/bridge";
-import { createCanUseTool } from "./approval-handler";
+import { createSmartCanUseTool } from "./approval-delegate";
 import { trackContextFromMessage } from "./context-tracker";
 
 interface ActiveAgent {
@@ -93,7 +93,7 @@ export async function spawnAgent(config: SpawnAgentConfig): Promise<string> {
       model: config.model,
       permissionMode: config.permissionMode as "default" | "acceptEdits" | "bypassPermissions" | "plan" | "dontAsk",
       maxBudgetUsd: config.maxBudgetUsd,
-      canUseTool: createCanUseTool(agentId),
+      canUseTool: createSmartCanUseTool(agentId),
       includePartialMessages: true,
       abortController,
     },
@@ -296,7 +296,7 @@ export async function resumeSession(agentId: string, sessionId: string, cwd: str
       cwd,
       resume: sessionId,
       permissionMode: "default",
-      canUseTool: createCanUseTool(agentId),
+      canUseTool: createSmartCanUseTool(agentId),
       includePartialMessages: true,
       abortController,
     },
