@@ -274,6 +274,52 @@ export function killAgent(agentId: string): void {
 }
 
 /**
+ * Resume an external session — attach to it and make it interactive.
+ * The agent becomes a deck-managed agent with full chat capability.
+ */
+export async function resumeSession(agentId: string, sessionId: string, cwd: string): Promise<void> {
+  const abortController = new AbortController();
+
+  const activeAgent: ActiveAgent = {
+    id: agentId,
+    query: null!,
+    abortController,
+    messageQueue: [],
+    resolveNextMessage: null,
+  };
+
+  // Use the Agent SDK's resume option to continue an existing session
+  const q = sdkQuery({
+    prompt: "Continue where you left off. What's the current status?",
+    options: {
+      pathToClaudeCodeExecutable: getClaudeCodePath(),
+      cwd,
+      resume: sessionId,
+      permissionMode: "default",
+      canUseTool: createCanUseTool(agentId),
+      includePartialMessages: true,
+      abortController,
+    },
+  });
+
+  activeAgent.query = q;
+  activeAgents.set(agentId, activeAgent);
+
+  // Update agent source to deck (now managed)
+  updateAgent(agentId, { status: "active" });
+  addEvent(agentId, "task_start", "Resumed external session — now interactive");
+
+  processAgentStream(agentId, q).catch((err) => {
+    console.error(`[AgentManager] Resume ${agentId} stream error:`, err);
+    updateAgent(agentId, { status: "errored" });
+    addEvent(agentId, "error", `Resume error: ${String(err)}`);
+    broadcastStoreUpdate();
+  });
+
+  broadcastStoreUpdate();
+}
+
+/**
  * Get the list of currently active agent IDs.
  */
 export function getActiveAgentIds(): string[] {

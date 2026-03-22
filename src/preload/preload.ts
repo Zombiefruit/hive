@@ -8,6 +8,8 @@ const api = {
     ipcRenderer.invoke("agent:message", { agentId, message }),
   interruptAgent: (agentId: string) =>
     ipcRenderer.invoke("agent:interrupt", agentId),
+  resumeSession: (agentId: string, sessionId: string, cwd: string) =>
+    ipcRenderer.invoke("agent:resume", { agentId, sessionId, cwd }),
 
   // Approval
   respondToApproval: (approvalId: string, approved: boolean) =>

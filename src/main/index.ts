@@ -2,9 +2,10 @@ import { app, BrowserWindow } from "electron";
 import path from "node:path";
 import { initDatabase, closeDatabase, getAllAgents, getMessages, getPendingApprovals, getAllContextRefs, getRecentEvents, upsertExternalAgent, cleanupStaleExternalAgents } from "./db/database";
 import { registerIpcHandlers, startStoreSync, stopStoreSync } from "./ipc/bridge";
-import { spawnAgent, sendMessage, interruptAgent, killAgent } from "./agents/agent-manager";
+import { spawnAgent, sendMessage, interruptAgent, killAgent, resumeSession } from "./agents/agent-manager";
 import { handleApprovalResponse } from "./agents/approval-handler";
 import { watchSessions } from "./agents/session-discovery";
+import { enrichExternalAgents } from "./agents/session-enricher";
 import { addContextFromUrl } from "./agents/context-tracker";
 import {
   initManager,
@@ -157,6 +158,15 @@ app.whenReady().then(() => {
       );
     }
     cleanupStaleExternalAgents(activeSessionIds);
+  });
+
+  // Enrich external agents with conversation history (runs once after discovery)
+  setTimeout(() => enrichExternalAgents().catch(console.error), 3000);
+
+  // Resume session IPC handler
+  ipcMain.handle("agent:resume", async (_event, data: { agentId: string; sessionId: string; cwd: string }) => {
+    await resumeSession(data.agentId, data.sessionId, data.cwd);
+    return { ok: true };
   });
 
   // Start periodic store sync to renderer (every 100ms)

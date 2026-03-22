@@ -148,6 +148,7 @@ if (!isElectron) {
     killAgent: noop,
     sendMessage: noop,
     interruptAgent: noop,
+    resumeSession: noop,
     respondToApproval: noop,
     addContextUrl: noop,
     sendManagerMessage: async (msg: string) => {

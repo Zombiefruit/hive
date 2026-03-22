@@ -207,9 +207,24 @@ export function AgentDetail() {
                 </Group>
               </Stack>
             </Card>
-            <Button variant="light" size="sm" onClick={() => navigate("/")}>
-              Back to Dashboard
-            </Button>
+            <Group gap="sm">
+              {agent.sessionId && (
+                <Button
+                  variant="filled"
+                  size="sm"
+                  onClick={async () => {
+                    if (agent.sessionId) {
+                      await window.deck.resumeSession(agent.id, agent.sessionId, agent.cwd);
+                    }
+                  }}
+                >
+                  Resume &amp; Chat
+                </Button>
+              )}
+              <Button variant="light" size="sm" onClick={() => navigate("/")}>
+                Back to Dashboard
+              </Button>
+            </Group>
           </Stack>
         ) : (
           <ChatPanel agentId={agent.id} agentStatus={agent.status} />
