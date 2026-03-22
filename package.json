@@ -10,6 +10,7 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
+    "dev:browser": "vite --config vite.renderer.config.ts",
     "lint": "echo \"No linting configured\""
   },
   "keywords": [],
