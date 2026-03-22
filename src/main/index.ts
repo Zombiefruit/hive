@@ -2,7 +2,10 @@ import { app, BrowserWindow } from "electron";
 import path from "node:path";
 import { initDatabase, closeDatabase, getAllAgents, getMessages, getPendingApprovals, getAllContextRefs, getRecentEvents } from "./db/database";
 import { registerIpcHandlers, startStoreSync, stopStoreSync } from "./ipc/bridge";
-import type { StoreState, FleetMetrics } from "../shared/types";
+import { spawnAgent, sendMessage, interruptAgent, killAgent } from "./agents/agent-manager";
+import { handleApprovalResponse } from "./agents/approval-handler";
+import { watchSessions } from "./agents/session-discovery";
+import type { StoreState, FleetMetrics, SpawnAgentConfig } from "../shared/types";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require("electron-squirrel-startup")) {
@@ -71,24 +74,30 @@ app.whenReady().then(() => {
   // Initialize database
   initDatabase();
 
-  // Register IPC handlers (stubs for now — Phase 3 will implement real agent logic)
+  // Register IPC handlers with real agent logic
   registerIpcHandlers({
     onSpawn: async (config) => {
-      console.log("[IPC] agent:spawn", config);
-      return { ok: true };
+      const agentId = await spawnAgent(config as SpawnAgentConfig);
+      return { agentId };
     },
     onKill: async (agentId) => {
-      console.log("[IPC] agent:kill", agentId);
+      killAgent(agentId as string);
     },
     onMessage: async (data) => {
-      console.log("[IPC] agent:message", data);
+      const { agentId, message } = data as { agentId: string; message: string };
+      sendMessage(agentId, message);
     },
     onInterrupt: async (agentId) => {
-      console.log("[IPC] agent:interrupt", agentId);
+      await interruptAgent(agentId as string);
     },
     onApprovalResponse: async (data) => {
-      console.log("[IPC] agent:approval-response", data);
+      handleApprovalResponse(data.approvalId, data.approved);
     },
+  });
+
+  // Watch for external Claude sessions
+  const stopWatching = watchSessions((sessions) => {
+    console.log(`[SessionDiscovery] Found ${sessions.length} sessions, ${sessions.filter(s => s.isAlive).length} alive`);
   });
 
   // Start periodic store sync to renderer (every 100ms)
@@ -113,3 +122,6 @@ app.on("before-quit", () => {
   stopStoreSync();
   closeDatabase();
 });
+
+// Keep TypeScript happy — stopWatching is used in before-quit via closure
+void 0;
