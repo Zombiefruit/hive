@@ -1,104 +1,127 @@
-import { Badge, Card, Group, Stack, Text, ThemeIcon } from "@mantine/core";
-import { IconRobot, IconExternalLink, IconGitBranch } from "@tabler/icons-react";
+import { Badge, Group, Progress, Stack, Text } from "@mantine/core";
+import { IconTerminal2, IconGitBranch, IconClock, IconExternalLink } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
+import { StatusDot } from "./StatusDot";
 import type { Agent } from "../../shared/types";
 
-const statusColors: Record<string, string> = {
-  active: "blue",
-  idle: "gray",
+const statusLabels: Record<string, string> = {
+  active: "Running",
+  idle: "Idle",
+  errored: "Errored",
+  completed: "Done",
+};
+
+const statusBadgeColors: Record<string, string> = {
+  active: "green",
+  idle: "yellow",
   errored: "red",
-  completed: "green",
+  completed: "gray",
 };
 
 const modelLabels: Record<string, string> = {
   "claude-opus-4-6": "Opus",
   "claude-sonnet-4-6": "Sonnet",
   "claude-haiku-4-5-20251001": "Haiku",
+  unknown: "",
 };
 
-interface AgentCardProps {
-  agent: Agent;
-}
-
-export function AgentCard({ agent }: AgentCardProps) {
+export function AgentCard({ agent }: { agent: Agent }) {
   const navigate = useNavigate();
+  const elapsed = Math.round((Date.now() - new Date(agent.createdAt).getTime()) / 60000);
+  const elapsedStr = elapsed < 60 ? `${elapsed}m` : `${Math.floor(elapsed / 60)}h ${String(elapsed % 60).padStart(2, "0")}m`;
+  const cwdShort = agent.cwd.split("/").pop() ?? agent.cwd;
+  const tokenPct = agent.maxBudgetUsd ? Math.min(100, (agent.costUsd / agent.maxBudgetUsd) * 100) : 0;
 
   return (
-    <Card
-      padding="md"
-      radius="sm"
-      withBorder
-      style={{ cursor: "pointer", transition: "border-color 0.15s ease" }}
+    <div
       onClick={() => navigate(`/agent/${agent.id}`)}
+      style={{
+        padding: 20,
+        borderRadius: 8,
+        border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
+        backgroundColor: "var(--mantine-color-dark-7)",
+        cursor: "pointer",
+        transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+      }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = "var(--mantine-color-blue-5)";
+        e.currentTarget.style.borderColor = "var(--mantine-color-default-border)";
+        e.currentTarget.style.boxShadow = "0 8px 24px rgba(0, 0, 0, 0.2)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = "";
+        e.currentTarget.style.borderColor = "color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)";
+        e.currentTarget.style.boxShadow = "none";
       }}
     >
-      <Stack gap="xs">
-        <Group justify="space-between">
+      <Stack gap="sm">
+        {/* Header: name + status */}
+        <Group justify="space-between" align="flex-start">
           <Group gap="xs">
-            <ThemeIcon
-              variant="light"
-              color={statusColors[agent.status] ?? "gray"}
-              size="sm"
-              radius="xl"
-            >
-              <IconRobot size={12} stroke={1.5} />
-            </ThemeIcon>
+            <StatusDot status={agent.status} />
+            <Text size="sm" fw={500} ff="monospace">
+              {cwdShort}
+            </Text>
+          </Group>
+          <Group gap={6}>
             <Badge
               variant="light"
-              color={statusColors[agent.status] ?? "gray"}
-              size="xs"
+              color={statusBadgeColors[agent.status] ?? "gray"}
+              size="sm"
+              radius="sm"
             >
-              {agent.status}
+              {statusLabels[agent.status] ?? agent.status}
             </Badge>
+            {modelLabels[agent.model] && (
+              <Badge variant="outline" color="gray" size="xs" radius="sm">
+                {modelLabels[agent.model]}
+              </Badge>
+            )}
           </Group>
-          <Badge variant="outline" color="gray" size="xs">
-            {modelLabels[agent.model] ?? agent.model}
-          </Badge>
         </Group>
 
-        <Text size="sm" fw={500} lineClamp={2}>
+        {/* Task description */}
+        <Text size="sm" c="dimmed" lineClamp={2} style={{ lineHeight: 1.5 }}>
           {agent.task}
         </Text>
 
-        <Group gap="xs">
-          {agent.branch && (
-            <Badge
-              variant="light"
-              color="violet"
-              size="xs"
-              leftSection={<IconGitBranch size={10} stroke={1.5} />}
-            >
-              {agent.branch}
-            </Badge>
-          )}
+        {/* Metadata row */}
+        <Group gap="md">
           {agent.source === "external" && (
-            <Badge
-              variant="outline"
-              color="gray"
-              size="xs"
-              leftSection={<IconExternalLink size={10} stroke={1.5} />}
-            >
-              External
-            </Badge>
+            <Group gap={4}>
+              <IconExternalLink size={12} color="var(--mantine-color-dimmed)" />
+              <Text size="xs" c="dimmed">External</Text>
+            </Group>
           )}
+          {agent.pid && (
+            <Group gap={4}>
+              <IconTerminal2 size={12} color="var(--mantine-color-dimmed)" />
+              <Text size="xs" c="dimmed" ff="monospace">pid/{agent.pid}</Text>
+            </Group>
+          )}
+          {agent.branch && (
+            <Group gap={4}>
+              <IconGitBranch size={12} color="var(--mantine-color-dimmed)" />
+              <Text size="xs" c="dimmed" ff="monospace" truncate style={{ maxWidth: 140 }}>
+                {agent.branch}
+              </Text>
+            </Group>
+          )}
+          <Group gap={4}>
+            <IconClock size={12} color="var(--mantine-color-dimmed)" />
+            <Text size="xs" c="dimmed" ff="monospace">{elapsedStr}</Text>
+          </Group>
         </Group>
 
-        <Group justify="space-between">
-          <Text size="xs" c="dimmed" lineClamp={1} style={{ flex: 1, minWidth: 0 }}>
-            {agent.cwd.replace(/^\/Users\/\w+\//, "~/")}
+        {/* Token usage */}
+        <Group justify="space-between" align="center">
+          <Text size="xs" c="dimmed">Tokens</Text>
+          <Text size="xs" fw={500} ff="monospace">
+            {(agent.inputTokens + agent.outputTokens).toLocaleString()}
           </Text>
-          {agent.costUsd > 0 && (
-            <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
-              ${agent.costUsd.toFixed(3)}
-            </Text>
-          )}
         </Group>
+        {tokenPct > 0 && (
+          <Progress value={tokenPct} color="blue" size={4} radius="xl" />
+        )}
       </Stack>
-    </Card>
+    </div>
   );
 }
