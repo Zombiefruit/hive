@@ -25,6 +25,9 @@ import { AgentFilterBar } from "../components/AgentFilterBar";
 import { ActivityFeed } from "../components/ActivityFeed";
 import { ApprovalSidebar } from "../components/ApprovalSidebar";
 import { NewAgentModal } from "../components/NewAgentModal";
+import { SkillsPanel } from "../components/SkillsPanel";
+import { GlobalContextBar } from "../components/GlobalContextBar";
+import { IntegrationPanel } from "../components/IntegrationPanel";
 import { useAgentStore, usePendingApprovals } from "../stores/agent-store";
 
 export function Dashboard() {
@@ -188,6 +191,15 @@ export function Dashboard() {
                 <ApprovalSidebar />
               </div>
             </div>
+
+            {/* Skills */}
+            <SkillsPanel />
+
+            {/* Context */}
+            <GlobalContextBar />
+
+            {/* Integrations */}
+            <IntegrationPanel />
 
             {/* Activity */}
             <div
