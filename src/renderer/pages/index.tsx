@@ -16,13 +16,13 @@ import { ActivityFeed } from "../components/ActivityFeed";
 import { ApprovalSidebar } from "../components/ApprovalSidebar";
 import { NewAgentModal } from "../components/NewAgentModal";
 import { PinnedPanel } from "../components/ManagerChat";
-import { useAgentStore, selectPendingApprovals } from "../stores/agent-store";
+import { usePendingApprovals } from "../stores/agent-store";
 import { useManagerStore } from "../stores/manager-store";
 
 export function Dashboard() {
   const isPinned = useManagerStore((s) => s.isPinned);
   const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
-  const pendingCount = useAgentStore(selectPendingApprovals()).length;
+  const pendingCount = usePendingApprovals().length;
 
   return (
     <>

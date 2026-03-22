@@ -6,7 +6,7 @@ import {
   Stack,
   Text,
 } from "@mantine/core";
-import { useAgentStore, selectContextRefs } from "../stores/agent-store";
+import { useAgentContextRefs } from "../stores/agent-store";
 import type { ContextRefType } from "../../shared/types";
 
 const typeLabels: Record<ContextRefType, string> = {
@@ -28,7 +28,7 @@ interface ContextPanelProps {
 }
 
 export function ContextPanel({ agentId }: ContextPanelProps) {
-  const contextRefs = useAgentStore(selectContextRefs(agentId));
+  const contextRefs = useAgentContextRefs(agentId);
 
   // Group by type
   const grouped = contextRefs.reduce(

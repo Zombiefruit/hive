@@ -1,5 +1,5 @@
 import { Badge, Button, Card, Code, Group, Stack, Text } from "@mantine/core";
-import { useAgentStore, selectPendingApprovals } from "../stores/agent-store";
+import { useAgentStore, usePendingApprovals } from "../stores/agent-store";
 
 const riskColors: Record<string, string> = {
   low: "green",
@@ -8,7 +8,7 @@ const riskColors: Record<string, string> = {
 };
 
 export function ApprovalSidebar() {
-  const approvals = useAgentStore(selectPendingApprovals());
+  const approvals = usePendingApprovals();
   const agents = useAgentStore((s) => s.agents);
 
   const agentNameMap = new Map(agents.map((a) => [a.id, a.task.slice(0, 25)]));

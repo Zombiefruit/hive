@@ -1,12 +1,12 @@
 import { ActionIcon, Badge, Transition } from "@mantine/core";
 import { useManagerStore } from "../../stores/manager-store";
-import { useAgentStore, selectPendingApprovals } from "../../stores/agent-store";
+import { usePendingApprovals } from "../../stores/agent-store";
 
 export function FloatingTrigger() {
   const isOpen = useManagerStore((s) => s.isOpen);
   const isPinned = useManagerStore((s) => s.isPinned);
   const toggleOpen = useManagerStore((s) => s.toggleOpen);
-  const pendingCount = useAgentStore(selectPendingApprovals()).length;
+  const pendingCount = usePendingApprovals().length;
 
   const visible = !isOpen && !isPinned;
 

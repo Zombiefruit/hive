@@ -75,23 +75,17 @@ export const useAgentStore = create<AgentStore>((set) => ({
     })),
 }));
 
-/** Selector: get agents filtered by status. */
-export function selectAgentsByStatus(status: Agent["status"]) {
-  return (state: AgentStore) => state.agents.filter((a) => a.status === status);
+/** Hook: get pending approvals. */
+export function usePendingApprovals() {
+  return useAgentStore((state) => state.approvals.filter((a) => a.status === "pending"));
 }
 
-/** Selector: get messages for an agent. */
-export function selectMessages(agentId: string) {
-  return (state: AgentStore) => state.messages[agentId] ?? [];
+/** Hook: get messages for an agent. */
+export function useAgentMessages(agentId: string) {
+  return useAgentStore((state) => state.messages[agentId] ?? []);
 }
 
-/** Selector: get context refs for an agent. */
-export function selectContextRefs(agentId: string) {
-  return (state: AgentStore) => state.contextRefs[agentId] ?? [];
-}
-
-/** Selector: get pending approvals. */
-export function selectPendingApprovals() {
-  return (state: AgentStore) =>
-    state.approvals.filter((a) => a.status === "pending");
+/** Hook: get context refs for an agent. */
+export function useAgentContextRefs(agentId: string) {
+  return useAgentStore((state) => state.contextRefs[agentId] ?? []);
 }

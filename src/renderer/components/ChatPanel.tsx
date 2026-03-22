@@ -9,7 +9,7 @@ import {
   Textarea,
 } from "@mantine/core";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAgentStore, selectMessages } from "../stores/agent-store";
+import { useAgentMessages } from "../stores/agent-store";
 import type { Message } from "../../shared/types";
 
 interface ChatPanelProps {
@@ -81,7 +81,7 @@ function ChatMessage({ message }: { message: Message }) {
 }
 
 export function ChatPanel({ agentId, agentStatus }: ChatPanelProps) {
-  const messages = useAgentStore(selectMessages(agentId));
+  const messages = useAgentMessages(agentId);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
