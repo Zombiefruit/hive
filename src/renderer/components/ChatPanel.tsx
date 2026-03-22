@@ -16,6 +16,7 @@ import type { Message } from "../../shared/types";
 interface ChatPanelProps {
   agentId: string;
   agentStatus: string;
+  isReadOnly?: boolean;
 }
 
 function ChatMessage({ message }: { message: Message }) {
@@ -89,7 +90,7 @@ function ChatMessage({ message }: { message: Message }) {
   );
 }
 
-export function ChatPanel({ agentId, agentStatus }: ChatPanelProps) {
+export function ChatPanel({ agentId, agentStatus, isReadOnly }: ChatPanelProps) {
   const messages = useAgentMessages(agentId);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -127,7 +128,8 @@ export function ChatPanel({ agentId, agentStatus }: ChatPanelProps) {
     }
   };
 
-  const isActive = agentStatus === "active";
+  const isActive = agentStatus === "active" && !isReadOnly;
+  const canSend = isActive;
 
   return (
     <Stack gap={0} h="100%">

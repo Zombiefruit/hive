@@ -205,7 +205,7 @@ export function AgentDetail() {
             )}
           </Group>
         )}
-        <ChatPanel agentId={agent.id} agentStatus={isExternal ? "completed" : agent.status} />
+        <ChatPanel agentId={agent.id} agentStatus={agent.status} isReadOnly={isExternal} />
       </div>
 
       {/* Right panel: Context */}

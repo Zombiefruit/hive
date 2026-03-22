@@ -56,6 +56,7 @@ export function Dashboard() {
         style={{
           minHeight: "100vh",
           backgroundColor: "var(--mantine-color-body)",
+          overflowY: "auto",
         }}
       >
         {/* Header */}
