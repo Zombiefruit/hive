@@ -134,7 +134,10 @@ function buildMockState(): StoreState {
   };
 }
 
-if (!window.deck) {
+// Detect Electron reliably via userAgent (not window.deck which has timing issues with contextBridge)
+const isElectron = navigator.userAgent.toLowerCase().includes("electron");
+
+if (!isElectron) {
   console.warn("[Claude Deck] Running in browser mode with mock data");
 
   const mockState = buildMockState();

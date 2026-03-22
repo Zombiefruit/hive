@@ -11,7 +11,11 @@ export function useIpcSync(): void {
 
   useEffect(() => {
     const unsub = window.deck.onStoreUpdate((state) => {
-      syncFromMain(state as StoreState);
+      const s = state as StoreState;
+      if (s.agents?.length > 0) {
+        console.log(`[IPC Sync] Received ${s.agents.length} agents, ${s.events?.length ?? 0} events`);
+      }
+      syncFromMain(s);
     });
     return unsub;
   }, [syncFromMain]);
