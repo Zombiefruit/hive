@@ -10,7 +10,7 @@ import {
 } from "@mantine/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAgentMessages } from "../stores/agent-store";
-import { Markdown } from "./Markdown";
+import { ClaudeContent } from "./ClaudeContent";
 import type { Message } from "../../shared/types";
 
 interface ChatPanelProps {
@@ -71,13 +71,7 @@ function ChatMessage({ message }: { message: Message }) {
         maxWidth: "85%",
       }}
     >
-      {isUser ? (
-        <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
-          {message.content}
-        </Text>
-      ) : (
-        <Markdown content={message.content} />
-      )}
+      <ClaudeContent content={message.content} role={isUser ? "user" : "assistant"} />
       <Text size="xs" c="dimmed" mt={2}>
         {new Date(message.timestamp).toLocaleTimeString()}
       </Text>
