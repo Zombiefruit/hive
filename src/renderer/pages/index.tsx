@@ -29,7 +29,7 @@ export function Dashboard() {
     <>
       <AppShell
         header={{ height: 52 }}
-        aside={{ width: isPinned ? 560 : 320, breakpoint: "md" }}
+        aside={{ width: isPinned ? 560 : 280, breakpoint: "lg", collapsed: { desktop: false, mobile: true } }}
         padding="md"
       >
         <AppShell.Header

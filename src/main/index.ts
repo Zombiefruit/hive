@@ -28,18 +28,8 @@ if (require("electron-squirrel-startup")) {
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
-import fs from "node:fs";
-const logFile = path.join(app.getPath("userData"), "debug.log");
-function debugLog(msg: string) {
-  fs.appendFileSync(logFile, `${new Date().toISOString()} ${msg}\n`);
-}
-
-let storeLogCount = 0;
 function buildStoreState(): StoreState {
   const agents = getAllAgents();
-  if (storeLogCount++ % 50 === 0) {
-    debugLog(`StoreSync agents=${agents.length}, first=${agents[0]?.task?.slice(0, 40) ?? "none"}`);
-  }
   const approvals = getPendingApprovals();
   const events = getRecentEvents(100);
   const allContextRefs = getAllContextRefs();
