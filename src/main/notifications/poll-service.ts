@@ -206,6 +206,25 @@ export function updateNotificationByTitle(titleSubstring: string, changes: Recor
   return true;
 }
 
+/**
+ * Upsert a notification — if it exists, update it. If not, create it.
+ * Used when skipped items (client-only IDs) are moved to a stage.
+ */
+export function upsertNotification(data: Record<string, unknown>): boolean {
+  const id = String(data.id ?? "");
+  if (!id) return false;
+  const existing = notifications.find(n => n.id === id);
+  if (existing) {
+    Object.assign(existing, data);
+  } else {
+    notifications.push(data as unknown as PollNotification);
+  }
+  saveCacheToFile();
+  broadcastNotifications();
+  logPoll(`Upserted [${id.slice(0, 20)}] stage=${data.stage}`);
+  return true;
+}
+
 export function updateNotificationById(id: string, changes: Record<string, unknown>): boolean {
   logPoll(`updateNotificationById called: id=${id.slice(0, 20)}, changes=${JSON.stringify(changes)}, total notifications=${notifications.length}`);
   const n = notifications.find(n => n.id === id);

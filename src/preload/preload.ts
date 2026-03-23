@@ -47,6 +47,8 @@ const api = {
     ipcRenderer.invoke("notifications:update-by-title", { titleSubstring, changes }),
   updateNotificationById: (id: string, changes: Record<string, unknown>) =>
     ipcRenderer.invoke("notifications:update-by-id", { id, changes }),
+  upsertNotification: (data: Record<string, unknown>) =>
+    ipcRenderer.invoke("notifications:upsert", data),
   refreshNotifications: (lookbackHours?: number) => ipcRenderer.invoke("notifications:refresh", lookbackHours),
   onNotificationsUpdate: (callback: (notifications: unknown[]) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, data: unknown[]) => callback(data);

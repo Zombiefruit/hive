@@ -94,6 +94,7 @@ export function Notifications() {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [plansReady, setPlansReady] = useState<Set<string>>(new Set());
   const [fetching, setFetching] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<string | null>(null);
   const [pollProgress, setPollProgress] = useState<{ source: string; current: number; total: number } | null>(null);
@@ -202,15 +203,26 @@ export function Notifications() {
 
   // Move card visually + persist. Always call this first so the card doesn't freeze.
   const moveCardToStage = useCallback((id: string, newStage: string) => {
-    console.log(`[DnD] moveCardToStage: ${id.slice(0, 20)} → ${newStage}`);
+    let movedItem: NotificationItem | undefined;
     setNotifications(prev => {
-      const updated = prev.map(n => n.id === id ? { ...n, stage: newStage } : n);
-      console.log(`[DnD] setNotifications: ${updated.filter(n => n.stage === newStage).length} items now in ${newStage}`);
+      const updated = prev.map(n => {
+        if (n.id === id) {
+          movedItem = { ...n, stage: newStage };
+          return movedItem;
+        }
+        return n;
+      });
       return updated;
     });
-    window.deck.updateNotificationById?.(id, { stage: newStage })
-      .then((result: unknown) => console.log(`[DnD] persist result: ${result}`))
-      .catch((err: unknown) => console.error(`[DnD] persist error:`, err));
+
+    // For skipped items (client-generated IDs), upsert the full item into main process
+    if (id.startsWith("skipped-") && movedItem) {
+      window.deck.upsertNotification?.({ ...movedItem, stage: newStage })
+        .catch(() => {});
+    } else {
+      window.deck.updateNotificationById?.(id, { stage: newStage })
+        .catch(() => {});
+    }
   }, []);
 
   // Trigger agent actions for a card (call AFTER moveCardToStage)
@@ -507,12 +519,18 @@ export function Notifications() {
                                 </Text>
                               )}
                               {/* Status indicator for in-progress stages */}
-                              {(stage.key === "planning" || stage.key === "working") && (
+                              {(stage.key === "planning" || stage.key === "working") && !plansReady.has(n.id) && (
                                 <Group gap={4} mt={2}>
                                   <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: stage.color, animation: "pulse 1.5s infinite" }} />
                                   <Text size="xs" c={stage.color} fw={500} style={{ fontSize: "0.6rem" }}>
                                     {stage.key === "planning" ? "Planning..." : "Working..."}
                                   </Text>
+                                </Group>
+                              )}
+                              {stage.key === "planning" && plansReady.has(n.id) && (
+                                <Group gap={4} mt={2}>
+                                  <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#22c55e" }} />
+                                  <Text size="xs" c="#22c55e" fw={500} style={{ fontSize: "0.6rem" }}>Plan ready</Text>
                                 </Group>
                               )}
                               {stage.key !== "done" && stage.key !== "skipped" && stage.key !== "planning" && stage.key !== "working" && (
@@ -661,6 +679,7 @@ export function Notifications() {
               else moveCardToStage(selected.id, "done");
             }}
             onDismiss={() => dismiss(selected.id)}
+            onPlanReady={() => setPlansReady(prev => new Set([...prev, selected.id]))}
           />
         </>
       )}
@@ -712,11 +731,12 @@ export function Notifications() {
   );
 }
 
-function DetailPane({ notification: n, onClose, onAdvance, onDismiss }: {
+function DetailPane({ notification: n, onClose, onAdvance, onDismiss, onPlanReady }: {
   notification: NotificationItem;
   onClose: () => void;
   onAdvance: () => void;
   onDismiss: () => void;
+  onPlanReady?: () => void;
 }) {
   const [conversation, setConversation] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
   const [loading, setLoading] = useState(false);
@@ -740,6 +760,7 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss }: {
           setConversation((existing as { conversationHistory: typeof conversation }).conversationHistory);
           setLoading(false);
           setActivity([]);
+          onPlanReady?.();
         } else if (isPreparingStage) {
           setLoading(true);
         }
