@@ -64,8 +64,15 @@ export function clearAllNotifications(): void {
 
 let nextLookbackHours = 168;
 
+let pendingRefresh = false;
+
 export function forcePoll(lookbackHours?: number): void {
   if (lookbackHours) nextLookbackHours = lookbackHours;
+  if (isPolling) {
+    pendingRefresh = true;
+    logPoll("Refresh queued — poll already in progress");
+    return;
+  }
   poll();
 }
 
@@ -297,5 +304,11 @@ Rules:
     logPoll(`poll ERROR: ${String(err)}`);
   } finally {
     isPolling = false;
+    // If a refresh was queued while we were polling, run again
+    if (pendingRefresh) {
+      pendingRefresh = false;
+      logPoll("Running queued refresh");
+      setTimeout(() => poll(), 1000);
+    }
   }
 }
