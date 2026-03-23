@@ -1,102 +1,121 @@
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { Code, Table, Text, Anchor, List } from "@mantine/core";
+import { Code, Text } from "@mantine/core";
 
-interface MarkdownProps {
-  content: string;
+/**
+ * Simple markdown-ish renderer that doesn't depend on react-markdown.
+ * Handles: code blocks, inline code, bold, headers, lists, links.
+ */
+export function Markdown({ content }: { content: string }) {
+  const blocks = content.split(/\n\n+/);
+
+  return (
+    <div>
+      {blocks.map((block, i) => (
+        <MarkdownBlock key={i} text={block} />
+      ))}
+    </div>
+  );
 }
 
-export function Markdown({ content }: MarkdownProps) {
+function MarkdownBlock({ text }: { text: string }) {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  // Code block: ```...```
+  const codeBlockMatch = trimmed.match(/^```(\w*)\n?([\s\S]*?)```$/);
+  if (codeBlockMatch) {
+    return (
+      <Code block style={{ fontSize: "0.75rem", marginBlock: 6 }}>
+        {codeBlockMatch[2].trim()}
+      </Code>
+    );
+  }
+
+  // Heading
+  if (trimmed.startsWith("### ")) {
+    return <Text size="sm" fw={600} mt="xs">{renderInline(trimmed.slice(4))}</Text>;
+  }
+  if (trimmed.startsWith("## ")) {
+    return <Text size="md" fw={600} mt="xs">{renderInline(trimmed.slice(3))}</Text>;
+  }
+  if (trimmed.startsWith("# ")) {
+    return <Text size="lg" fw={700} mt="xs">{renderInline(trimmed.slice(2))}</Text>;
+  }
+
+  // List (bullet or numbered)
+  if (/^[-*] /.test(trimmed) || /^\d+\. /.test(trimmed)) {
+    const items = trimmed.split("\n").filter(Boolean);
+    return (
+      <ul style={{ margin: "4px 0", paddingLeft: 20, fontSize: "0.875rem" }}>
+        {items.map((item, i) => (
+          <li key={i} style={{ marginBottom: 2 }}>
+            {renderInline(item.replace(/^[-*]\s+/, "").replace(/^\d+\.\s+/, ""))}
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  // Blockquote
+  if (trimmed.startsWith("> ")) {
+    return (
+      <div style={{ borderLeft: "3px solid var(--mantine-color-blue-5)", paddingLeft: 12, margin: "4px 0", opacity: 0.85 }}>
+        <Text size="sm">{renderInline(trimmed.replace(/^>\s?/gm, ""))}</Text>
+      </div>
+    );
+  }
+
+  // Regular paragraph — handle multi-line within a block
+  const lines = trimmed.split("\n");
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      components={{
-        p: ({ children }) => (
-          <Text size="sm" style={{ marginBottom: 4 }}>
-            {children}
-          </Text>
-        ),
-        a: ({ href, children }) => (
-          <Anchor href={href ?? "#"} target="_blank" size="sm">
-            {children}
-          </Anchor>
-        ),
-        code: ({ className, children, ...props }) => {
-          const isBlock = className?.startsWith("language-");
-          if (isBlock) {
-            return (
-              <Code block style={{ fontSize: "0.75rem", marginBlock: 8 }}>
-                {String(children).replace(/\n$/, "")}
-              </Code>
-            );
-          }
-          return (
-            <Code style={{ fontSize: "0.8em" }} {...props}>
-              {children}
-            </Code>
-          );
-        },
-        pre: ({ children }) => <>{children}</>,
-        ul: ({ children }) => (
-          <List size="sm" style={{ marginBlock: 4 }}>
-            {children}
-          </List>
-        ),
-        ol: ({ children }) => (
-          <List type="ordered" size="sm" style={{ marginBlock: 4 }}>
-            {children}
-          </List>
-        ),
-        li: ({ children }) => <List.Item>{children}</List.Item>,
-        table: ({ children }) => (
-          <Table
-            striped
-            highlightOnHover
-            withTableBorder
-            withColumnBorders
-            style={{ marginBlock: 8, fontSize: "0.8rem" }}
-          >
-            {children}
-          </Table>
-        ),
-        thead: ({ children }) => <Table.Thead>{children}</Table.Thead>,
-        tbody: ({ children }) => <Table.Tbody>{children}</Table.Tbody>,
-        tr: ({ children }) => <Table.Tr>{children}</Table.Tr>,
-        th: ({ children }) => <Table.Th>{children}</Table.Th>,
-        td: ({ children }) => <Table.Td>{children}</Table.Td>,
-        strong: ({ children }) => (
-          <Text span fw={600} size="sm">
-            {children}
-          </Text>
-        ),
-        h1: ({ children }) => (
-          <Text fw={700} size="lg" mt="xs">
-            {children}
-          </Text>
-        ),
-        h2: ({ children }) => (
-          <Text fw={600} size="md" mt="xs">
-            {children}
-          </Text>
-        ),
-        h3: ({ children }) => (
-          <Text fw={600} size="sm" mt="xs">
-            {children}
-          </Text>
-        ),
-        blockquote: ({ children }) => (
-          <div
-            style={{
-              borderLeft: "3px solid var(--mantine-color-blue-5)",
-              paddingLeft: 12,
-              marginBlock: 8,
-              opacity: 0.85,
-            }}
-          >
-            {children}
-          </div>
-        ),
-      }}
-    />
+    <Text size="sm" style={{ marginBottom: 4 }}>
+      {lines.map((line, i) => (
+        <span key={i}>
+          {renderInline(line)}
+          {i < lines.length - 1 && <br />}
+        </span>
+      ))}
+    </Text>
   );
+}
+
+/** Render inline markdown: **bold**, `code`, [links](url) */
+function renderInline(text: string): React.ReactNode {
+  const parts: React.ReactNode[] = [];
+  let remaining = text;
+  let key = 0;
+
+  while (remaining.length > 0) {
+    // Inline code: `...`
+    const codeMatch = remaining.match(/^(.*?)`([^`]+)`/);
+    if (codeMatch) {
+      if (codeMatch[1]) parts.push(<span key={key++}>{codeMatch[1]}</span>);
+      parts.push(<Code key={key++} style={{ fontSize: "0.8em" }}>{codeMatch[2]}</Code>);
+      remaining = remaining.slice(codeMatch[0].length);
+      continue;
+    }
+
+    // Bold: **...**
+    const boldMatch = remaining.match(/^(.*?)\*\*(.+?)\*\*/);
+    if (boldMatch) {
+      if (boldMatch[1]) parts.push(<span key={key++}>{boldMatch[1]}</span>);
+      parts.push(<strong key={key++}>{boldMatch[2]}</strong>);
+      remaining = remaining.slice(boldMatch[0].length);
+      continue;
+    }
+
+    // Link: [text](url)
+    const linkMatch = remaining.match(/^(.*?)\[([^\]]+)\]\(([^)]+)\)/);
+    if (linkMatch) {
+      if (linkMatch[1]) parts.push(<span key={key++}>{linkMatch[1]}</span>);
+      parts.push(<a key={key++} href={linkMatch[3]} target="_blank" rel="noopener" style={{ color: "var(--mantine-color-blue-4)" }}>{linkMatch[2]}</a>);
+      remaining = remaining.slice(linkMatch[0].length);
+      continue;
+    }
+
+    // No match — emit rest as text
+    parts.push(<span key={key++}>{remaining}</span>);
+    break;
+  }
+
+  return parts.length === 1 ? parts[0] : <>{parts}</>;
 }

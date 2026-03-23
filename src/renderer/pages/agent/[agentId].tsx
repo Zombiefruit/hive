@@ -193,7 +193,6 @@ export function AgentDetail() {
               <Button
                 variant="light"
                 size="xs"
-                compact
                 onClick={async () => {
                   if (agent.sessionId) {
                     await window.deck.resumeSession(agent.id, agent.sessionId, agent.cwd);
