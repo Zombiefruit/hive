@@ -115,10 +115,12 @@ export function GlobalContextBar() {
                 wrap="nowrap"
                 style={{
                   borderTop: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 20%, transparent)",
+                  cursor: ref.url ? "pointer" : undefined,
                 }}
+                onClick={() => { if (ref.url) window.deck.openExternal(ref.url); }}
               >
                 <Icon size={13} color={cfg?.color ?? "#6b7280"} style={{ flexShrink: 0 }} />
-                <Text size="xs" fw={500} truncate style={{ flex: 1, minWidth: 0 }}>
+                <Text size="xs" fw={500} truncate style={{ flex: 1, minWidth: 0, color: ref.url ? "var(--mantine-color-blue-4)" : undefined }}>
                   {ref.title}
                 </Text>
                 {ref.resourceId !== ref.title && (

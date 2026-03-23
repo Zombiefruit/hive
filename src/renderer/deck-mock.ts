@@ -144,6 +144,7 @@ if (!isElectron) {
   let storeCallback: ((state: unknown) => void) | null = null;
 
   (window as unknown as { deck: unknown }).deck = {
+    openExternal: (url: string) => window.open(url, "_blank"),
     spawnAgent: noop,
     killAgent: noop,
     sendMessage: noop,

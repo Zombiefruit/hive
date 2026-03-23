@@ -71,22 +71,20 @@ export function ContextPanel({ agentId }: ContextPanelProps) {
             <Accordion.Panel>
               <Stack gap="xs">
                 {grouped[type].map((ref) => (
-                  <Group key={ref.id} gap="xs" wrap="nowrap">
-                    {ref.url ? (
-                      <Anchor
-                        href={ref.url}
-                        target="_blank"
-                        size="xs"
-                        truncate
-                        style={{ minWidth: 0 }}
-                      >
-                        {ref.title || ref.resourceId}
-                      </Anchor>
-                    ) : (
-                      <Text size="xs" truncate style={{ minWidth: 0 }}>
-                        {ref.title || ref.resourceId}
-                      </Text>
-                    )}
+                  <Group
+                    key={ref.id}
+                    gap="xs"
+                    wrap="nowrap"
+                    style={{ cursor: ref.url ? "pointer" : undefined }}
+                    onClick={() => { if (ref.url) window.deck.openExternal(ref.url); }}
+                  >
+                    <Text
+                      size="xs"
+                      truncate
+                      style={{ minWidth: 0, color: ref.url ? "var(--mantine-color-blue-4)" : undefined }}
+                    >
+                      {ref.title || ref.resourceId}
+                    </Text>
                     <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
                       {new Date(ref.detectedAt).toLocaleTimeString()}
                     </Text>
