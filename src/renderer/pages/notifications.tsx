@@ -62,6 +62,7 @@ const HUMAN_ROW: StageConfig[] = [
   { key: "new", label: "Needs Response", Icon: IconInbox, color: "#f97316", tip: "Meetings and messages only you can handle." },
   ...HUMAN_STAGES,
   { key: "done", label: "Done", Icon: IconCircleCheck, color: "#6b7280", tip: "Handled." },
+  { key: "skipped", label: "Reviewed", Icon: IconEyeOff, color: "#525252", tip: "AI skipped. Drag to Inbox if wrong." },
 ];
 
 const sourceIcons: Record<string, React.FC<{ size?: number; color?: string }>> = {
@@ -267,6 +268,7 @@ export function Notifications() {
         .notif-action-btn { transition: filter 0.15s ease; }
         .notif-action-btn:hover { filter: brightness(1.2); }
         @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
       `}</style>
       {/* Header with tabs */}
       <div
@@ -390,6 +392,8 @@ export function Notifications() {
                 ? (n: NotificationItem) => (n.stage ?? "new") === "new" && !HUMAN_ONLY_TYPES.has(n.taskType ?? "")
                 : stage.key === "done"
                 ? (n: NotificationItem) => n.stage === "done" && !HUMAN_ONLY_TYPES.has(n.taskType ?? "")
+                : stage.key === "skipped"
+                ? (n: NotificationItem) => n.stage === "skipped" && !HUMAN_ONLY_TYPES.has(n.taskType ?? "")
                 : (n: NotificationItem) => (n.stage ?? "new") === stage.key;
               const items = notifications.filter(filterFn).sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
               const isOver = dragOverStage === stage.key;
@@ -441,9 +445,10 @@ export function Notifications() {
                             <div
                               key={n.id}
                               draggable
+                              onMouseDown={() => { wasDragging.current = false; }}
                               onDragStart={(e) => { e.dataTransfer.setData("text/plain", n.id); setDraggingId(n.id); wasDragging.current = true; }}
-                              onDragEnd={() => { setDraggingId(null); setDragOverStage(null); setTimeout(() => { wasDragging.current = false; }, 50); }}
-                              onClick={() => { if (wasDragging.current) return; setSelectedId(n.id === selectedId ? null : n.id); }}
+                              onDragEnd={() => { setDraggingId(null); setDragOverStage(null); }}
+                              onClick={() => { if (wasDragging.current) { wasDragging.current = false; return; } setSelectedId(n.id === selectedId ? null : n.id); }}
                               className="notif-card"
                               style={{
                                 padding: "10px 12px", borderRadius: 6, cursor: "grab", userSelect: "none",
@@ -488,52 +493,25 @@ export function Notifications() {
                                   → {n.actionNeeded}
                                 </Text>
                               )}
-                              <Group gap={4}>
-                                {(stage.key === "new" || stage.key === "skipped") && AGENT_ACTIONABLE_TYPES.has(n.taskType ?? "") && (
-                                  <UnstyledButton
-                                    className="notif-action-btn"
-                                    onClick={(e) => { e.stopPropagation(); handleStageButton(n.id, "planning"); }}
-                                    style={{ padding: "3px 10px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 600, backgroundColor: "var(--mantine-color-blue-5)", color: "white", lineHeight: 1.4 }}
-                                  >
-                                    Plan
-                                  </UnstyledButton>
-                                )}
-                                {(stage.key === "new" || stage.key === "skipped") && HUMAN_ONLY_TYPES.has(n.taskType ?? "") && (
-                                  <UnstyledButton
-                                    className="notif-action-btn"
-                                    onClick={(e) => { e.stopPropagation(); handleStageButton(n.id, "prepared"); }}
-                                    style={{ padding: "3px 10px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 600, backgroundColor: "#06b6d4", color: "white", lineHeight: 1.4 }}
-                                  >
-                                    Prepare
-                                  </UnstyledButton>
-                                )}
-                                {(stage.key === "new" || stage.key === "skipped") && !n.taskType && (
-                                  <UnstyledButton
-                                    className="notif-action-btn"
-                                    onClick={(e) => { e.stopPropagation(); handleStageButton(n.id, "planning"); }}
-                                    style={{ padding: "3px 10px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 600, backgroundColor: "var(--mantine-color-blue-5)", color: "white", lineHeight: 1.4 }}
-                                  >
-                                    Plan
-                                  </UnstyledButton>
-                                )}
-                                {stage.key === "planning" && (
-                                  <UnstyledButton
-                                    className="notif-action-btn"
-                                    onClick={(e) => { e.stopPropagation(); handleStageButton(n.id, "working"); }}
-                                    style={{ padding: "3px 10px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 600, backgroundColor: "#22c55e", color: "white", lineHeight: 1.4 }}
-                                  >
-                                    Start Work
-                                  </UnstyledButton>
-                                )}
-                                {stage.key !== "done" && stage.key !== "skipped" && (
+                              {/* Status indicator for in-progress stages */}
+                              {(stage.key === "planning" || stage.key === "working") && (
+                                <Group gap={4} mt={2}>
+                                  <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: stage.color, animation: "pulse 1.5s infinite" }} />
+                                  <Text size="xs" c={stage.color} fw={500} style={{ fontSize: "0.6rem" }}>
+                                    {stage.key === "planning" ? "Planning..." : "Working..."}
+                                  </Text>
+                                </Group>
+                              )}
+                              {stage.key !== "done" && stage.key !== "skipped" && stage.key !== "planning" && stage.key !== "working" && (
+                                <Group gap={4} mt={2}>
                                   <UnstyledButton
                                     onClick={(e) => { e.stopPropagation(); moveCardToStage(n.id, "done"); }}
                                     style={{ padding: "2px 4px", borderRadius: 4, color: "var(--mantine-color-dimmed)", opacity: 0.5 }}
                                   >
                                     <IconCircleCheck size={12} />
                                   </UnstyledButton>
-                                )}
-                              </Group>
+                                </Group>
+                              )}
                             </div>
                           );
                         })}
@@ -554,6 +532,8 @@ export function Notifications() {
                 ? (n: NotificationItem) => (n.stage ?? "new") === "new" && HUMAN_ONLY_TYPES.has(n.taskType ?? "")
                 : stage.key === "done"
                 ? (n: NotificationItem) => n.stage === "done" && HUMAN_ONLY_TYPES.has(n.taskType ?? "")
+                : stage.key === "skipped"
+                ? (n: NotificationItem) => n.stage === "skipped" && HUMAN_ONLY_TYPES.has(n.taskType ?? "")
                 : (n: NotificationItem) => (n.stage ?? "new") === stage.key;
               const items = notifications.filter(filterFn).sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
               const isOver = dragOverStage === `human-${stage.key}`;
@@ -601,9 +581,10 @@ export function Notifications() {
                             <div
                               key={n.id}
                               draggable
+                              onMouseDown={() => { wasDragging.current = false; }}
                               onDragStart={(e) => { e.dataTransfer.setData("text/plain", n.id); setDraggingId(n.id); wasDragging.current = true; }}
-                              onDragEnd={() => { setDraggingId(null); setDragOverStage(null); setTimeout(() => { wasDragging.current = false; }, 50); }}
-                              onClick={() => { if (wasDragging.current) return; setSelectedId(n.id === selectedId ? null : n.id); }}
+                              onDragEnd={() => { setDraggingId(null); setDragOverStage(null); }}
+                              onClick={() => { if (wasDragging.current) { wasDragging.current = false; return; } setSelectedId(n.id === selectedId ? null : n.id); }}
                               className="notif-card"
                               style={{
                                 padding: "10px 12px", borderRadius: 6, cursor: "grab", userSelect: "none",
@@ -621,20 +602,20 @@ export function Notifications() {
                               </Group>
                               <Text size="xs" fw={500} lineClamp={2} mb={4}>{n.title}</Text>
                               {n.actionNeeded && <Text size="xs" c="blue.4" lineClamp={1} mb={4} style={{ fontSize: "0.65rem" }}>→ {n.actionNeeded}</Text>}
-                              <Group gap={4}>
-                                {stage.key === "new" && (
-                                  <UnstyledButton className="notif-action-btn" onClick={(e) => { e.stopPropagation(); handleStageButton(n.id, "prepared"); }}
-                                    style={{ padding: "3px 10px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 600, backgroundColor: "#06b6d4", color: "white", lineHeight: 1.4 }}>
-                                    Prepare
-                                  </UnstyledButton>
-                                )}
-                                {stage.key !== "done" && (
+                              {stage.key === "prepared" && (
+                                <Group gap={4} mt={2}>
+                                  <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#06b6d4", animation: "pulse 1.5s infinite" }} />
+                                  <Text size="xs" c="#06b6d4" fw={500} style={{ fontSize: "0.6rem" }}>Preparing...</Text>
+                                </Group>
+                              )}
+                              {stage.key !== "done" && stage.key !== "prepared" && stage.key !== "skipped" && (
+                                <Group gap={4} mt={2}>
                                   <UnstyledButton onClick={(e) => { e.stopPropagation(); moveCardToStage(n.id, "done"); }}
                                     style={{ padding: "2px 4px", borderRadius: 4, color: "var(--mantine-color-dimmed)", opacity: 0.5 }}>
                                     <IconCircleCheck size={12} />
                                   </UnstyledButton>
-                                )}
-                              </Group>
+                                </Group>
+                              )}
                             </div>
                           );
                         })}
