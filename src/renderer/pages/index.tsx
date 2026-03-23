@@ -31,6 +31,59 @@ import { GlobalContextBar } from "../components/GlobalContextBar";
 import { IntegrationPanel } from "../components/IntegrationPanel";
 import { useAgentStore, usePendingApprovals } from "../stores/agent-store";
 
+function RecentHistory() {
+  const navigate = useNavigate();
+  const [sessions, setSessions] = useState<Array<{ sessionId: string; firstPrompt: string; lastModified: number; cwd: string; messageCount: number }>>([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const result = await window.deck.listAllSessions();
+        if (result) setSessions(result.slice(0, 6)); // Show last 6
+      } catch {}
+    })();
+  }, []);
+
+  if (sessions.length === 0) return null;
+
+  return (
+    <Stack gap="sm">
+      <Group justify="space-between">
+        <Title order={5}>Recent Sessions</Title>
+        <UnstyledButton onClick={() => navigate("/history")} style={{ fontSize: "0.75rem", color: "var(--mantine-color-blue-4)" }}>
+          View all →
+        </UnstyledButton>
+      </Group>
+      <SimpleGrid cols={2}>
+        {sessions.map(s => {
+          const age = Math.round((Date.now() - s.lastModified) / 60000);
+          const ageStr = age < 60 ? `${age}m ago` : age < 1440 ? `${Math.round(age / 60)}h ago` : `${Math.round(age / 1440)}d ago`;
+          return (
+            <UnstyledButton
+              key={s.sessionId}
+              onClick={() => navigate("/history")}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 8,
+                border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
+                backgroundColor: "var(--mantine-color-dark-7)",
+                opacity: 0.7,
+              }}
+            >
+              <Group gap={6} mb={4}>
+                <StatusDot status="completed" size={6} pulse={false} />
+                <Text size="xs" c="dimmed">{ageStr}</Text>
+              </Group>
+              <Text size="xs" fw={500} lineClamp={1}>{s.firstPrompt}</Text>
+              <Text size="xs" c="dimmed" ff="monospace" mt={2}>{s.cwd.replace(/^\/Users\/\w+\//, "~/")}</Text>
+            </UnstyledButton>
+          );
+        })}
+      </SimpleGrid>
+    </Stack>
+  );
+}
+
 export function Dashboard() {
   const navigate = useNavigate();
   const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
@@ -211,6 +264,8 @@ export function Dashboard() {
                 ))}
               </SimpleGrid>
             )}
+            {/* Recent history */}
+            <RecentHistory />
           </Stack>
 
           {/* Right: sidebar */}
