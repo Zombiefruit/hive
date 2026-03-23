@@ -4,12 +4,14 @@ import { AgentDetail } from "./pages/agent/[agentId]";
 import { History } from "./pages/history";
 import { Notifications } from "./pages/notifications";
 import { Debug } from "./pages/debug";
+import { TaskDetail } from "./pages/task/[taskId]";
 
 const router = createBrowserRouter([
   { path: "/", element: <Dashboard /> },
   { path: "/agent/:agentId", element: <AgentDetail /> },
   { path: "/history", element: <History /> },
   { path: "/notifications", element: <Notifications /> },
+  { path: "/task/:taskId", element: <TaskDetail /> },
   { path: "/debug", element: <Debug /> },
 ]);
 
