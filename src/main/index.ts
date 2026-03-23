@@ -1,5 +1,6 @@
 import { app, BrowserWindow, shell } from "electron";
 import path from "node:path";
+import http from "node:http";
 import { initDatabase, closeDatabase, getAllAgents, getMessages, getPendingApprovals, getAllContextRefs, getRecentEvents, upsertExternalAgent, cleanupStaleExternalAgents } from "./db/database";
 import { registerIpcHandlers, startStoreSync, stopStoreSync } from "./ipc/bridge";
 import { spawnAgent, sendMessage, interruptAgent, killAgent, resumeSession } from "./agents/agent-manager";
@@ -200,7 +201,6 @@ app.whenReady().then(() => {
   startStoreSync(buildStoreState, 100);
 
   // Debug HTTP API — lets browser/Playwright access real data
-  const http = require("node:http");
   const debugServer = http.createServer((req: { url?: string }, res: { writeHead: Function; end: Function }) => {
     res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
     if (req.url === "/api/store") {
