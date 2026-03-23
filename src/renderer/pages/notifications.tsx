@@ -482,6 +482,7 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss }: {
     try {
       const result = await window.deck.prepareWorkPlan({
         id: n.id, source: n.source, title: n.title, summary: n.summary, url: n.url,
+        taskType: n.taskType, links: n.links,
       });
       const plan = result as { conversationHistory: typeof conversation };
       if (plan?.conversationHistory) setConversation(plan.conversationHistory);

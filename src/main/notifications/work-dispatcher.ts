@@ -73,6 +73,8 @@ export async function prepareWorkPlan(notification: {
   title: string;
   summary: string;
   url?: string;
+  taskType?: string;
+  links?: Array<{ type: string; label: string; url: string }>;
 }): Promise<WorkPlan> {
   log(`prepareWorkPlan: ${notification.title}`);
 
@@ -88,14 +90,21 @@ export async function prepareWorkPlan(notification: {
     };
   }
 
-  // Step 1: Ask the bridge to fetch full context AND propose a plan
-  const prompt = `I need you to analyze this work item and create a detailed plan for me.
+  const taskType = notification.taskType ?? "implementation";
+  const linksText = notification.links?.map(l => `- [${l.type}] ${l.label}: ${l.url}`).join("\n") ?? "";
+
+  // Ask the bridge to fetch full context AND propose a plan using the right skill
+  const prompt = `I need you to analyze this work item and create a detailed plan.
+
+## Task Type: ${taskType}
+Use the /parse-${taskType} skill approach to analyze this.
 
 ## Notification
 - **Source**: ${notification.source}
 - **Title**: ${notification.title}
 - **Summary**: ${notification.summary}
 ${notification.url ? `- **URL**: ${notification.url}` : ""}
+${linksText ? `\n## Related Links\n${linksText}` : ""}
 
 ## What I need from you
 
