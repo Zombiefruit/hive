@@ -35,6 +35,11 @@ function logPoll(msg: string): void {
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 const notifications: PollNotification[] = [];
 let isPolling = false;
+let hasCompletedFirstPoll = false;
+
+export function hasPolledOnce(): boolean {
+  return hasCompletedFirstPoll;
+}
 
 export function startPolling(): void {
   if (pollInterval) return;
@@ -304,6 +309,8 @@ Rules:
     logPoll(`poll ERROR: ${String(err)}`);
   } finally {
     isPolling = false;
+    hasCompletedFirstPoll = true;
+    broadcastNotifications(); // Always broadcast after poll completes
     // If a refresh was queued while we were polling, run again
     if (pendingRefresh) {
       pendingRefresh = false;

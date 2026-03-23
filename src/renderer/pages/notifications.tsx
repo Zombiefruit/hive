@@ -65,12 +65,14 @@ export function Notifications() {
       try {
         const result = await window.deck.getNotifications();
         if (result) {
-          const items = (result as NotificationItem[]).map(n => ({ ...n, stage: n.stage ?? "new" }));
-          // Replace entirely — the backend handles dedup
-          if (items.length > 0) {
-            setNotifications(items);
-            setFetching(false);
-          }
+          const data = result as { items?: NotificationItem[]; hasPolled?: boolean } | NotificationItem[];
+          // Handle both old format (array) and new format ({items, hasPolled})
+          const items = Array.isArray(data) ? data : (data.items ?? []);
+          const hasPolled = Array.isArray(data) ? items.length > 0 : (data.hasPolled ?? false);
+
+          const mapped = items.map(n => ({ ...n, stage: n.stage ?? "new" }));
+          if (mapped.length > 0) setNotifications(mapped);
+          if (hasPolled) setFetching(false);
         }
       } catch {}
     };

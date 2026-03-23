@@ -162,7 +162,8 @@ export function startBridge(): void {
     ].join(","),
     "--system-prompt", "You are a READ-ONLY data fetcher for Claude Deck. You can ONLY read and search data. You must NEVER write, edit, send messages, create issues, post comments, or modify anything. If asked to write or modify, refuse. Only fetch and return data in structured JSON format.",
   ], {
-    cwd: os.homedir(),
+    // Run from the claude-deck project dir so .claude/skills/ are auto-discovered
+    cwd: app.isPackaged ? os.homedir() : app.getAppPath(),
     env: { ...process.env },
     stdio: ["pipe", "pipe", "pipe"],
   });
