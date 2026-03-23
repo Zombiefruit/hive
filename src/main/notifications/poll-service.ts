@@ -122,60 +122,84 @@ async function poll(): Promise<void> {
   // Don't seed from context refs — only use real triage results
 
   try {
-    // Ask the bridge to check for notifications using natural language
-    const prompt = `You are a smart notification triage agent for Kieran Williams (kwilliams, Slack U02PKBZSB9Q, Linear kwilliams, team Vector at Monte Carlo Data).
+    // PASS 1: Gather all raw data from all sources
+    logPoll("Pass 1: Gathering raw data from all sources");
+    const gatherPrompt = `You are gathering data for Kieran Williams (kwilliams, Slack ID U02PKBZSB9Q, Linear user kwilliams, team Vector at Monte Carlo Data).
 
-Your job is to find things that GENUINELY NEED Kieran's attention. Not everything — only actionable items.
+Fetch ALL of the following — don't filter anything yet, just gather:
 
-## What to check
-1. **Slack**: Search for DMs and @mentions of <@U02PKBZSB9Q> in the last 4 hours
-2. **Linear**: Issues assigned to kwilliams — ONLY "In Progress", "Todo", or "Backlog" status. SKIP anything marked Done/Completed/Cancelled.
-3. **GitHub**: Open PR review requests where Kieran is a reviewer
-4. **Gmail**: Check for unread emails in the last 4 hours
-5. **Notion**: Check for recent mentions or page updates
+1. **Slack**: All @mentions of <@U02PKBZSB9Q> in the last 6 hours. Also check DMs. For each message, get: who sent it, what they said (exact quote), which channel/thread, and when.
 
-## What counts as ACTIONABLE (include these)
-- Someone directly asked Kieran a question and is waiting for a reply
-- A PR needs Kieran's review and hasn't been reviewed yet
-- A Linear ticket is assigned to Kieran and is In Progress or Todo (NOT Done)
-- An important email that needs a response
-- A Slack DM that needs a reply
+2. **Linear**: ALL issues assigned to kwilliams. For each: title, status, description summary, any recent comments, priority.
 
-## What to SKIP (do NOT include)
-- Completed/Done/Cancelled tickets — Kieran already knows about these
-- General channel announcements where Kieran was mentioned but not asked to do anything
-- Automated messages, bot messages, CI notifications
-- Threads where Kieran was mentioned but the conversation moved on without needing his input
-- FYI-only information with no required action
+3. **GitHub**: Any open PRs where I'm a reviewer or author. Get: title, status, who requested review.
 
-## Confidence score
-Rate each notification 1-10:
-- 9-10: Definitely needs attention NOW (someone waiting, deadline soon)
-- 7-8: Should look at today
-- 5-6: Nice to know, might need action
-- Below 5: Don't include it
+4. **Gmail**: Recent unread emails from the last 6 hours. Subject, sender, preview.
 
-## Output format
-Return ONLY a JSON array, NOTHING else:
+5. **Notion**: Any pages where I was recently mentioned.
+
+Return ALL of this as a structured text report. Don't skip anything — I need the complete picture. Format it clearly with sections.`;
+
+    const rawData = await askBridge(gatherPrompt, 120000);
+    logPoll(`Pass 1 complete: ${rawData.length} chars of raw data`);
+
+    if (rawData.length < 50) {
+      logPoll("Pass 1 returned too little data, skipping Pass 2");
+      isPolling = false;
+      return;
+    }
+
+    // PASS 2: AI consolidation — think like Kieran going through his inbox
+    logPoll("Pass 2: AI consolidation and prioritization");
+    const triagePrompt = `You are Kieran's personal assistant. Here is everything from his Slack, Linear, GitHub, Gmail, and Notion from the last few hours:
+
+---
+${rawData}
+---
+
+Now, go through all of this the way Kieran would if he sat down to process his inbox. Think about:
+- What actually needs a response or action from Kieran?
+- What's urgent vs. can wait?
+- Are there related items that should be consolidated? (e.g., a Slack mention about a Linear ticket — that's ONE action item, not two)
+- What's just noise that can be ignored?
+
+Create a PRIORITIZED action list. Each item should be a clear task with context. Consolidate related items into single actions.
+
+Categories:
+- **urgent**: Someone is blocked waiting for Kieran, or there's a deadline
+- **today**: Should handle today but not immediately blocking anyone
+- **low**: Can wait, but worth knowing about
+
+Return ONLY a JSON array, nothing else:
 [{
   "source": "slack",
-  "priority": "actionable",
+  "priority": "urgent",
   "confidence": 9,
-  "title": "DM from Yael: deployment timeline question",
-  "summary": "Yael Chemla DM'd you: 'Hey, what's the ETA on the retry logic? We're planning the Thursday deploy and need to know if it'll be ready.' She sent this 30 minutes ago and is waiting for a reply.",
-  "url": "https://montecarlodata.slack.com/archives/D043DJB30DB",
-  "author": "Yael Chemla",
-  "action_needed": "Reply to Yael with an ETA"
+  "title": "Clear, actionable title",
+  "summary": "2-3 sentences explaining the full context. WHO needs what, WHY it matters, WHAT Kieran should do. Quote relevant messages.",
+  "url": "direct link to the item",
+  "author": "Person who needs Kieran's attention",
+  "action_needed": "Specific action: 'Reply to X about Y' or 'Review PR #123' or 'Start work on VEC-10'"
 }]
 
-If nothing genuinely actionable, return: []`;
+Important:
+- Consolidate related items (don't list the same thing from Slack AND Linear separately)
+- Only include items where Kieran needs to DO something
+- Skip completed/done items entirely
+- Sort by priority (urgent first)
+- If nothing needs action, return []`;
 
-    logPoll("Asking bridge for notifications");
-    const response = await askBridge(prompt, 90000);
-    logPoll(`Bridge response (first 300): ${response.slice(0, 300)}`);
+    const response = await askBridge(triagePrompt, 90000);
+    logPoll(`Pass 2 complete: ${response.length} chars`);
+    logPoll(`Response (first 300): ${response.slice(0, 300)}`);
+
+    // Strip markdown code blocks if present
+    let cleanResponse = response;
+    const codeBlockMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeBlockMatch) cleanResponse = codeBlockMatch[1];
 
     // Parse JSON array from response
-    const jsonMatch = response.match(/\[[\s\S]*\]/);
+    const jsonMatch = cleanResponse.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
       logPoll("No JSON array in response");
       isPolling = false;
