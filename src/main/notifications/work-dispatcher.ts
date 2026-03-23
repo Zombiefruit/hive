@@ -179,32 +179,75 @@ export async function prepareWorkPlan(notification: {
     ? `## MANDATORY: Fetch Context First\nYou MUST execute these MCP calls before creating a plan. Do NOT skip any.\n${fetchSteps.map((s, i) => `${i + 1}. ${s}`).join("\n")}\n`
     : "";
 
-  // Build the prompt — fetch ALL context first, then plan
-  const prompt = `You are planning work for Kieran Williams, a Senior Frontend Engineer at Monte Carlo Data (Vector team). The main codebase is at ~/Documents/GitHub/frontend (React + TypeScript + Mantine).
+  // Different prompts for agent-actionable vs human-only tasks
+  const isHumanOnly = taskType === "meeting_prep" || taskType === "response" || taskType === "follow_up";
 
-## STEP 1: FETCH ALL CONTEXT (do this FIRST, before writing anything)
+  const fetchSection = `## STEP 1: FETCH ALL CONTEXT (do this FIRST)
 
-${fetchSteps.length > 0 ? fetchSteps.map((s, i) => `${i + 1}. ${s}`).join("\n") : "No specific links to fetch — use the summary below."}
-${notification.source === "linear" ? `\nAlso: Search Linear for any related issues or parent epics.` : ""}
-${notification.source === "slack" ? `\nAlso: Read the full Slack thread to understand the complete context.` : ""}
+${fetchSteps.length > 0 ? fetchSteps.map((s, i) => `${i + 1}. ${s}`).join("\n") : "No specific links — use the summary below."}
+${notification.source === "linear" ? `\nAlso: Search Linear for related issues.` : ""}
+${notification.source === "slack" ? `\nAlso: Read the full Slack thread.` : ""}`;
 
-## STEP 2: CREATE A CONCISE PLAN (after fetching context)
-
-## Work Item
+  const workItem = `## Work Item
 - **Type**: ${taskType}
 - **Title**: ${notification.title}
 - **Summary**: ${notification.summary}
 ${notification.url ? `- **URL**: ${notification.url}` : ""}
 ${linksText ? `\n**Links:**\n${linksText}` : ""}
-${ghContext ? `\n**GitHub (pre-fetched):**\n${ghContext}` : ""}
+${ghContext ? `\n**GitHub:**\n${ghContext}` : ""}`;
 
-Based on the context you fetched, write a SHORT plan (max 10 lines):
-1. What needs to be done (1-2 sentences, reference specifics from the context)
+  let prompt: string;
+
+  if (isHumanOnly && taskType === "meeting_prep") {
+    prompt = `You are briefing Kieran Williams for a meeting. Fetch all available context, then prepare a concise briefing.
+
+${fetchSection}
+
+${workItem}
+
+## STEP 2: MEETING BRIEFING (after fetching context)
+
+Write a SHORT briefing (max 15 lines):
+1. **What's this meeting about** — topic, purpose
+2. **Key people** — who's attending and their roles/context
+3. **What to expect** — likely discussion topics, any decisions needed
+4. **Talking points for Kieran** — things he should bring up or be ready for
+5. **Recent context** — any Slack threads, tickets, or PRs relevant to the discussion
+
+Do NOT ask questions. Use what you fetched.`;
+  } else if (isHumanOnly && taskType === "response") {
+    prompt = `You are helping Kieran Williams draft a response. Fetch all available context, then prepare a draft.
+
+${fetchSection}
+
+${workItem}
+
+## STEP 2: DRAFT RESPONSE (after fetching context)
+
+Write:
+1. **Context summary** — what's being asked and by whom (2-3 sentences)
+2. **Suggested response** — a draft Kieran can edit and send
+3. **Key points to address** — what the person is looking for
+
+Keep the draft concise and in Kieran's voice (direct, technical, helpful).
+Do NOT ask questions. Use what you fetched.`;
+  } else {
+    prompt = `You are planning work for Kieran Williams, Senior Frontend Engineer at Monte Carlo Data (Vector team). Main codebase: ~/Documents/GitHub/frontend (React + TypeScript + Mantine).
+
+${fetchSection}
+
+${workItem}
+
+## STEP 2: CONCISE WORK PLAN (after fetching context)
+
+Write a SHORT plan (max 10 lines):
+1. What needs to be done (reference specifics from context)
 2. Key files/components to modify
 3. Estimated complexity (simple/moderate/complex)
 4. Any blockers or dependencies
 
-Do NOT ask questions. Do NOT say "I need more info". Use what you have and what you can fetch via MCP tools. If you can't access something, note it and plan around it.`;
+Do NOT ask questions. Use what you have and what you can fetch via MCP tools.`;
+  }
 
   const response = await askBridge(prompt, 90000);
   log(`Plan response: ${response.length} chars`);

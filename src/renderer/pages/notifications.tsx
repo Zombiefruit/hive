@@ -28,21 +28,19 @@ interface NotificationItem {
 }
 
 const STAGES = [
-  { key: "new", label: "Inbox", Icon: IconInbox, color: "#3b82f6", tip: "New items from Slack, Linear, Gmail, etc. Drag to Planning to start working." },
-  { key: "follow_up", label: "Follow Up", Icon: IconClock, color: "#f59e0b", tip: "Items you've handled but need to recheck later. Rechecked each refresh." },
-  { key: "planning", label: "Planning", Icon: IconSparkles, color: "#a855f7", tip: "Drop here to have AI create a work plan. Opens the detail view for review." },
-  { key: "working", label: "Working", Icon: IconPlayerPlay, color: "#22c55e", tip: "Drop here from Planning to spawn an agent that executes the plan." },
-  { key: "done", label: "Done", Icon: IconCircleCheck, color: "#6b7280", tip: "Completed items. Persisted so you can review what you've done." },
-  { key: "skipped", label: "Reviewed", Icon: IconEyeOff, color: "#525252", tip: "AI reviewed these and skipped them. Drag to Inbox if you disagree." },
+  { key: "new", label: "Inbox", Icon: IconInbox, color: "#3b82f6", tip: "New items. Drag to Planning for agent tasks, or to Prepared for meetings/responses." },
+  { key: "follow_up", label: "Follow Up", Icon: IconClock, color: "#f59e0b", tip: "Items to recheck later — waiting for reply, monitoring progress." },
+  { key: "planning", label: "Planning", Icon: IconSparkles, color: "#a855f7", tip: "AI fetches context and creates a work plan. For code tasks only." },
+  { key: "working", label: "Working", Icon: IconPlayerPlay, color: "#22c55e", tip: "Agent is executing the plan. For code tasks only." },
+  { key: "prepared", label: "Prepared", Icon: IconFileText, color: "#06b6d4", tip: "AI gathered context for you. For meetings, responses — things only you can do." },
+  { key: "done", label: "Done", Icon: IconCircleCheck, color: "#6b7280", tip: "Completed items." },
+  { key: "skipped", label: "Reviewed", Icon: IconEyeOff, color: "#525252", tip: "AI reviewed and skipped. Drag to Inbox if you disagree." },
 ];
 
-// What each stage transition does:
-// Inbox → Planning: triggers prepareWorkPlan (AI creates a plan)
-// Inbox → Follow Up: just moves it (recheck later)
-// Planning → Working: triggers startWorkAgent (only if plan exists)
-// Any → Done: marks complete
-// Any → Inbox: moves back (resets)
-// Reviewed → Inbox: promotes a skipped item to actionable
+// Agent-actionable: an agent can do the actual work
+const AGENT_ACTIONABLE_TYPES = new Set(["implementation", "investigation", "review", "planning"]);
+// Human-only: agent can prepare context but you handle it
+const HUMAN_ONLY_TYPES = new Set(["meeting_prep", "response", "follow_up"]);
 
 const sourceIcons: Record<string, React.FC<{ size?: number; color?: string }>> = {
   linear: SiLinear as React.FC<{ size?: number; color?: string }>,
@@ -191,8 +189,9 @@ export function Notifications() {
       return;
     }
 
-    if (newStage === "planning") {
+    if (newStage === "planning" || newStage === "prepared") {
       setSelectedId(id);
+      // Both planning and prepared use prepareWorkPlan — the prompt adapts based on taskType
       window.deck.prepareWorkPlan?.({
         id: n.id, source: n.source, title: n.title, summary: n.summary, url: n.url,
         taskType: n.taskType, links: n.links,
@@ -462,7 +461,25 @@ export function Notifications() {
                                 </Text>
                               )}
                               <Group gap={4}>
-                                {(stage.key === "new" || stage.key === "skipped") && (
+                                {(stage.key === "new" || stage.key === "skipped") && AGENT_ACTIONABLE_TYPES.has(n.taskType ?? "") && (
+                                  <UnstyledButton
+                                    className="notif-action-btn"
+                                    onClick={(e) => { e.stopPropagation(); handleStageButton(n.id, "planning"); }}
+                                    style={{ padding: "3px 10px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 600, backgroundColor: "var(--mantine-color-blue-5)", color: "white", lineHeight: 1.4 }}
+                                  >
+                                    Plan
+                                  </UnstyledButton>
+                                )}
+                                {(stage.key === "new" || stage.key === "skipped") && HUMAN_ONLY_TYPES.has(n.taskType ?? "") && (
+                                  <UnstyledButton
+                                    className="notif-action-btn"
+                                    onClick={(e) => { e.stopPropagation(); handleStageButton(n.id, "prepared"); }}
+                                    style={{ padding: "3px 10px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 600, backgroundColor: "#06b6d4", color: "white", lineHeight: 1.4 }}
+                                  >
+                                    Prepare
+                                  </UnstyledButton>
+                                )}
+                                {(stage.key === "new" || stage.key === "skipped") && !n.taskType && (
                                   <UnstyledButton
                                     className="notif-action-btn"
                                     onClick={(e) => { e.stopPropagation(); handleStageButton(n.id, "planning"); }}
@@ -599,15 +616,15 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss }: {
         if (existing && (existing as { conversationHistory: typeof conversation }).conversationHistory?.length > 0) {
           setConversation((existing as { conversationHistory: typeof conversation }).conversationHistory);
           setLoading(false);
-        } else if (n.stage === "planning") {
-          // Plan is being prepared — show loading and keep polling
+        } else if (n.stage === "planning" || n.stage === "prepared") {
+          // Plan/briefing is being prepared — show loading and keep polling
           setLoading(true);
         }
       } catch {}
     };
     loadPlan();
-    // Poll every 3s while in planning stage to pick up plan updates
-    const interval = n.stage === "planning" ? setInterval(loadPlan, 3000) : undefined;
+    // Poll every 3s while preparing to pick up updates
+    const interval = (n.stage === "planning" || n.stage === "prepared") ? setInterval(loadPlan, 3000) : undefined;
     return () => { cancelled = true; if (interval) clearInterval(interval); };
   }, [n.id, n.stage]);
 
