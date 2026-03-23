@@ -167,9 +167,11 @@ export function Notifications() {
       const items = (data as NotificationItem[]).map(n => ({ ...n, stage: n.stage ?? "new" }));
       console.log(`[live] onNotificationsUpdate: ${items.length} items, stages: ${[...new Set(items.map(n => n.stage))].join(",")}`);
       if (items.length > 0) {
+        // Server is source of truth — only add skipped cards that aren't in the server data
+        const serverIds = new Set(items.map(n => n.id));
         setNotifications(prev => {
-          const skippedCards = prev.filter(n => n.id.startsWith("skipped-"));
-          return [...items, ...skippedCards];
+          const clientOnly = prev.filter(n => n.id.startsWith("skipped-") && !serverIds.has(n.id));
+          return [...items, ...clientOnly];
         });
       }
     });
@@ -200,6 +202,26 @@ export function Notifications() {
       unsubProgress?.();
     };
   }, []);
+
+  // Poll for plan readiness on items in planning/prepared stages
+  useEffect(() => {
+    const planningIds = notifications.filter(n => (n.stage === "planning" || n.stage === "prepared") && !plansReady.has(n.id)).map(n => n.id);
+    if (planningIds.length === 0) return;
+
+    const checkPlans = async () => {
+      for (const id of planningIds) {
+        try {
+          const plan = await window.deck?.getPlan?.(id);
+          if (plan && (plan as { conversationHistory?: unknown[] }).conversationHistory?.length) {
+            setPlansReady(prev => new Set([...prev, id]));
+          }
+        } catch {}
+      }
+    };
+    checkPlans();
+    const interval = setInterval(checkPlans, 5000);
+    return () => clearInterval(interval);
+  }, [notifications, plansReady]);
 
   // Move card visually + persist. Always call this first so the card doesn't freeze.
   const moveCardToStage = useCallback((id: string, newStage: string) => {
