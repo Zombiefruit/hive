@@ -15,6 +15,9 @@ interface NotificationItem {
   title: string;
   summary: string;
   url?: string;
+  author?: string;
+  confidence?: number;
+  actionNeeded?: string;
   createdAt: string;
   stage?: string;
 }
@@ -222,13 +225,33 @@ export function Notifications() {
                               cursor: "pointer",
                             }}
                           >
-                            <Group gap={6} mb={4}>
-                              <SrcIcon size={12} color={srcColor} />
-                              <Text size="xs" c="dimmed">{formatAge(n.createdAt)}</Text>
+                            <Group gap={6} mb={4} justify="space-between">
+                              <Group gap={4}>
+                                <SrcIcon size={12} color={srcColor} />
+                                {n.author && <Text size="xs" c="dimmed" truncate style={{ maxWidth: 80 }}>{n.author}</Text>}
+                              </Group>
+                              <Group gap={4}>
+                                {n.confidence && (
+                                  <div style={{
+                                    width: 16, height: 16, borderRadius: "50%", fontSize: "0.55rem", fontWeight: 700,
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    backgroundColor: n.confidence >= 8 ? "#ef4444" : n.confidence >= 6 ? "#eab308" : "#6b7280",
+                                    color: "white",
+                                  }}>
+                                    {n.confidence}
+                                  </div>
+                                )}
+                                <Text size="xs" c="dimmed">{formatAge(n.createdAt)}</Text>
+                              </Group>
                             </Group>
-                            <Text size="xs" fw={500} lineClamp={2} mb={6}>
+                            <Text size="xs" fw={500} lineClamp={2} mb={4}>
                               {n.title}
                             </Text>
+                            {n.actionNeeded && (
+                              <Text size="xs" c="blue.4" lineClamp={1} mb={4} style={{ fontSize: "0.65rem" }}>
+                                → {n.actionNeeded}
+                              </Text>
+                            )}
                             <Group gap={4}>
                               {stage.key === "new" && (
                                 <UnstyledButton
@@ -379,11 +402,37 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss }: {
           </UnstyledButton>
         </Group>
         <Text size="lg" fw={600}>{n.title}</Text>
+        {n.author && <Text size="xs" c="dimmed" mt={4}>From: {n.author}</Text>}
       </div>
 
       {/* Content */}
       <div style={{ flex: 1, padding: 24, overflowY: "auto" }}>
         <Text size="sm" c="dimmed" mb="md">{n.summary}</Text>
+
+        {n.actionNeeded && (
+          <div style={{
+            padding: "10px 14px",
+            borderRadius: 6,
+            backgroundColor: "color-mix(in srgb, var(--mantine-color-blue-5) 10%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--mantine-color-blue-5) 30%, transparent)",
+            marginBottom: 16,
+          }}>
+            <Text size="xs" fw={600} c="blue" mb={4}>Action needed</Text>
+            <Text size="sm">{n.actionNeeded}</Text>
+          </div>
+        )}
+
+        {n.confidence && (
+          <Group gap="xs" mb="md">
+            <Text size="xs" c="dimmed">Confidence:</Text>
+            <Badge
+              size="sm"
+              color={n.confidence >= 8 ? "red" : n.confidence >= 6 ? "yellow" : "gray"}
+            >
+              {n.confidence}/10
+            </Badge>
+          </Group>
+        )}
 
         {n.url && (
           <UnstyledButton

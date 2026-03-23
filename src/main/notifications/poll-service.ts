@@ -13,6 +13,9 @@ export interface PollNotification {
   title: string;
   summary: string;
   url?: string;
+  author?: string;
+  confidence?: number;
+  actionNeeded?: string;
   createdAt: string;
   stage?: string;
 }
@@ -101,31 +104,61 @@ async function poll(): Promise<void> {
   logPoll("poll starting");
 
   if (!isBridgeReady()) {
-    logPoll("Bridge not ready, skipping poll");
+    logPoll("Bridge not ready, waiting...");
     isPolling = false;
     return;
   }
 
+  // Don't seed from context refs — only use real triage results
+
   try {
     // Ask the bridge to check for notifications using natural language
-    const prompt = `Check the following for Kieran Williams (kwilliams, Slack ID U02PKBZSB9Q, Linear user kwilliams, team Vector):
+    const prompt = `You are a smart notification triage agent for Kieran Williams (kwilliams, Slack U02PKBZSB9Q, Linear kwilliams, team Vector at Monte Carlo Data).
 
-1. **Slack**: Search for messages mentioning <@U02PKBZSB9Q> or DMs to me in the last 2 hours. For each mention, include WHO said it and WHAT they said (quote the key part).
-2. **Linear**: List issues assigned to "kwilliams" updated in the last 24 hours. Include status and any recent comments.
-3. **GitHub**: Check for PR review requests directed at me.
+Your job is to find things that GENUINELY NEED Kieran's attention. Not everything — only actionable items.
 
-For each item, include rich detail:
-- "source": "slack" | "linear" | "github"
-- "priority": "actionable" (I need to DO something) | "fyi" (just informational)
-- "title": Short descriptive title
-- "summary": 2-3 sentences with context. WHO is involved, WHAT they need, and WHY it matters. Include quotes from messages where relevant.
-- "url": Direct link to the item
-- "author": Who created/sent this (name if available)
+## What to check
+1. **Slack**: Search for DMs and @mentions of <@U02PKBZSB9Q> in the last 4 hours
+2. **Linear**: Issues assigned to kwilliams — ONLY "In Progress", "Todo", or "Backlog" status. SKIP anything marked Done/Completed/Cancelled.
+3. **GitHub**: Open PR review requests where Kieran is a reviewer
+4. **Gmail**: Check for unread emails in the last 4 hours
+5. **Notion**: Check for recent mentions or page updates
 
-Return ONLY a JSON array, no other text:
-[{"source":"slack","priority":"actionable","title":"#team-vector: Yael asked about retry logic","summary":"Yael Chemla asked: 'Hey Kieran, what's the status on the retry logic? We need it for the Thursday deploy.' This is in the deployment planning thread.","url":"https://montecarlodata.slack.com/archives/C0AMSV2SK4Z","author":"Yael Chemla"}]
+## What counts as ACTIONABLE (include these)
+- Someone directly asked Kieran a question and is waiting for a reply
+- A PR needs Kieran's review and hasn't been reviewed yet
+- A Linear ticket is assigned to Kieran and is In Progress or Todo (NOT Done)
+- An important email that needs a response
+- A Slack DM that needs a reply
 
-If nothing found, return: []`;
+## What to SKIP (do NOT include)
+- Completed/Done/Cancelled tickets — Kieran already knows about these
+- General channel announcements where Kieran was mentioned but not asked to do anything
+- Automated messages, bot messages, CI notifications
+- Threads where Kieran was mentioned but the conversation moved on without needing his input
+- FYI-only information with no required action
+
+## Confidence score
+Rate each notification 1-10:
+- 9-10: Definitely needs attention NOW (someone waiting, deadline soon)
+- 7-8: Should look at today
+- 5-6: Nice to know, might need action
+- Below 5: Don't include it
+
+## Output format
+Return ONLY a JSON array, NOTHING else:
+[{
+  "source": "slack",
+  "priority": "actionable",
+  "confidence": 9,
+  "title": "DM from Yael: deployment timeline question",
+  "summary": "Yael Chemla DM'd you: 'Hey, what's the ETA on the retry logic? We're planning the Thursday deploy and need to know if it'll be ready.' She sent this 30 minutes ago and is waiting for a reply.",
+  "url": "https://montecarlodata.slack.com/archives/D043DJB30DB",
+  "author": "Yael Chemla",
+  "action_needed": "Reply to Yael with an ETA"
+}]
+
+If nothing genuinely actionable, return: []`;
 
     logPoll("Asking bridge for notifications");
     const response = await askBridge(prompt, 90000);
@@ -140,7 +173,8 @@ If nothing found, return: []`;
     }
 
     const items = JSON.parse(jsonMatch[0]) as Array<{
-      source: string; priority: string; title: string; summary: string; url?: string; author?: string;
+      source: string; priority: string; title: string; summary: string;
+      url?: string; author?: string; confidence?: number; action_needed?: string;
     }>;
 
     logPoll(`Parsed ${items.length} notifications`);
@@ -172,6 +206,9 @@ If nothing found, return: []`;
       const key = extractKey(item);
       if (existingKeys.has(key)) continue;
       existingKeys.add(key);
+      // Only include items with confidence >= 5
+      if (item.confidence !== undefined && item.confidence < 5) continue;
+
       notifications.unshift({
         id: `poll-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         source: item.source as PollNotification["source"],
@@ -180,6 +217,9 @@ If nothing found, return: []`;
         title: item.title,
         summary: item.summary,
         url: item.url,
+        author: item.author,
+        confidence: item.confidence,
+        actionNeeded: item.action_needed,
         createdAt: new Date().toISOString(),
       });
       added++;
