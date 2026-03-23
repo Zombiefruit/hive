@@ -139,13 +139,15 @@ If nothing found, return: []`;
 
     const child = execFile(claudePath, [
       "-p", prompt,
-      "--output-format", "json",
+      "--output-format", "stream-json",
+      "--verbose",
       "--model", "claude-haiku-4-5-20251001",
       "--max-turns", "5",
     ], {
       timeout: 60000,
       maxBuffer: 1024 * 1024,
       env: { ...process.env },
+      cwd: os.homedir(), // Run from home dir for MCP access
     }, (error, stdout, stderr) => {
       if (error) {
         logPoll(`CLI error: ${error.message}`);
@@ -156,13 +158,29 @@ If nothing found, return: []`;
       logPoll(`CLI stdout length: ${stdout.length}`);
 
       try {
-        // Without --verbose, --output-format json gives a single result object
-        const result = JSON.parse(stdout);
-        const text = String(result.result ?? "");
-        logPoll(`Result text (first 300): ${text.slice(0, 300)}`);
+        // stream-json with --verbose outputs NDJSON lines
+        // Find the result line and extract the text
+        let resultText = "";
+        for (const line of stdout.split("\n")) {
+          if (!line.trim()) continue;
+          try {
+            const obj = JSON.parse(line);
+            if (obj.type === "result" && obj.result) {
+              resultText = String(obj.result);
+            }
+          } catch {}
+        }
+
+        if (!resultText) {
+          // Fallback: try to find JSON array anywhere in stdout
+          const anyMatch = stdout.match(/\[\s*\{[^}]*"source"[^}]*\}[\s\S]*?\]/);
+          if (anyMatch) resultText = anyMatch[0];
+        }
+
+        logPoll(`Result text (first 300): ${resultText.slice(0, 300)}`);
 
         // Extract JSON array from the result text
-        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        const jsonMatch = resultText.match(/\[[\s\S]*\]/);
         if (!jsonMatch) {
           logPoll("No JSON array found in result");
           resolve([]);

@@ -11,6 +11,25 @@ const typeConfig: Record<string, { icon: typeof IconTicket; color: string }> = {
   notion: { icon: IconFileText, color: "#94a3b8" },
 };
 
+function deriveShortTitle(task: string, cwd: string): string {
+  // If it's a default "Claude Code session" title, use the directory
+  if (task.startsWith("Claude Code session")) {
+    return cwd.split("/").pop() ?? "Session";
+  }
+  // Extract key phrases
+  const prMatch = task.match(/PR\s*#?\d+/i);
+  if (prMatch) return `Review ${prMatch[0]}`;
+  const ticketMatch = task.match(/[A-Z]+-\d+/);
+  if (ticketMatch) return ticketMatch[0];
+  // Shorten: take first meaningful phrase
+  const short = task
+    .replace(/^(Can you |Please |I want to |Let's )/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const firstSentence = short.split(/[.!?\n]/)[0].trim();
+  return firstSentence.length > 30 ? firstSentence.slice(0, 30) + "…" : firstSentence;
+}
+
 export function GlobalContextBar() {
   const agents = useAgentStore((s) => s.agents);
   const allContextRefs = useAgentStore((s) => s.contextRefs);
@@ -26,7 +45,7 @@ export function GlobalContextBar() {
     if (refs.length > 0) {
       agentContexts.push({
         agentId: agent.id,
-        agentName: agent.task.length > 40 ? agent.task.slice(0, 40) + "..." : agent.task,
+        agentName: deriveShortTitle(agent.task, agent.cwd),
         refs,
       });
     }

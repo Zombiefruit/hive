@@ -140,36 +140,35 @@ export function Dashboard() {
             WebkitAppRegion: "drag",
           }}
         >
-          <Group gap="sm" style={{ WebkitAppRegion: "no-drag" }}>
+          <Group gap="sm" style={{ WebkitAppRegion: "no-drag", minWidth: 120 }}>
             <Title order={4}>Claude Deck</Title>
           </Group>
-          <Group gap={4} style={{ WebkitAppRegion: "no-drag" }}>
-            {[
-              { key: "agents", label: "Agents" },
-              { key: "inbox", label: "Inbox" },
-            ].map(tab => (
-              <UnstyledButton
-                key={tab.key}
-                onClick={() => {
-                  if (tab.key === "inbox") navigate("/notifications");
-                }}
-                style={{
-                  padding: "4px 12px",
-                  borderRadius: 6,
-                  fontSize: "0.8rem",
-                  fontWeight: 500,
-                  backgroundColor: tab.key === "agents" ? "var(--mantine-color-dark-6)" : "transparent",
-                  color: tab.key === "agents" ? "var(--mantine-color-text)" : "var(--mantine-color-dimmed)",
-                }}
-              >
-                {tab.label}
-                {tab.key === "inbox" && (
-                  <Badge variant="filled" color="blue" size="xs" ml={6}>
-                    {pendingCount || "0"}
-                  </Badge>
-                )}
-              </UnstyledButton>
-            ))}
+          {/* Centered tabs */}
+          <Group gap={4} style={{ WebkitAppRegion: "no-drag", position: "absolute", left: "50%", transform: "translateX(-50%)" }}>
+            <UnstyledButton
+              style={{
+                padding: "4px 14px",
+                borderRadius: 6,
+                fontSize: "0.8rem",
+                fontWeight: 500,
+                backgroundColor: "var(--mantine-color-dark-6)",
+                color: "var(--mantine-color-text)",
+              }}
+            >
+              Agents
+            </UnstyledButton>
+            <UnstyledButton
+              onClick={() => navigate("/notifications")}
+              style={{
+                padding: "4px 14px",
+                borderRadius: 6,
+                fontSize: "0.8rem",
+                fontWeight: 500,
+                color: "var(--mantine-color-dimmed)",
+              }}
+            >
+              Inbox
+            </UnstyledButton>
           </Group>
           <Group gap="xs" style={{ WebkitAppRegion: "no-drag" }}>
             <UnstyledButton

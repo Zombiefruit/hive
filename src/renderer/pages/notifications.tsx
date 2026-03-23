@@ -124,21 +124,19 @@ export function Notifications() {
           flexShrink: 0,
         }}
       >
-        <Text size="md" fw={700} style={{ WebkitAppRegion: "no-drag" }}>Claude Deck</Text>
-        <Group gap={4} style={{ WebkitAppRegion: "no-drag" }}>
+        <Text size="md" fw={700} style={{ WebkitAppRegion: "no-drag", minWidth: 120 }}>Claude Deck</Text>
+        {/* Centered tabs */}
+        <Group gap={4} style={{ WebkitAppRegion: "no-drag", position: "absolute", left: "50%", transform: "translateX(-50%)" }}>
           <UnstyledButton
             onClick={() => navigate("/")}
-            style={{ padding: "4px 12px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500, color: "var(--mantine-color-dimmed)" }}
+            style={{ padding: "4px 14px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500, color: "var(--mantine-color-dimmed)" }}
           >
             Agents
           </UnstyledButton>
           <UnstyledButton
-            style={{ padding: "4px 12px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500, backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-text)" }}
+            style={{ padding: "4px 14px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500, backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-text)" }}
           >
             Inbox
-            <Badge variant="filled" color="blue" size="xs" ml={6}>
-              {notifications.filter(n => (n.stage ?? "new") === "new").length || "0"}
-            </Badge>
           </UnstyledButton>
         </Group>
       </div>
