@@ -105,11 +105,23 @@ export async function prepareWorkPlan(notification: {
   const taskType = notification.taskType ?? "implementation";
   const linksText = notification.links?.map(l => `- [${l.type}] ${l.label}: ${l.url}`).join("\n") ?? "";
 
-  // Ask the bridge to fetch full context AND propose a plan using the right skill
+  // Load the relevant skill prompt
+  let skillPrompt = "";
+  try {
+    const skillPath = path.join(process.cwd(), ".claude", "skills", `parse-${taskType}`, "SKILL.md");
+    if (fs.existsSync(skillPath)) {
+      const raw = fs.readFileSync(skillPath, "utf-8");
+      // Strip frontmatter
+      const bodyMatch = raw.match(/---[\s\S]*?---\s*([\s\S]*)/);
+      skillPrompt = bodyMatch ? bodyMatch[1].trim() : raw;
+    }
+  } catch {}
+
+  // Ask the bridge to fetch full context AND propose a plan
   const prompt = `I need you to analyze this work item and create a detailed plan.
 
 ## Task Type: ${taskType}
-Use the /parse-${taskType} skill approach to analyze this.
+${skillPrompt ? `\n## Skill Instructions\n${skillPrompt}\n` : ""}
 
 ## Notification
 - **Source**: ${notification.source}

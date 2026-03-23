@@ -510,11 +510,6 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss }: {
     try {
       const agentId = await window.deck.startWorkAgent(n.id);
       onAdvance();
-      // Navigate to task detail view to watch the agent work
-      if (agentId) {
-        window.location.hash = ""; // Clear any hash
-        window.location.pathname = `/task/${agentId}`;
-      }
     } catch {}
     setLoading(false);
   };
