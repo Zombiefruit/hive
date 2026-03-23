@@ -98,7 +98,6 @@ export function Notifications() {
   const [fetching, setFetching] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<string | null>(null);
   const [pollProgress, setPollProgress] = useState<{ source: string; current: number; total: number } | null>(null);
-  const [skippedItems, setSkippedItems] = useState<Array<{ source?: string; title?: string; reason?: string }>>([]);
   const [showSkipped, setShowSkipped] = useState(false);
   const [authStatus, setAuthStatus] = useState<{ installed: boolean; version: string | null; authenticated: boolean } | null>(null);
 
@@ -118,41 +117,9 @@ export function Notifications() {
           const skipped = Array.isArray(data) ? [] : (data.skipped ?? []);
           const hasPolled = Array.isArray(data) ? items.length > 0 : (data.hasPolled ?? false);
 
-          // Items from server already have persisted stages
+          // Server is the single source of truth — skipped items are now real server notifications
           const serverItems = items.map(n => ({ ...n, stage: n.stage ?? "new" }));
-
-          // Convert skipped items to cards (only if they don't already exist in server items)
-          const serverIds = new Set(serverItems.map(n => n.id));
-          // Infer task type from source for skipped items so they land in the right section
-          const inferTaskType = (source?: string, title?: string): string => {
-            const t = (title ?? "").toLowerCase();
-            const s = (source ?? "").toLowerCase();
-            if (s === "calendar" || t.includes("meeting") || t.includes("sync") || t.includes("standup")) return "meeting_prep";
-            if (t.includes("replied") || t.includes("response") || t.includes("dm") || t.includes("thread") || t.includes("asked")) return "response";
-            if (s === "slack" && (t.includes("mention") || t.includes("tagged"))) return "response";
-            if (s === "linear" || t.includes("ticket") || t.includes("issue") || t.includes("pr ") || t.includes("pull request")) return "implementation";
-            if (s === "gmail" || s === "email") return "response";
-            if (s === "slack") return "response"; // slack items are generally things people said to you
-            return "investigation"; // default to actionable
-          };
-
-          const skippedCards: NotificationItem[] = skipped.map((s: { source?: string; title?: string; reason?: string; url?: string }, i: number) => ({
-            id: `skipped-${i}-${(s.title ?? "").slice(0, 20).replace(/\s/g, "")}`,
-            source: s.source ?? "unknown",
-            priority: "low",
-            status: "new",
-            title: s.title ?? "Unknown item",
-            summary: s.reason ?? "",
-            actionNeeded: s.reason,
-            url: s.url,
-            taskType: inferTaskType(s.source, s.title),
-            createdAt: new Date().toISOString(),
-            stage: "skipped",
-          })).filter(s => !serverIds.has(s.id));
-
-          // Server state is the source of truth
-          setNotifications([...serverItems, ...skippedCards]);
-          if (skipped.length > 0) setSkippedItems(skipped);
+          setNotifications(serverItems);
           // Only clear fetching if polling has completed AND we're not currently polling
           if (hasPolled) setFetching(false);
         }
@@ -167,12 +134,7 @@ export function Notifications() {
       const items = (data as NotificationItem[]).map(n => ({ ...n, stage: n.stage ?? "new" }));
       console.log(`[live] onNotificationsUpdate: ${items.length} items, stages: ${[...new Set(items.map(n => n.stage))].join(",")}`);
       if (items.length > 0) {
-        // Server is source of truth — only add skipped cards that aren't in the server data
-        const serverIds = new Set(items.map(n => n.id));
-        setNotifications(prev => {
-          const clientOnly = prev.filter(n => n.id.startsWith("skipped-") && !serverIds.has(n.id));
-          return [...items, ...clientOnly];
-        });
+        setNotifications(items);
       }
     });
 
@@ -237,14 +199,9 @@ export function Notifications() {
       return updated;
     });
 
-    // For skipped items (client-generated IDs), upsert the full item into main process
-    if (id.startsWith("skipped-") && movedItem) {
-      window.deck.upsertNotification?.({ ...movedItem, stage: newStage })
-        .catch(() => {});
-    } else {
-      window.deck.updateNotificationById?.(id, { stage: newStage })
-        .catch(() => {});
-    }
+    // All items are now server-side, just update by ID
+    window.deck.updateNotificationById?.(id, { stage: newStage })
+      .catch(() => {});
   }, []);
 
   // Trigger agent actions for a card (call AFTER moveCardToStage)
@@ -753,6 +710,34 @@ export function Notifications() {
   );
 }
 
+function PlanDetails({ details }: { details: string }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div style={{ marginTop: 8 }}>
+      <UnstyledButton
+        onClick={() => setExpanded(!expanded)}
+        style={{
+          display: "flex", alignItems: "center", gap: 4,
+          fontSize: "0.7rem", color: "var(--mantine-color-blue-4)",
+          padding: "4px 0",
+        }}
+      >
+        {expanded ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />}
+        {expanded ? "Hide details" : "Show details"}
+      </UnstyledButton>
+      {expanded && (
+        <div style={{
+          marginTop: 4, padding: "8px 12px", borderRadius: 6,
+          backgroundColor: "color-mix(in srgb, var(--mantine-color-dark-6) 50%, transparent)",
+          borderLeft: "2px solid var(--mantine-color-blue-5)",
+        }}>
+          <Markdown content={details} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DetailPane({ notification: n, onClose, onAdvance, onDismiss, onPlanReady }: {
   notification: NotificationItem;
   onClose: () => void;
@@ -944,19 +929,39 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss, onPlanRead
           </Stack>
         )}
 
-        {conversation.map((msg, i) => (
-          <div key={i} style={{
-            padding: "10px 14px", borderRadius: 8, marginBottom: 8,
-            backgroundColor: msg.role === "user"
-              ? "color-mix(in srgb, var(--mantine-color-blue-5) 15%, transparent)"
-              : "var(--mantine-color-dark-7)",
-            border: msg.role === "assistant" ? "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)" : undefined,
-            maxWidth: msg.role === "user" ? "80%" : "100%",
-            marginLeft: msg.role === "user" ? "auto" : 0,
-          }}>
-            <Markdown content={msg.content} />
-          </div>
-        ))}
+        {conversation.map((msg, i) => {
+          // Split assistant messages at "---" into TL;DR + Details
+          if (msg.role === "assistant" && msg.content.includes("\n---\n")) {
+            const parts = msg.content.split("\n---\n");
+            const tldr = parts[0].trim();
+            const details = parts.slice(1).join("\n---\n").trim();
+            return (
+              <div key={i} style={{
+                padding: "10px 14px", borderRadius: 8, marginBottom: 8,
+                backgroundColor: "var(--mantine-color-dark-7)",
+                border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
+              }}>
+                <Markdown content={tldr} />
+                {details && (
+                  <PlanDetails details={details} />
+                )}
+              </div>
+            );
+          }
+          return (
+            <div key={i} style={{
+              padding: "10px 14px", borderRadius: 8, marginBottom: 8,
+              backgroundColor: msg.role === "user"
+                ? "color-mix(in srgb, var(--mantine-color-blue-5) 15%, transparent)"
+                : "var(--mantine-color-dark-7)",
+              border: msg.role === "assistant" ? "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)" : undefined,
+              maxWidth: msg.role === "user" ? "80%" : "100%",
+              marginLeft: msg.role === "user" ? "auto" : 0,
+            }}>
+              <Markdown content={msg.content} />
+            </div>
+          );
+        })}
 
         {loading && (
           <div>

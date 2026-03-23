@@ -196,25 +196,36 @@ ${notification.url ? `- **URL**: ${notification.url}` : ""}
 ${linksText ? `\n**Links:**\n${linksText}` : ""}
 ${ghContext ? `\n**GitHub:**\n${ghContext}` : ""}`;
 
+  // All prompts use a two-part format: TL;DR (always visible) + Details (expandable)
+  const formatInstruction = `
+## OUTPUT FORMAT — MANDATORY
+
+Structure your response in EXACTLY two sections separated by "---":
+
+**SECTION 1 (TL;DR)** — max 3-4 lines. The executive summary. What this is, what needs to happen, complexity.
+
+---
+
+**SECTION 2 (Details)** — the full breakdown. This section will be collapsed by default.
+
+The "---" separator on its own line is REQUIRED. Everything above it is the summary. Everything below is details.`;
+
   let prompt: string;
 
   if (isHumanOnly && taskType === "meeting_prep") {
-    prompt = `You are briefing Kieran Williams for a meeting. Fetch all available context, then prepare a concise briefing.
+    prompt = `You are briefing Kieran Williams for a meeting. Fetch all available context, then prepare a briefing.
 
 ${fetchSection}
 
 ${workItem}
 
-## STEP 2: MEETING BRIEFING (after fetching context)
+## STEP 2: MEETING BRIEFING
+${formatInstruction}
 
-Write a SHORT briefing (max 15 lines):
-1. **What's this meeting about** — topic, purpose
-2. **Key people** — who's attending and their roles/context
-3. **What to expect** — likely discussion topics, any decisions needed
-4. **Talking points for Kieran** — things he should bring up or be ready for
-5. **Recent context** — any Slack threads, tickets, or PRs relevant to the discussion
+**TL;DR section**: What the meeting is about, when, key attendees, 1-line prep note.
+**Details section**: Talking points, recent context from Slack/Linear, decisions expected, relevant threads.
 
-Do NOT ask questions. Use what you fetched.`;
+Do NOT ask questions.`;
   } else if (isHumanOnly && taskType === "response") {
     prompt = `You are helping Kieran Williams draft a response. Fetch all available context, then prepare a draft.
 
@@ -222,31 +233,27 @@ ${fetchSection}
 
 ${workItem}
 
-## STEP 2: DRAFT RESPONSE (after fetching context)
+## STEP 2: DRAFT RESPONSE
+${formatInstruction}
 
-Write:
-1. **Context summary** — what's being asked and by whom (2-3 sentences)
-2. **Suggested response** — a draft Kieran can edit and send
-3. **Key points to address** — what the person is looking for
+**TL;DR section**: Who's asking, what they want, suggested 1-2 sentence reply.
+**Details section**: Full context, longer draft if needed, key points to address.
 
-Keep the draft concise and in Kieran's voice (direct, technical, helpful).
-Do NOT ask questions. Use what you fetched.`;
+Keep drafts in Kieran's voice (direct, technical). Do NOT ask questions.`;
   } else {
-    prompt = `You are planning work for Kieran Williams, Senior Frontend Engineer at Monte Carlo Data (Vector team). Main codebase: ~/Documents/GitHub/frontend (React + TypeScript + Mantine).
+    prompt = `You are planning work for Kieran Williams, Senior Frontend Engineer at Monte Carlo Data (Vector team).
 
 ${fetchSection}
 
 ${workItem}
 
-## STEP 2: CONCISE WORK PLAN (after fetching context)
+## STEP 2: WORK PLAN
+${formatInstruction}
 
-Write a SHORT plan (max 10 lines):
-1. What needs to be done (reference specifics from context)
-2. Key files/components to modify
-3. Estimated complexity (simple/moderate/complex)
-4. Any blockers or dependencies
+**TL;DR section**: What needs to be done (1-2 sentences), estimated complexity (simple/moderate/complex), any blockers.
+**Details section**: Specific files/components, approach, risks, related tickets/PRs.
 
-Do NOT ask questions. Use what you have and what you can fetch via MCP tools.`;
+Do NOT ask questions. Use what you can fetch via MCP tools.`;
   }
 
   const response = await askBridge(prompt, 90000);

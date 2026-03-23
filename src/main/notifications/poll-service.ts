@@ -622,8 +622,42 @@ Rules:
       added++;
     }
 
+    // Add skipped items as real notifications with stage "skipped"
+    const inferTaskType = (source?: string, title?: string): string => {
+      const t = (title ?? "").toLowerCase();
+      const src = (source ?? "").toLowerCase();
+      if (src === "calendar" || t.includes("meeting") || t.includes("sync") || t.includes("standup")) return "meeting_prep";
+      if (t.includes("thread") || t.includes("dm") || t.includes("asked") || t.includes("replied")) return "response";
+      if (src === "slack") return "response";
+      if (src === "linear") return "implementation";
+      if (src === "gmail" || src === "email") return "response";
+      return "investigation";
+    };
+
+    for (const s of skippedItems) {
+      const title = s.title ?? "Unknown";
+      const key = `${s.source ?? "unknown"}:${title.toLowerCase().replace(/\s+/g, " ").trim()}`;
+      if (existingKeys.has(key)) continue;
+      existingKeys.add(key);
+
+      notifications.push({
+        id: `poll-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        source: (s.source ?? "unknown") as PollNotification["source"],
+        priority: "low" as PollNotification["priority"],
+        status: "new",
+        title,
+        summary: s.reason ?? "",
+        url: s.url,
+        taskType: inferTaskType(s.source, title) as PollNotification["taskType"],
+        actionNeeded: s.reason,
+        createdAt: new Date().toISOString(),
+        stage: "skipped",
+      });
+      added++;
+    }
+
     if (added > 0) {
-      logPoll(`Added ${added} new notifications`);
+      logPoll(`Added ${added} new notifications (incl. skipped)`);
       saveCacheToFile();
       broadcastNotifications();
     }
