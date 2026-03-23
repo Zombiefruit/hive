@@ -37,7 +37,7 @@ let outputBuffer = "";
 const debugLog: Array<{ timestamp: string; direction: "in" | "out"; content: string }> = [];
 const MAX_DEBUG_LOG = 200;
 
-function addDebugEntry(direction: "in" | "out", content: string): void {
+export function addDebugEntry(direction: "in" | "out", content: string): void {
   // Parse JSON to create human-readable entries
   if (direction === "out") {
     for (const line of content.split("\n")) {

@@ -1,5 +1,5 @@
 import { app, BrowserWindow } from "electron";
-import { askBridge, isBridgeReady, restartBridge } from "../mcp-bridge";
+import { askBridge, isBridgeReady, restartBridge, addDebugEntry } from "../mcp-bridge";
 import { getClaudeCodePath } from "../claude-path";
 import { getAllAgents, getAllContextRefs } from "../db/database";
 import { spawn as spawnProcess } from "node:child_process";
@@ -58,7 +58,7 @@ function askOneShot(prompt: string, timeoutMs: number): Promise<string> {
           if (msg.type === "system" && msg.subtype === "init" && !promptSent) {
             const mcpCount = ((msg.tools ?? []) as string[]).filter((t: string) => t.includes("mcp__claude_ai")).length;
             logPoll(`    [oneshot] init: ${(msg.tools ?? []).length} tools, ${mcpCount} MCP`);
-            // Broadcast to UI so user sees activity
+            addDebugEntry("out", `🚀 Source agent initialized: ${(msg.tools ?? []).length} tools, ${mcpCount} MCP connectors`);
             for (const win of BrowserWindow.getAllWindows()) {
               try { if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", { source: `Initialized (${mcpCount} MCP tools)`, current: 1, total: 2 }); } catch {}
             }
@@ -70,10 +70,24 @@ function askOneShot(prompt: string, timeoutMs: number): Promise<string> {
               parent_tool_use_id: null,
               session_id: msg.session_id ?? "",
             }) + "\n");
+            addDebugEntry("in", `📤 Sent prompt: ${prompt.slice(0, 100)}...`);
+          }
+
+          // Log tool calls and text from the agent
+          if (msg.type === "assistant" && Array.isArray(msg.message?.content)) {
+            for (const block of msg.message.content as Array<{ type: string; name?: string; text?: string }>) {
+              if (block.type === "tool_use" && block.name) {
+                addDebugEntry("out", `🔧 Tool: ${block.name}`);
+              }
+              if (block.type === "text" && block.text) {
+                addDebugEntry("out", `💬 ${block.text.slice(0, 150)}`);
+              }
+            }
           }
 
           if (msg.type === "result" && !done) {
             resultText = String(msg.result ?? "");
+            addDebugEntry("out", `✅ Result: ${resultText.slice(0, 150)}`);
             done = true;
             clearTimeout(timeout);
             proc.kill();

@@ -680,7 +680,7 @@ export function Notifications() {
       {/* Debug sidebar */}
       {showDebug && (
         <div style={{
-          position: "fixed", top: 52, right: 0, bottom: 0, width: 400,
+          position: "fixed", top: 42, right: 0, bottom: 0, width: 400,
           backgroundColor: "var(--mantine-color-dark-9)",
           borderLeft: "1px solid var(--mantine-color-default-border)",
           zIndex: 50, display: "flex", flexDirection: "column",
@@ -1028,6 +1028,20 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss, onPlanRead
                   Approve plan & start agent
                 </UnstyledButton>
               )}
+              <UnstyledButton
+                onClick={() => {
+                  setConversation([]);
+                  setLoading(true);
+                  setActivity([]);
+                  handlePrepare();
+                }}
+                disabled={loading}
+                style={{
+                  padding: "8px 16px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500,
+                  backgroundColor: "var(--mantine-color-dark-5)", color: "var(--mantine-color-dimmed)",
+                }}>
+                Regenerate
+              </UnstyledButton>
               <UnstyledButton onClick={onDismiss} style={{
                 padding: "8px 16px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500,
                 color: "var(--mantine-color-dimmed)",
