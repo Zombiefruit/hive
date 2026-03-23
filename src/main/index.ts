@@ -11,6 +11,7 @@ import { startSessionTailing, stopSessionTailing } from "./agents/session-tailer
 import { addContextFromUrl } from "./agents/context-tracker";
 import { listAllSessions } from "./agents/session-history";
 import { startPolling, stopPolling, getNotifications, dismissNotification, startWorkOnNotification } from "./notifications/poll-service";
+import { startBridge, stopBridge } from "./mcp-bridge";
 import {
   initManager,
   setManagerStreamCallback,
@@ -139,7 +140,10 @@ app.whenReady().then(() => {
     startWorkOnNotification(id);
   });
 
-  // Start notification polling
+  // Start MCP Bridge (persistent Claude Code process for Slack/Linear/etc.)
+  startBridge();
+
+  // Start notification polling (uses bridge for MCP access)
   startPolling();
 
   // Initialize Manager AI
@@ -231,6 +235,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  stopBridge();
   stopPolling();
   stopSessionTailing();
   stopStoreSync();
