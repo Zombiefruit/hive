@@ -49,6 +49,11 @@ const api = {
     ipcRenderer.on("notifications:update", listener);
     return () => ipcRenderer.removeListener("notifications:update", listener);
   },
+  onPollingStarted: (callback: () => void) => {
+    const listener = () => callback();
+    ipcRenderer.on("notifications:polling-started", listener);
+    return () => ipcRenderer.removeListener("notifications:polling-started", listener);
+  },
 
   // Store sync — renderer subscribes to state updates from main
   onStoreUpdate: (callback: (state: unknown) => void) => {

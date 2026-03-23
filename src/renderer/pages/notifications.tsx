@@ -1,7 +1,7 @@
 import { Badge, Code, Group, Loader, ScrollArea, Stack, Text, UnstyledButton } from "@mantine/core";
 import {
   IconInbox, IconSparkles, IconClock, IconPlayerPlay, IconGitPullRequest, IconCircleCheck,
-  IconBrandGithub, IconHash, IconMail, IconFileText, IconChevronRight,
+  IconBrandGithub, IconHash, IconMail, IconFileText, IconChevronRight, IconChevronDown,
 } from "@tabler/icons-react";
 import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
 import { useState, useEffect, useRef } from "react";
@@ -60,19 +60,22 @@ export function Notifications() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [fetching, setFetching] = useState(true);
+  const [skippedItems, setSkippedItems] = useState<Array<{ source?: string; title?: string; reason?: string }>>([]);
+  const [showSkipped, setShowSkipped] = useState(false);
 
   useEffect(() => {
     const load = async () => {
       try {
         const result = await window.deck.getNotifications();
         if (result) {
-          const data = result as { items?: NotificationItem[]; hasPolled?: boolean } | NotificationItem[];
-          // Handle both old format (array) and new format ({items, hasPolled})
+          const data = result as { items?: NotificationItem[]; skipped?: Array<{ source?: string; title?: string; reason?: string }>; hasPolled?: boolean } | NotificationItem[];
           const items = Array.isArray(data) ? data : (data.items ?? []);
+          const skipped = Array.isArray(data) ? [] : (data.skipped ?? []);
           const hasPolled = Array.isArray(data) ? items.length > 0 : (data.hasPolled ?? false);
 
           const mapped = items.map(n => ({ ...n, stage: n.stage ?? "new" }));
           if (mapped.length > 0) setNotifications(mapped);
+          if (skipped.length > 0) setSkippedItems(skipped);
           if (hasPolled) setFetching(false);
         }
       } catch {}
@@ -90,13 +93,19 @@ export function Notifications() {
       }
     });
 
-    // Stop showing fetching after 45s max
-    const fetchTimeout = setTimeout(() => setFetching(false), 45000);
+    // Listen for polling-started to re-show loading
+    const unsubPolling = window.deck.onPollingStarted?.(() => {
+      setFetching(true);
+    });
+
+    // Stop showing fetching after 3 min max
+    const fetchTimeout = setTimeout(() => setFetching(false), 180000);
 
     return () => {
       clearInterval(interval);
       clearTimeout(fetchTimeout);
       unsub?.();
+      unsubPolling?.();
     };
   }, [fetching]);
 
@@ -198,7 +207,7 @@ export function Notifications() {
             <option value={168}>Last week</option>
           </select>
           <UnstyledButton
-            onClick={() => { setFetching(true); window.deck.refreshNotifications(lookbackHours); }}
+            onClick={() => { setFetching(true); setNotifications([]); setSkippedItems([]); window.deck.refreshNotifications(lookbackHours); }}
             style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-dimmed)" }}
           >
             Refresh
@@ -394,6 +403,40 @@ export function Notifications() {
           })}
         </div>
       </ScrollArea>
+
+      {/* Skipped items section */}
+      {skippedItems.length > 0 && (
+        <div style={{
+          borderTop: "1px solid var(--mantine-color-default-border)",
+          flexShrink: 0,
+          maxHeight: showSkipped ? 200 : 32,
+          overflow: "hidden",
+          transition: "max-height 0.2s ease",
+        }}>
+          <UnstyledButton
+            onClick={() => setShowSkipped(!showSkipped)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              width: "100%", padding: "6px 16px",
+              fontSize: "0.7rem", color: "var(--mantine-color-dimmed)",
+            }}
+          >
+            {showSkipped ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />}
+            {skippedItems.length} items reviewed and skipped
+          </UnstyledButton>
+          {showSkipped && (
+            <div style={{ padding: "0 16px 8px", overflowY: "auto", maxHeight: 160 }}>
+              {skippedItems.map((item, i) => (
+                <div key={i} style={{ display: "flex", gap: 6, padding: "3px 0", fontSize: "0.65rem" }}>
+                  <Text size="xs" c="dimmed" style={{ flexShrink: 0, width: 50 }}>{item.source}</Text>
+                  <Text size="xs" c="dimmed" truncate style={{ flex: 1 }}>{item.title}</Text>
+                  <Text size="xs" c="dimmed" fs="italic" style={{ flexShrink: 0 }}>{item.reason}</Text>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Detail pane */}
       {selected && (

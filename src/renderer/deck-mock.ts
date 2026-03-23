@@ -169,6 +169,7 @@ if (!isElectron) {
     prepareWorkPlan: noop,
     startWorkAgent: noop,
     onTaskEvent: () => () => {},
+    onPollingStarted: () => () => {},
     onNotificationsUpdate: () => () => {},
     respondToApproval: noop,
     addContextUrl: noop,

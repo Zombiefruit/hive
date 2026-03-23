@@ -1,5 +1,5 @@
 import { BrowserWindow } from "electron";
-import { askBridge, isBridgeReady } from "../mcp-bridge";
+import { askBridge, isBridgeReady, restartBridge } from "../mcp-bridge";
 import { getAllAgents, getAllContextRefs } from "../db/database";
 import fs from "node:fs";
 import path from "node:path";
@@ -47,18 +47,22 @@ export function startPolling(): void {
   loadCachedNotifications();
   broadcastNotifications();
 
-  // First poll after 20s (give MCP Bridge time to initialize)
+  // Single poll on startup after bridge initializes (no automatic interval)
   setTimeout(() => poll(), 20000);
-  // Then every 2 minutes
-  pollInterval = setInterval(() => poll(), 120000);
 }
 
 export function stopPolling(): void {
   if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
 }
 
+let lastSkippedItems: Array<{ source?: string; title?: string; reason?: string }> = [];
+
 export function getNotifications(): PollNotification[] {
   return notifications.filter(n => n.status !== "dismissed" && n.status !== "done");
+}
+
+export function getSkippedItems(): Array<{ source?: string; title?: string; reason?: string }> {
+  return lastSkippedItems;
 }
 
 export function clearAllNotifications(): void {
@@ -130,6 +134,11 @@ async function poll(): Promise<void> {
   isPolling = true;
   logPoll("poll starting");
 
+  // Broadcast that polling started so UI shows loading
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send("notifications:polling-started");
+  }
+
   if (!isBridgeReady()) {
     logPoll("Bridge not ready, waiting...");
     isPolling = false;
@@ -199,11 +208,21 @@ Return ONLY a JSON array, nothing else:
 Rules:
 - VERIFY status of every PR and ticket before including — no hallucinating about open PRs that are actually merged
 - Manager/lead asks = confidence 10
+- Product manager (Mor Ofir) asks = confidence 9
 - Include ALL related links (tickets, PRs, threads, docs) in the "links" array
 - Consolidate related items into single actions
-- Skip anything already done/merged/closed/resolved
 - Sort by confidence (highest first)
-- If nothing genuinely needs action, return []`;
+
+IMPORTANT — return TWO arrays in a JSON object:
+{
+  "actionable": [... items that need action ...],
+  "skipped": [... items you considered but skipped, with WHY you skipped them ...]
+}
+
+The "skipped" array helps Kieran understand what you looked at. Each skipped item:
+{"source": "slack", "title": "Short description", "reason": "Why it was skipped — e.g., 'Already responded', 'Ticket is Done', 'Bot message', 'No action needed'"}
+
+Include EVERYTHING you looked at in either actionable or skipped. Nothing should be silently dropped.`;
 
     const response = await askBridge(triagePrompt, 180000); // 3 min — single combined request
     logPoll(`Poll complete: ${response.length} chars`);
@@ -214,21 +233,48 @@ Rules:
     const codeBlockMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (codeBlockMatch) cleanResponse = codeBlockMatch[1];
 
-    // Parse JSON array from response
-    const jsonMatch = cleanResponse.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      logPoll("No JSON array in response");
-      isPolling = false;
-      return;
+    // Try to parse as {actionable, skipped} object first, then fall back to array
+    let actionableItems: unknown[] = [];
+    let skippedItems: Array<{ source?: string; title?: string; reason?: string }> = [];
+
+    const objMatch = cleanResponse.match(/\{[\s\S]*"actionable"[\s\S]*\}/);
+    if (objMatch) {
+      try {
+        const parsed = JSON.parse(objMatch[0]);
+        actionableItems = parsed.actionable ?? [];
+        skippedItems = parsed.skipped ?? [];
+        logPoll(`Parsed object: ${actionableItems.length} actionable, ${skippedItems.length} skipped`);
+        for (const s of skippedItems) {
+          logPoll(`  SKIPPED: [${s.source}] ${s.title} — ${s.reason}`);
+        }
+      } catch {}
     }
 
-    const items = JSON.parse(jsonMatch[0]) as Array<{
+    // Fallback: try parsing as a plain JSON array
+    if (actionableItems.length === 0) {
+      const jsonMatch = cleanResponse.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        logPoll("No JSON found in response");
+        isPolling = false;
+        return;
+      }
+      try {
+        actionableItems = JSON.parse(jsonMatch[0]);
+      } catch {
+        logPoll("Failed to parse JSON array");
+        isPolling = false;
+        return;
+      }
+    }
+
+    const items = actionableItems as Array<{
       source: string; priority: string; title: string; summary: string;
       url?: string; links?: Array<{ type: string; label: string; url: string }>;
       task_type?: string; author?: string; confidence?: number; action_needed?: string;
     }>;
 
-    logPoll(`Parsed ${items.length} notifications`);
+    logPoll(`Parsed ${items.length} actionable notifications`);
+    lastSkippedItems = skippedItems;
 
     // Clear existing notifications — each poll is a fresh, complete picture
     notifications.length = 0;
@@ -291,7 +337,11 @@ Rules:
   } finally {
     isPolling = false;
     hasCompletedFirstPoll = true;
-    broadcastNotifications(); // Always broadcast after poll completes
+    broadcastNotifications();
+
+    // Restart the bridge to clear conversation context for next poll
+    restartBridge();
+
     // If a refresh was queued while we were polling, run again
     if (pendingRefresh) {
       pendingRefresh = false;
