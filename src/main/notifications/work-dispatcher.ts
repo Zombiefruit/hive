@@ -218,17 +218,32 @@ export async function startWorkAgent(notificationId: string): Promise<string> {
 
   log(`startWorkAgent: ${plan.title}`);
 
+  // Load the execution skill for this task type
+  let executeSkill = "";
+  try {
+    const taskType = plan.conversationHistory?.[0]?.content?.includes("review") ? "review" : "implementation";
+    const skillPath = path.join(process.cwd(), ".claude", "skills", `execute-${taskType}`, "SKILL.md");
+    if (fs.existsSync(skillPath)) {
+      const raw = fs.readFileSync(skillPath, "utf-8");
+      const bodyMatch = raw.match(/---[\s\S]*?---\s*([\s\S]*)/);
+      executeSkill = bodyMatch ? bodyMatch[1].trim() : "";
+    }
+  } catch {}
+
   // Ask the Manager to compose the actual work prompt
   const promptComposition = `Based on this approved plan, compose a complete prompt for a Claude Code agent that will execute this work. The agent has access to all MCP tools (Slack, Linear, GitHub, Notion) and standard code tools (Read, Write, Edit, Bash, etc.).
 
 ## The approved plan:
 ${plan.plan}
 
+${executeSkill ? `## Execution skill instructions:\n${executeSkill}\n` : ""}
+
 ## What to include in the prompt:
 - Clear task description
 - All relevant context the agent needs
-- Step-by-step instructions
-- What to do when done (create PR, update ticket, etc.)
+- Step-by-step instructions from the plan
+- Which repository and branch to work in
+- What to do when done (create draft PR, update Linear ticket, etc.)
 - Any constraints or things to avoid
 
 Write the prompt as if you're giving instructions to a skilled developer. Be thorough but clear.`;
