@@ -9,6 +9,7 @@ import { enrichExternalAgents } from "./agents/session-enricher";
 import { startSessionTailing, stopSessionTailing } from "./agents/session-tailer";
 import { addContextFromUrl } from "./agents/context-tracker";
 import { listAllSessions } from "./agents/session-history";
+import { startPolling, stopPolling, getNotifications, dismissNotification, startWorkOnNotification } from "./notifications/poll-service";
 import {
   initManager,
   setManagerStreamCallback,
@@ -126,6 +127,20 @@ app.whenReady().then(() => {
     return listAllSessions();
   });
 
+  // Notifications
+  ipcMain.handle("notifications:get", () => {
+    return getNotifications().filter(n => n.status !== "dismissed" && n.status !== "done");
+  });
+  ipcMain.handle("notifications:dismiss", (_event, id: string) => {
+    dismissNotification(id);
+  });
+  ipcMain.handle("notifications:start-work", (_event, id: string) => {
+    startWorkOnNotification(id);
+  });
+
+  // Start notification polling
+  startPolling();
+
   // Initialize Manager AI
   initManager();
   setManagerStreamCallback((event) => {
@@ -201,6 +216,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  stopPolling();
   stopSessionTailing();
   stopStoreSync();
   stopManager();

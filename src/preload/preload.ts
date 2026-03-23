@@ -21,6 +21,16 @@ const api = {
   // Session history
   listAllSessions: () => ipcRenderer.invoke("sessions:list-all"),
 
+  // Notifications
+  getNotifications: () => ipcRenderer.invoke("notifications:get"),
+  dismissNotification: (id: string) => ipcRenderer.invoke("notifications:dismiss", id),
+  startWorkOnNotification: (id: string) => ipcRenderer.invoke("notifications:start-work", id),
+  onNotificationsUpdate: (callback: (notifications: unknown[]) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: unknown[]) => callback(data);
+    ipcRenderer.on("notifications:update", listener);
+    return () => ipcRenderer.removeListener("notifications:update", listener);
+  },
+
   // Store sync — renderer subscribes to state updates from main
   onStoreUpdate: (callback: (state: unknown) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, state: unknown) =>

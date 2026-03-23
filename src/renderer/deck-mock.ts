@@ -151,6 +151,10 @@ if (!isElectron) {
     interruptAgent: noop,
     resumeSession: noop,
     listAllSessions: () => Promise.resolve([]),
+    getNotifications: () => Promise.resolve([]),
+    dismissNotification: noop,
+    startWorkOnNotification: noop,
+    onNotificationsUpdate: () => () => {},
     respondToApproval: noop,
     addContextUrl: noop,
     sendManagerMessage: async (msg: string) => {

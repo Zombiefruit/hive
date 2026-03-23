@@ -1,6 +1,7 @@
 import { Badge, Card, Group, Stack, Text, Title, UnstyledButton } from "@mantine/core";
 import { IconArrowLeft, IconBell, IconCheck, IconPlayerPlay, IconX, IconBrandGithub, IconHash, IconMail, IconFileText } from "@tabler/icons-react";
 import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import type { NotificationSource, NotificationPriority } from "../../shared/notification-types";
 
@@ -93,8 +94,25 @@ function formatAge(iso: string): string {
 
 export function Notifications() {
   const navigate = useNavigate();
-  const actionable = MOCK_NOTIFICATIONS.filter(n => n.priority === "actionable");
-  const fyi = MOCK_NOTIFICATIONS.filter(n => n.priority === "fyi");
+  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+
+  // Load real notifications and subscribe to updates
+  useEffect(() => {
+    (async () => {
+      try {
+        const real = await window.deck.getNotifications();
+        if (real && real.length > 0) setNotifications(real as typeof MOCK_NOTIFICATIONS);
+      } catch {}
+    })();
+    const unsub = window.deck.onNotificationsUpdate?.((data: unknown) => {
+      const items = data as typeof MOCK_NOTIFICATIONS;
+      if (items && items.length > 0) setNotifications(items);
+    });
+    return unsub;
+  }, []);
+
+  const actionable = notifications.filter(n => n.priority === "actionable");
+  const fyi = notifications.filter(n => n.priority === "fyi" || n.priority === "noise");
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "var(--mantine-color-body)" }}>
