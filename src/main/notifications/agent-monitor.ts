@@ -1,18 +1,25 @@
 /**
  * Agent Monitor — the Manager's oversight loop.
- * Periodically checks running work agents and escalates when needed.
+ * Periodically checks running work agents, detects stuck/idle states,
+ * and escalates to the user through both the task page and Manager chat.
  */
 
-import { askBridge, isBridgeReady } from "../mcp-bridge";
 import { BrowserWindow } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { notifyAgentCompleted, notifyAgentError } from "../native-notifications";
 
 const LOG_PATH = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "monitor.log");
 function log(msg: string): void {
-  try { fs.appendFileSync(LOG_PATH, `${new Date().toISOString()} ${msg}\n`); } catch {}
+  try {
+    const dir = path.dirname(LOG_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.appendFileSync(LOG_PATH, `${new Date().toISOString()} ${msg}\n`);
+  } catch {}
 }
+
+type AgentStatus = "running" | "idle" | "stuck" | "completed" | "errored";
 
 interface MonitoredAgent {
   agentId: string;
@@ -21,6 +28,9 @@ interface MonitoredAgent {
   lastEventAt: number;
   eventCount: number;
   lastCheckAt: number;
+  status: AgentStatus;
+  lastEscalationAt: number;
+  lastOutput: string;
 }
 
 const monitoredAgents = new Map<string, MonitoredAgent>();
@@ -38,16 +48,47 @@ export function stopMonitoring(): void {
 export function registerAgent(agentId: string, title: string): void {
   const now = Date.now();
   monitoredAgents.set(agentId, {
-    agentId, title, startedAt: now, lastEventAt: now, eventCount: 0, lastCheckAt: now,
+    agentId, title, startedAt: now, lastEventAt: now, eventCount: 0,
+    lastCheckAt: now, status: "running", lastEscalationAt: 0, lastOutput: "",
   });
   log(`Registered agent ${agentId}: ${title}`);
 }
 
-export function recordAgentEvent(agentId: string): void {
+export function recordAgentEvent(agentId: string, output?: string): void {
   const agent = monitoredAgents.get(agentId);
   if (agent) {
     agent.lastEventAt = Date.now();
     agent.eventCount++;
+    agent.status = "running";
+    if (output) agent.lastOutput = output.slice(0, 500);
+  }
+}
+
+export function markAgentCompleted(agentId: string): void {
+  const agent = monitoredAgents.get(agentId);
+  if (agent) {
+    agent.status = "completed";
+    broadcastEscalation(agentId, {
+      timestamp: new Date().toISOString(),
+      type: "completed",
+      content: `Agent "${agent.title}" completed after ${Math.round((Date.now() - agent.startedAt) / 60000)} minutes (${agent.eventCount} events).`,
+    });
+    notifyAgentCompleted(agent.title);
+    log(`Agent ${agentId} completed`);
+  }
+}
+
+export function markAgentErrored(agentId: string, error: string): void {
+  const agent = monitoredAgents.get(agentId);
+  if (agent) {
+    agent.status = "errored";
+    broadcastEscalation(agentId, {
+      timestamp: new Date().toISOString(),
+      type: "error",
+      content: `Agent "${agent.title}" errored: ${error.slice(0, 200)}`,
+    });
+    notifyAgentError(agentId, agent.title, error);
+    log(`Agent ${agentId} errored: ${error.slice(0, 100)}`);
   }
 }
 
@@ -55,46 +96,63 @@ export function unregisterAgent(agentId: string): void {
   monitoredAgents.delete(agentId);
 }
 
+/** Get a summary of all monitored agents for the Manager's context. */
+export function getMonitorSummary(): string {
+  if (monitoredAgents.size === 0) return "No agents being monitored.";
+  const lines: string[] = [];
+  for (const [, agent] of monitoredAgents) {
+    const elapsed = Math.round((Date.now() - agent.startedAt) / 60000);
+    const idle = Math.round((Date.now() - agent.lastEventAt) / 60000);
+    lines.push(`- [${agent.status}] "${agent.title}" (${elapsed}m elapsed, ${idle}m idle, ${agent.eventCount} events)`);
+    if (agent.lastOutput) lines.push(`  Last: ${agent.lastOutput.slice(0, 100)}`);
+  }
+  return lines.join("\n");
+}
+
 async function checkAgents(): Promise<void> {
-  if (!isBridgeReady()) return;
+  const now = Date.now();
 
   for (const [agentId, agent] of monitoredAgents) {
-    const now = Date.now();
+    if (agent.status === "completed" || agent.status === "errored") continue;
+
     const idleMs = now - agent.lastEventAt;
     const elapsedMs = now - agent.startedAt;
+    const timeSinceEscalation = now - agent.lastEscalationAt;
 
-    // Quick checks (no AI needed)
-    if (idleMs > 180000) {
+    // Idle detection: no events for 3+ minutes
+    if (idleMs > 180000 && agent.status !== "idle") {
+      agent.status = "idle";
       log(`Agent ${agentId} idle for ${Math.round(idleMs / 60000)}m`);
+    }
+
+    // Stuck detection: idle for 10+ minutes with very few events
+    if (idleMs > 600000 && agent.eventCount < 5 && agent.status !== "stuck") {
+      agent.status = "stuck";
+      log(`Agent ${agentId} appears stuck (${agent.eventCount} events in ${Math.round(elapsedMs / 60000)}m)`);
+    }
+
+    // Escalate idle/stuck agents (max once per 5 min to avoid spam)
+    if ((agent.status === "idle" || agent.status === "stuck") && timeSinceEscalation > 300000) {
+      agent.lastEscalationAt = now;
       broadcastEscalation(agentId, {
         timestamp: new Date().toISOString(),
         type: "escalation",
-        content: `Agent "${agent.title}" has been idle for ${Math.round(idleMs / 60000)} minutes. It may be stuck or waiting for input.`,
+        content: agent.status === "stuck"
+          ? `Agent "${agent.title}" appears stuck — ${agent.eventCount} events in ${Math.round(elapsedMs / 60000)} minutes. Consider interrupting or restarting.`
+          : `Agent "${agent.title}" idle for ${Math.round(idleMs / 60000)} minutes. It may need input or have completed silently.`,
       });
     }
 
-    // Periodic progress summary every 5 minutes via bridge
-    const timeSinceLastCheck = now - agent.lastCheckAt;
-    if (timeSinceLastCheck > 300000 && agent.eventCount > 3) {
-      log(`Agent ${agentId}: periodic check-in (${agent.eventCount} events, ${Math.round(elapsedMs / 60000)}m elapsed)`);
-
-      // Ask the bridge to summarize the agent's progress
-      try {
-        const summary = await askBridge(
-          `An agent working on "${agent.title}" has been running for ${Math.round(elapsedMs / 60000)} minutes with ${agent.eventCount} events. Based on this, generate a brief 1-sentence progress update for the user.`,
-          15000
-        );
-        if (summary && summary.length > 10) {
-          broadcastEscalation(agentId, {
-            timestamp: new Date().toISOString(),
-            type: "progress",
-            content: summary.slice(0, 200),
-          });
-        }
-      } catch {}
+    // Periodic progress updates every 5 minutes for actively running agents
+    const timeSinceCheck = now - agent.lastCheckAt;
+    if (timeSinceCheck > 300000 && agent.status === "running" && agent.eventCount > 3) {
+      agent.lastCheckAt = now;
+      broadcastEscalation(agentId, {
+        timestamp: new Date().toISOString(),
+        type: "progress",
+        content: `Agent "${agent.title}": ${agent.eventCount} events, running for ${Math.round(elapsedMs / 60000)} minutes.`,
+      });
     }
-
-    agent.lastCheckAt = now;
   }
 }
 

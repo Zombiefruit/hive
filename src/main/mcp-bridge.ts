@@ -27,6 +27,9 @@ function log(msg: string): void {
 let bridgeProcess: ChildProcess | null = null;
 let sessionId: string = "";
 let isReady = false;
+let lastMcpToolCount = 0;
+let bridgeGeneration = 0; // Incremented on each startBridge() to invalidate stale timeouts
+const MIN_EXPECTED_MCP_TOOLS = 85;
 let pendingRequests = new Map<string, { resolve: (text: string) => void; timeout: ReturnType<typeof setTimeout> }>();
 let outputBuffer = "";
 
@@ -114,9 +117,51 @@ export function getBridgeDebugLog(): typeof debugLog {
  */
 export function startBridge(): void {
   if (bridgeProcess) return;
+  bridgeGeneration++;
 
   const claudePath = getClaudeCodePath();
   log("Starting MCP Bridge process");
+
+  // Write tools to block — everything else is auto-approved via bypassPermissions
+  const disallowedTools = [
+    "Write", "Edit", "Bash", "NotebookEdit", "Agent", "EnterWorktree", "ExitWorktree",
+    "mcp__claude_ai_Slack__slack_send_message",
+    "mcp__claude_ai_Slack__slack_send_message_draft",
+    "mcp__claude_ai_Slack__slack_schedule_message",
+    "mcp__claude_ai_Slack__slack_create_canvas",
+    "mcp__claude_ai_Slack__slack_update_canvas",
+    "mcp__claude_ai_Linear__save_issue",
+    "mcp__claude_ai_Linear__save_comment",
+    "mcp__claude_ai_Linear__save_project",
+    "mcp__claude_ai_Linear__save_initiative",
+    "mcp__claude_ai_Linear__save_milestone",
+    "mcp__claude_ai_Linear__save_customer",
+    "mcp__claude_ai_Linear__save_customer_need",
+    "mcp__claude_ai_Linear__save_status_update",
+    "mcp__claude_ai_Linear__delete_comment",
+    "mcp__claude_ai_Linear__delete_customer",
+    "mcp__claude_ai_Linear__delete_customer_need",
+    "mcp__claude_ai_Linear__delete_status_update",
+    "mcp__claude_ai_Linear__delete_attachment",
+    "mcp__claude_ai_Linear__create_issue_label",
+    "mcp__claude_ai_Linear__create_document",
+    "mcp__claude_ai_Linear__create_attachment",
+    "mcp__claude_ai_Linear__update_document",
+    "mcp__claude_ai_Notion__notion-create-pages",
+    "mcp__claude_ai_Notion__notion-create-database",
+    "mcp__claude_ai_Notion__notion-create-comment",
+    "mcp__claude_ai_Notion__notion-update-page",
+    "mcp__claude_ai_Notion__notion-move-pages",
+    "mcp__claude_ai_Notion__notion-duplicate-page",
+    "mcp__claude_ai_Notion__notion-create-view",
+    "mcp__claude_ai_Notion__notion-update-view",
+    "mcp__claude_ai_Notion__notion-update-data-source",
+    "mcp__claude_ai_Gmail__gmail_create_draft",
+    "mcp__claude_ai_Google_Calendar__gcal_create_event",
+    "mcp__claude_ai_Google_Calendar__gcal_delete_event",
+    "mcp__claude_ai_Google_Calendar__gcal_update_event",
+    "mcp__claude_ai_Google_Calendar__gcal_respond_to_event",
+  ];
 
   bridgeProcess = spawn(claudePath, [
     "--output-format", "stream-json",
@@ -125,43 +170,8 @@ export function startBridge(): void {
     "--no-chrome",
     "--model", "claude-haiku-4-5-20251001",
     "--no-session-persistence",
-    // READ-ONLY: block all write/mutating tools
-    "--disallowedTools", [
-      "Write", "Edit", "Bash", "NotebookEdit", "Agent", "EnterWorktree", "ExitWorktree",
-      // Block write MCP tools explicitly
-      "mcp__claude_ai_Slack__slack_send_message",
-      "mcp__claude_ai_Slack__slack_send_message_draft",
-      "mcp__claude_ai_Slack__slack_schedule_message",
-      "mcp__claude_ai_Slack__slack_create_canvas",
-      "mcp__claude_ai_Slack__slack_update_canvas",
-      "mcp__claude_ai_Linear__save_issue",
-      "mcp__claude_ai_Linear__save_comment",
-      "mcp__claude_ai_Linear__save_project",
-      "mcp__claude_ai_Linear__save_initiative",
-      "mcp__claude_ai_Linear__save_milestone",
-      "mcp__claude_ai_Linear__save_customer",
-      "mcp__claude_ai_Linear__save_customer_need",
-      "mcp__claude_ai_Linear__save_status_update",
-      "mcp__claude_ai_Linear__delete_comment",
-      "mcp__claude_ai_Linear__delete_customer",
-      "mcp__claude_ai_Linear__delete_customer_need",
-      "mcp__claude_ai_Linear__delete_status_update",
-      "mcp__claude_ai_Linear__delete_attachment",
-      "mcp__claude_ai_Linear__create_issue_label",
-      "mcp__claude_ai_Linear__create_document",
-      "mcp__claude_ai_Linear__create_attachment",
-      "mcp__claude_ai_Linear__update_document",
-      "mcp__claude_ai_Notion__notion-create-pages",
-      "mcp__claude_ai_Notion__notion-create-database",
-      "mcp__claude_ai_Notion__notion-create-comment",
-      "mcp__claude_ai_Notion__notion-update-page",
-      "mcp__claude_ai_Notion__notion-move-pages",
-      "mcp__claude_ai_Notion__notion-duplicate-page",
-      "mcp__claude_ai_Notion__notion-create-view",
-      "mcp__claude_ai_Notion__notion-update-view",
-      "mcp__claude_ai_Notion__notion-update-data-source",
-      "mcp__claude_ai_Gmail__gmail_create_draft",
-    ].join(","),
+    // No explicit permission mode — MCP read tools work without approval in non-headless mode
+    "--disallowedTools", disallowedTools.join(","),
     "--system-prompt", "You are a READ-ONLY data fetcher for Claude Deck. You can ONLY read and search data. You must NEVER write, edit, send messages, create issues, post comments, or modify anything. If asked to write or modify, refuse. Only fetch and return data in structured JSON format. IMPORTANT: Each message you receive is an INDEPENDENT request — do not reference previous messages or complain about repeated requests. Every request is new. Just fetch the data and respond.",
   ], {
     // Run from the claude-deck project dir so .claude/skills/ are auto-discovered
@@ -181,21 +191,28 @@ export function startBridge(): void {
     log(`STDERR: ${chunk.toString("utf-8").slice(0, 200)}`);
   });
 
+  const startGen = bridgeGeneration;
   bridgeProcess.on("exit", (code) => {
     log(`Bridge process exited with code ${code}`);
     bridgeProcess = null;
     isReady = false;
-    // Restart after 5s
-    setTimeout(() => startBridge(), 5000);
+    lastMcpToolCount = 0;
+    // Only auto-restart if this wasn't an intentional stop (generation unchanged)
+    if (startGen === bridgeGeneration) {
+      log("Unexpected exit — auto-restarting in 5s");
+      setTimeout(() => startBridge(), 5000);
+    }
   });
 
-  // Wait for init before marking ready
+  // Fallback: if init never arrives after 60s, mark ready to unblock callers.
+  // Use generation counter to prevent stale timeouts from affecting new bridge instances.
+  const gen = bridgeGeneration;
   setTimeout(() => {
-    if (bridgeProcess && !isReady) {
+    if (gen === bridgeGeneration && bridgeProcess && !isReady) {
       isReady = true;
-      log("Bridge marked as ready (timeout)");
+      log("Bridge marked as ready (timeout fallback after 60s)");
     }
-  }, 15000);
+  }, 60000);
 }
 
 function processOutputBuffer(): void {
@@ -210,17 +227,45 @@ function processOutputBuffer(): void {
       // Track session ID from init
       if (msg.type === "system" && msg.subtype === "init") {
         sessionId = msg.session_id ?? "";
-        isReady = true;
-        log(`Bridge initialized, session=${sessionId}, tools=${(msg.tools ?? []).length}`);
+        const allTools: string[] = msg.tools ?? [];
+        const mcpTools = allTools.filter((t: string) => t.includes("mcp__claude_ai"));
+        lastMcpToolCount = mcpTools.length;
 
-        // Log MCP tools specifically
-        const mcpTools = (msg.tools ?? []).filter((t: string) => t.includes("mcp__claude_ai"));
-        log(`claude.ai MCP tools: ${mcpTools.length} — ${mcpTools.slice(0, 5).join(", ")}`);
+        // Check for required connectors
+        const hasSlack = mcpTools.some((t: string) => t.includes("Slack"));
+        const hasLinear = mcpTools.some((t: string) => t.includes("Linear"));
+        const hasGmail = mcpTools.some((t: string) => t.includes("Gmail"));
+        const hasCalendar = mcpTools.some((t: string) => t.includes("Google_Calendar"));
+        const hasNotion = mcpTools.some((t: string) => t.includes("Notion"));
+
+        isReady = true;
+        log(`Bridge initialized, session=${sessionId}, tools=${allTools.length}, MCP=${mcpTools.length}`);
+        log(`  Connectors: Slack=${hasSlack} Linear=${hasLinear} Gmail=${hasGmail} Calendar=${hasCalendar} Notion=${hasNotion}`);
+
+        if (mcpTools.length < MIN_EXPECTED_MCP_TOOLS) {
+          log(`  WARNING: Only ${mcpTools.length} MCP tools loaded (expected >=${MIN_EXPECTED_MCP_TOOLS}). Some connectors may be missing.`);
+        }
+      }
+
+      // Log all message types when we have pending requests
+      if (pendingRequests.size > 0 && msg.type) {
+        if (msg.type === "assistant") {
+          const content = msg.message?.content;
+          if (Array.isArray(content)) {
+            for (const block of content as Array<{ type: string; name?: string; text?: string }>) {
+              if (block.type === "tool_use") log(`  Bridge calling tool: ${block.name}`);
+              if (block.type === "text" && block.text) log(`  Bridge text: ${block.text.slice(0, 100)}`);
+            }
+          }
+        } else if (msg.type === "tool_result" || (msg.type === "user" && msg.message?.content)) {
+          // Tool result came back
+        }
       }
 
       // Check for result messages
       if (msg.type === "result") {
         const resultText = String(msg.result ?? "");
+        log(`  Bridge result received: ${resultText.length} chars`);
         // Resolve any pending request
         for (const [reqId, req] of pendingRequests) {
           clearTimeout(req.timeout);
@@ -255,11 +300,20 @@ export function restartBridge(): void {
   setTimeout(() => startBridge(), 1000);
 }
 
+// restartBridgeAndWait removed — no longer needed since we don't restart between sources
+
 /**
  * Send a natural language prompt to the MCP Bridge and get a response.
  * The bridge has access to Slack, Linear, Notion, Gmail, etc.
+ * Waits up to 90s for the bridge to be ready before sending (init takes ~45s).
  */
-export function askBridge(prompt: string, timeoutMs = 60000): Promise<string> {
+export async function askBridge(prompt: string, timeoutMs = 60000): Promise<string> {
+  // Wait for bridge to be ready — init takes ~45s on first start
+  const waitStart = Date.now();
+  while (!isBridgeReady() && Date.now() - waitStart < 90000) {
+    await new Promise(r => setTimeout(r, 500));
+  }
+
   return new Promise((resolve, reject) => {
     if (!bridgeProcess || !bridgeProcess.stdin) {
       resolve("MCP Bridge not running");
@@ -267,7 +321,7 @@ export function askBridge(prompt: string, timeoutMs = 60000): Promise<string> {
     }
 
     if (!isReady) {
-      resolve("MCP Bridge still initializing — try again in a few seconds");
+      resolve("MCP Bridge still initializing after 20s wait");
       return;
     }
 
@@ -307,6 +361,7 @@ export function isBridgeReady(): boolean {
  * Stop the bridge process.
  */
 export function stopBridge(): void {
+  bridgeGeneration++; // Invalidate stale timeouts and prevent auto-restart
   if (bridgeProcess) {
     bridgeProcess.kill();
     bridgeProcess = null;

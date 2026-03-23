@@ -1,5 +1,6 @@
 import { broadcastApprovalRequest } from "../ipc/bridge";
 import { createApproval, resolveApproval } from "../db/database";
+import { notifyApprovalNeeded } from "../native-notifications";
 import type { RiskLevel } from "../../shared/types";
 
 /** Map of pending approval promises: approvalId → resolve function */
@@ -8,26 +9,38 @@ const pendingResolvers = new Map<
   (result: { behavior: "allow" } | { behavior: "deny"; message: string }) => void
 >();
 
+/** Low-risk tools that can be auto-approved without user interaction. */
+const LOW_RISK_TOOLS = new Set([
+  "Read", "Glob", "Grep", "ToolSearch", "WebSearch", "WebFetch", "LSP",
+]);
+
 /** Classify risk level based on tool name and input. */
 function classifyRisk(toolName: string, input: Record<string, unknown>): RiskLevel {
+  // Low risk: reads, searches, file listing
+  if (LOW_RISK_TOOLS.has(toolName)) return "low";
+
+  // MCP tools: low risk unless they mutate (save/create/delete/send/update)
+  if (
+    toolName.startsWith("mcp__") &&
+    !toolName.includes("save") &&
+    !toolName.includes("create") &&
+    !toolName.includes("delete") &&
+    !toolName.includes("send") &&
+    !toolName.includes("update")
+  ) {
+    return "low";
+  }
+
+  // High risk: destructive bash, git push, force operations
   if (toolName === "Bash") {
-    const command = String(input.command ?? "");
-    const highRiskPatterns = [
-      /\brm\s+-rf\b/,
-      /--force/,
-      /--hard/,
-      /--no-verify/,
-      /\bdrop\b/i,
-      /\bdelete\b/i,
-      /--accept-data-loss/,
-      /\bgit\s+push\b.*--force/,
-      /\bgit\s+reset\b/,
-    ];
-    if (highRiskPatterns.some((p) => p.test(command))) return "high";
+    const cmd = String(input.command ?? "");
+    if (/rm\s+-rf|git\s+push|git\s+reset\s+--hard|force|--no-verify/.test(cmd)) return "high";
     return "medium";
   }
-  if (toolName === "Write" || toolName === "Edit") return "medium";
-  if (toolName === "Read" || toolName === "Glob" || toolName === "Grep") return "low";
+
+  // Medium: writes, edits
+  if (["Write", "Edit", "NotebookEdit"].includes(toolName)) return "medium";
+
   return "medium";
 }
 
@@ -65,7 +78,14 @@ export function createCanUseTool(agentId: string) {
     const riskLevel = classifyRisk(toolName, input);
     const description = _options.description ?? describeToolCall(toolName, input);
 
-    // Store in DB
+    // Auto-approve low risk tools without user interaction
+    if (riskLevel === "low") {
+      const approval = createApproval(agentId, toolName, JSON.stringify(input), description, riskLevel);
+      resolveApproval(approval.id, "approved");
+      return { behavior: "allow" };
+    }
+
+    // Store in DB for medium/high risk
     const approval = createApproval(
       agentId,
       toolName,
@@ -76,6 +96,9 @@ export function createCanUseTool(agentId: string) {
 
     // Broadcast to renderer UI
     broadcastApprovalRequest(approval);
+
+    // Native macOS notification when app is not focused
+    notifyApprovalNeeded(description);
 
     // Wait for user response
     return new Promise((resolve) => {

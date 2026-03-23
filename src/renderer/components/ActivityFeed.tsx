@@ -2,7 +2,7 @@ import { Group, Stack, Text } from "@mantine/core";
 import {
   IconGitBranch,
   IconAlertTriangle,
-  IconMessageSquare,
+  IconMessage,
   IconCheck,
   IconPlayerPlay,
   IconTool,

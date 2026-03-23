@@ -50,9 +50,9 @@ export function broadcastStoreUpdate(): void {
   if (!getStore) return;
   const state = getStore();
   for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) {
-      win.webContents.send(IPC_CHANNELS.STORE_SYNC, state);
-    }
+    try {
+      if (!win.isDestroyed()) win.webContents.send(IPC_CHANNELS.STORE_SYNC, state);
+    } catch {}
   }
 }
 

@@ -112,9 +112,9 @@ function buildMockState(): StoreState {
     agents: MOCK_AGENTS,
     messages: {
       "agent-1": [
-        { id: "msg-1", agentId: "agent-1", role: "user", content: "Implement retry logic for pipeline ingestion failures. Check VEC-423 for details.", toolCallsJson: null, costUsd: null, tokenUsageJson: null, timestamp: new Date(Date.now() - 1200000).toISOString() },
-        { id: "msg-2", agentId: "agent-1", role: "assistant", content: "I'll start by reading the current pipeline ingestion code to understand the failure points, then implement exponential backoff retry logic.", toolCallsJson: null, costUsd: 0.05, tokenUsageJson: null, timestamp: new Date(Date.now() - 1190000).toISOString() },
-        { id: "msg-3", agentId: "agent-1", role: "tool_use", content: "Read", toolCallsJson: JSON.stringify({ name: "Read", input: { file_path: "src/pipeline/ingestion.py" } }), costUsd: null, tokenUsageJson: null, timestamp: new Date(Date.now() - 1180000).toISOString() },
+        { id: "msg-1", agentId: "agent-1", role: "user", origin: "user", content: "Implement retry logic for pipeline ingestion failures. Check VEC-423 for details.", toolCallsJson: null, costUsd: null, tokenUsageJson: null, timestamp: new Date(Date.now() - 1200000).toISOString() },
+        { id: "msg-2", agentId: "agent-1", role: "assistant", origin: "user", content: "I'll start by reading the current pipeline ingestion code to understand the failure points, then implement exponential backoff retry logic.", toolCallsJson: null, costUsd: 0.05, tokenUsageJson: null, timestamp: new Date(Date.now() - 1190000).toISOString() },
+        { id: "msg-3", agentId: "agent-1", role: "tool_use", origin: "system", content: "Read", toolCallsJson: JSON.stringify({ name: "Read", input: { file_path: "src/pipeline/ingestion.py" } }), costUsd: null, tokenUsageJson: null, timestamp: new Date(Date.now() - 1180000).toISOString() },
       ],
     },
     approvals: MOCK_APPROVALS,

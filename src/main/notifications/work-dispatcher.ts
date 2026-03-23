@@ -9,13 +9,50 @@
  */
 
 import { askBridge, isBridgeReady } from "../mcp-bridge";
-import { spawn, ChildProcess } from "node:child_process";
+import { spawn, ChildProcess, execFile } from "node:child_process";
 import { getClaudeCodePath } from "../claude-path";
 import { BrowserWindow } from "electron";
 import { registerAgent, recordAgentEvent, unregisterAgent } from "./agent-monitor";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+
+/** Pre-fetch GitHub context using gh CLI for any GitHub URLs in the links. */
+async function fetchGitHubContext(links?: Array<{ type: string; label: string; url: string }>): Promise<string> {
+  if (!links?.length) return "";
+  const ghLinks = links.filter(l => l.url?.includes("github.com"));
+  if (ghLinks.length === 0) return "";
+
+  const results: string[] = [];
+  for (const link of ghLinks) {
+    try {
+      const prMatch = link.url.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
+      const issueMatch = link.url.match(/github\.com\/([^/]+\/[^/]+)\/issues\/(\d+)/);
+
+      if (prMatch) {
+        const [, repo, num] = prMatch;
+        const pr = await ghCmd(`pr view ${num} --repo ${repo} --json title,body,state,author,reviews,files,comments`);
+        results.push(`## GitHub PR #${num} (${repo})\n${pr}`);
+      } else if (issueMatch) {
+        const [, repo, num] = issueMatch;
+        const issue = await ghCmd(`issue view ${num} --repo ${repo} --json title,body,state,author,comments`);
+        results.push(`## GitHub Issue #${num} (${repo})\n${issue}`);
+      }
+    } catch (err) {
+      results.push(`## GitHub ${link.label}\nFailed to fetch: ${String(err).slice(0, 100)}`);
+    }
+  }
+  return results.join("\n\n");
+}
+
+function ghCmd(args: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile("gh", args.split(" "), { timeout: 15000, maxBuffer: 512 * 1024 }, (err, stdout) => {
+      if (err) reject(err);
+      else resolve(stdout.slice(0, 5000));
+    });
+  });
+}
 
 const LOG_PATH = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "dispatcher.log");
 
@@ -117,9 +154,34 @@ export async function prepareWorkPlan(notification: {
     }
   } catch {}
 
-  // Ask the bridge to fetch full context AND propose a plan
+  // Pre-fetch GitHub context (gh CLI) before sending to bridge
+  const ghContext = await fetchGitHubContext(notification.links);
+
+  // Build explicit MCP fetch instructions based on available links
+  const fetchSteps: string[] = [];
+  for (const link of (notification.links ?? [])) {
+    if (link.type === "linear" || link.url?.includes("linear.app")) {
+      const idMatch = link.url?.match(/([A-Z]+-\d+)/) ?? link.label.match(/([A-Z]+-\d+)/);
+      if (idMatch) fetchSteps.push(`Use mcp__claude_ai_Linear__get_issue to fetch full details for ${idMatch[1]}`);
+    }
+    if (link.type === "slack" || link.url?.includes("slack.com")) {
+      const chanMatch = link.url?.match(/archives\/([A-Z0-9]+)/);
+      if (chanMatch) fetchSteps.push(`Use mcp__claude_ai_Slack__slack_read_channel with channel_id "${chanMatch[1]}" limit 20 to get the conversation`);
+      const threadMatch = link.url?.match(/archives\/([A-Z0-9]+)\/p(\d+)/);
+      if (threadMatch) fetchSteps.push(`Use mcp__claude_ai_Slack__slack_read_thread with channel_id "${threadMatch[1]}" and thread_ts derived from "${threadMatch[2]}" to get the full thread`);
+    }
+    if (link.type === "notion" || link.url?.includes("notion.so")) {
+      fetchSteps.push(`Use mcp__claude_ai_Notion__notion-fetch to get the Notion page at ${link.url}`);
+    }
+  }
+
+  const fetchInstructions = fetchSteps.length > 0
+    ? `## MANDATORY: Fetch Context First\nYou MUST execute these MCP calls before creating a plan. Do NOT skip any.\n${fetchSteps.map((s, i) => `${i + 1}. ${s}`).join("\n")}\n`
+    : "";
+
   const prompt = `I need you to analyze this work item and create a detailed plan.
 
+${fetchInstructions}
 ## Task Type: ${taskType}
 ${skillPrompt ? `\n## Skill Instructions\n${skillPrompt}\n` : ""}
 
@@ -129,25 +191,19 @@ ${skillPrompt ? `\n## Skill Instructions\n${skillPrompt}\n` : ""}
 - **Summary**: ${notification.summary}
 ${notification.url ? `- **URL**: ${notification.url}` : ""}
 ${linksText ? `\n## Related Links\n${linksText}` : ""}
+${ghContext ? `\n## GitHub Context (pre-fetched)\n${ghContext}` : ""}
 
-## What I need from you
+## CRITICAL: You MUST fetch full context using MCP tools BEFORE creating a plan.
+Do NOT just use the summary above. The summary is a triage overview — you need the ACTUAL data.
 
-1. **Fetch full context**: Use your MCP tools to get all relevant details:
-   - If Linear ticket: get the full description, acceptance criteria, comments, related issues
-   - If Slack thread: get the full conversation
-   - If GitHub PR: get the description, changed files, review comments
-   - Check for any related Notion docs or specs
+After fetching context, create a plan that includes:
+- What exactly needs to be done (be specific, reference actual content you fetched)
+- Recommended approach
+- Which files/areas of the codebase are likely involved
+- Best model (Haiku for simple, Sonnet for moderate, Opus for complex)
+- Risks or things to watch out for
 
-2. **Analyze and propose a plan**: Based on the context, tell me:
-   - What exactly needs to be done (be specific)
-   - What approach you'd recommend
-   - Which files/areas of the codebase are likely involved
-   - What model would be best for this (Haiku for simple, Sonnet for moderate, Opus for complex)
-   - Estimated cost
-   - Any risks or things to watch out for
-   - What the agent will need access to (repos, branches, etc.)
-
-3. **Format your response** as a clear plan I can review and approve. Be specific and actionable — I want to know exactly what the agent will do before I approve it.`;
+Be specific and actionable — reference the actual ticket description, Slack messages, or PR details you fetched.`;
 
   const response = await askBridge(prompt, 90000);
   log(`Plan response: ${response.length} chars`);

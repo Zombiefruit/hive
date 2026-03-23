@@ -19,7 +19,7 @@ export interface ManagerConversation {
 export interface ContextItem {
   id: string;
   label: string;
-  type: "agent" | "metric" | "ticket" | "custom";
+  type: "agent" | "metric" | "ticket" | "notification" | "pr" | "thread" | "custom";
   data?: Record<string, unknown>;
 }
 

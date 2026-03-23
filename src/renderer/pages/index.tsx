@@ -321,7 +321,7 @@ export function Dashboard() {
                 <IconActivity size={14} stroke={1.5} />
                 <Text size="sm" fw={600}>Activity</Text>
               </Group>
-              <div style={{ padding: 0 }}>
+              <div style={{ padding: 0, maxHeight: 400, overflowY: "auto" }}>
                 <ActivityFeed />
               </div>
             </div>

@@ -3,23 +3,27 @@ import {
   ActionIcon,
   Badge,
   Button,
-  Card,
   Divider,
   Group,
+  Menu,
   Progress,
   Stack,
   Text,
   ThemeIcon,
 } from "@mantine/core";
 import {
+  IconAlertTriangle,
   IconArrowLeft,
+  IconChevronDown,
   IconPlayerStop,
   IconGitBranch,
   IconFolder,
+  IconRefresh,
   IconRobot,
   IconExternalLink,
   IconClock,
 } from "@tabler/icons-react";
+import { useState } from "react";
 import { useAgentStore } from "../../stores/agent-store";
 import { ChatPanel } from "../../components/ChatPanel";
 import { Timeline } from "../../components/Timeline";
@@ -38,6 +42,132 @@ const modelLabels: Record<string, string> = {
   "claude-haiku-4-5-20251001": "Haiku",
   unknown: "Unknown",
 };
+
+const MODEL_OPTIONS = [
+  { value: "claude-opus-4-6", label: "Opus 4" },
+  { value: "claude-sonnet-4-6", label: "Sonnet 4" },
+  { value: "claude-haiku-4-5-20251001", label: "Haiku" },
+] as const;
+
+function ErrorRecoveryBanner({
+  agentId,
+  sessionId,
+  cwd,
+  task,
+  currentModel,
+}: {
+  agentId: string;
+  sessionId: string | null;
+  cwd: string;
+  task: string;
+  currentModel: string;
+}) {
+  const [retrying, setRetrying] = useState(false);
+
+  // Get the most recent error event for this agent
+  const errorEvent = useAgentStore((s) => {
+    const agentEvents = s.events.filter(
+      (e) => e.agentId === agentId && e.type === "error"
+    );
+    return agentEvents.length > 0 ? agentEvents[agentEvents.length - 1] : null;
+  });
+
+  const errorMessage = errorEvent?.summary ?? "Agent encountered an error";
+
+  const handleRetry = async (model?: string) => {
+    setRetrying(true);
+    try {
+      if (sessionId) {
+        // Resume the existing session
+        await window.deck.resumeSession(agentId, sessionId, cwd);
+      } else {
+        // No session to resume — spawn a fresh agent with the same task
+        await window.deck.spawnAgent({
+          task,
+          model: model ?? currentModel,
+          cwd,
+          permissionMode: "default",
+        });
+      }
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        padding: "var(--mantine-spacing-sm) var(--mantine-spacing-md)",
+        borderBottom: "1px solid var(--mantine-color-red-9)",
+        backgroundColor: "color-mix(in srgb, var(--mantine-color-red-9) 15%, transparent)",
+      }}
+    >
+      <Group gap="sm" align="flex-start" wrap="nowrap">
+        <ThemeIcon variant="light" color="red" size="md" radius="xl" mt={2}>
+          <IconAlertTriangle size={14} />
+        </ThemeIcon>
+        <Stack gap={6} style={{ flex: 1, minWidth: 0 }}>
+          <Text size="sm" fw={600} c="red.4">
+            Agent Error
+          </Text>
+          <Text
+            size="xs"
+            c="red.3"
+            style={{
+              fontFamily: "var(--mantine-font-family-monospace)",
+              wordBreak: "break-word",
+            }}
+          >
+            {errorMessage}
+          </Text>
+        </Stack>
+        <Group gap="xs" style={{ flexShrink: 0 }}>
+          <Button
+            variant="light"
+            color="red"
+            size="xs"
+            leftSection={<IconRefresh size={12} />}
+            loading={retrying}
+            onClick={() => handleRetry()}
+          >
+            Retry
+          </Button>
+          <Menu shadow="md" width={180} position="bottom-end">
+            <Menu.Target>
+              <Button
+                variant="subtle"
+                color="red"
+                size="xs"
+                rightSection={<IconChevronDown size={12} />}
+                disabled={retrying}
+              >
+                Retry with...
+              </Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Label>Choose model</Menu.Label>
+              {MODEL_OPTIONS.map((opt) => (
+                <Menu.Item
+                  key={opt.value}
+                  onClick={() => handleRetry(opt.value)}
+                  rightSection={
+                    opt.value === currentModel ? (
+                      <Badge size="xs" variant="light" color="gray">
+                        current
+                      </Badge>
+                    ) : null
+                  }
+                >
+                  {opt.label}
+                </Menu.Item>
+              ))}
+            </Menu.Dropdown>
+          </Menu>
+        </Group>
+      </Group>
+    </div>
+  );
+}
 
 export function AgentDetail() {
   const { agentId } = useParams<{ agentId: string }>();
@@ -177,6 +307,15 @@ export function AgentDetail() {
 
       {/* Center: Chat (shown for ALL agents, external get a banner + read-only) */}
       <div style={{ overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 0 }}>
+        {agent.status === "errored" && (
+          <ErrorRecoveryBanner
+            agentId={agent.id}
+            sessionId={agent.sessionId}
+            cwd={agent.cwd}
+            task={agent.task}
+            currentModel={agent.model}
+          />
+        )}
         {isExternal && (
           <Group
             gap="xs"

@@ -5,7 +5,7 @@ import { ConversationSidebar } from "./ConversationSidebar";
 import { ContextChips } from "./ContextChips";
 import { ManagerMessages } from "./ManagerMessages";
 import { ManagerInput } from "./ManagerInput";
-import type { ManagerMessage } from "../../stores/manager-store";
+import type { ManagerMessage, ManagerConversation } from "../../stores/manager-store";
 
 export function PinnedPanel() {
   const isPinned = useManagerStore((s) => s.isPinned);
@@ -42,7 +42,7 @@ export function PinnedPanel() {
           setStreaming(false);
           clearStreamingText();
           if (evt.message) addMessage(evt.message);
-          window.deck.getManagerConversations().then((convos) => {
+          window.deck.getManagerConversations().then((convos: ManagerConversation[]) => {
             if (convos) setConversations(convos);
           });
           break;

@@ -20,7 +20,7 @@ export function FloatingTrigger() {
             position: "fixed",
             bottom: 24,
             right: 24,
-            zIndex: 1000,
+            zIndex: 90, // Below detail pane (100) so it doesn't cover send button
           }}
         >
           <ActionIcon

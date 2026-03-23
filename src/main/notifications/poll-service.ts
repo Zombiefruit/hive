@@ -1,9 +1,95 @@
-import { BrowserWindow } from "electron";
+import { app, BrowserWindow } from "electron";
 import { askBridge, isBridgeReady, restartBridge } from "../mcp-bridge";
+import { getClaudeCodePath } from "../claude-path";
 import { getAllAgents, getAllContextRefs } from "../db/database";
+import { spawn as spawnProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+
+/**
+ * One-shot Claude Code call with MCP access via stream-json interactive mode.
+ * Each call spawns its own process so they can run in parallel.
+ * Waits for init (which loads MCP connectors) before sending the prompt.
+ */
+function askOneShot(prompt: string, timeoutMs: number): Promise<string> {
+  return new Promise((resolve) => {
+    const claudePath = getClaudeCodePath();
+    const systemPrompt = "You are a READ-ONLY data fetcher. Fetch the requested data using MCP tools and return it as plain text. Do not write, edit, or modify anything.";
+
+    const proc = spawnProcess(claudePath, [
+      "--output-format", "stream-json",
+      "--input-format", "stream-json",
+      "--verbose",
+      "--no-chrome",
+      "--model", "claude-haiku-4-5-20251001",
+      "--no-session-persistence",
+      "--system-prompt", systemPrompt,
+    ], {
+      env: { ...process.env },
+      cwd: app.isPackaged ? os.homedir() : app.getAppPath(),
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    let outputBuffer = "";
+    let resultText = "";
+    let done = false;
+    let promptSent = false;
+
+    const timeout = setTimeout(() => {
+      if (!done) {
+        done = true;
+        proc.kill();
+        resolve(resultText || "Request timed out");
+      }
+    }, timeoutMs);
+
+    proc.stdout?.on("data", (chunk: Buffer) => {
+      outputBuffer += chunk.toString("utf-8");
+      const lines = outputBuffer.split("\n");
+      outputBuffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const msg = JSON.parse(line);
+
+          // Wait for init with MCP tools loaded, THEN send prompt
+          if (msg.type === "system" && msg.subtype === "init" && !promptSent) {
+            const mcpCount = ((msg.tools ?? []) as string[]).filter((t: string) => t.includes("mcp__claude_ai")).length;
+            logPoll(`    [oneshot] init: ${(msg.tools ?? []).length} tools, ${mcpCount} MCP`);
+
+            promptSent = true;
+            proc.stdin?.write(JSON.stringify({
+              type: "user",
+              message: { role: "user", content: prompt },
+              parent_tool_use_id: null,
+              session_id: msg.session_id ?? "",
+            }) + "\n");
+          }
+
+          if (msg.type === "result" && !done) {
+            resultText = String(msg.result ?? "");
+            done = true;
+            clearTimeout(timeout);
+            proc.kill();
+            resolve(resultText);
+          }
+        } catch {}
+      }
+    });
+
+    proc.stderr?.on("data", () => {}); // suppress
+
+    proc.on("exit", () => {
+      if (!done) {
+        done = true;
+        clearTimeout(timeout);
+        resolve(resultText || "Process exited without result");
+      }
+    });
+  });
+}
 
 export interface PollNotification {
   id: string;
@@ -41,14 +127,19 @@ export function hasPolledOnce(): boolean {
   return hasCompletedFirstPoll;
 }
 
+let startPollTimeout: ReturnType<typeof setTimeout> | null = null;
+
 export function startPolling(): void {
   if (pollInterval) return;
   logPoll("startPolling called");
   loadCachedNotifications();
+  loadCachedSkipped();
   broadcastNotifications();
 
+  // Cancel any pending poll from a previous startPolling call
+  if (startPollTimeout) clearTimeout(startPollTimeout);
   // Single poll on startup after bridge initializes (no automatic interval)
-  setTimeout(() => poll(), 20000);
+  startPollTimeout = setTimeout(() => poll(), 20000);
 }
 
 export function stopPolling(): void {
@@ -57,8 +148,24 @@ export function stopPolling(): void {
 
 let lastSkippedItems: Array<{ source?: string; title?: string; reason?: string }> = [];
 
+function getSkippedCachePath(): string {
+  return path.join(os.homedir(), "Library", "Application Support", "claude-deck", "skipped-cache.json");
+}
+
+function loadCachedSkipped(): void {
+  try {
+    const raw = fs.readFileSync(getSkippedCachePath(), "utf-8");
+    lastSkippedItems = JSON.parse(raw);
+  } catch {}
+}
+
+function saveCachedSkipped(): void {
+  try { fs.writeFileSync(getSkippedCachePath(), JSON.stringify(lastSkippedItems)); } catch {}
+}
+
 export function getNotifications(): PollNotification[] {
-  return notifications.filter(n => n.status !== "dismissed" && n.status !== "done");
+  // Never hide anything — all items are always visible, just in different stages
+  return notifications;
 }
 
 export function getSkippedItems(): Array<{ source?: string; title?: string; reason?: string }> {
@@ -92,6 +199,20 @@ export function updateNotificationByTitle(titleSubstring: string, changes: Recor
   saveCacheToFile();
   broadcastNotifications();
   logPoll(`Updated "${n.title.slice(0, 40)}" with: ${JSON.stringify(changes)}`);
+  return true;
+}
+
+export function updateNotificationById(id: string, changes: Record<string, unknown>): boolean {
+  logPoll(`updateNotificationById called: id=${id.slice(0, 20)}, changes=${JSON.stringify(changes)}, total notifications=${notifications.length}`);
+  const n = notifications.find(n => n.id === id);
+  if (!n) {
+    logPoll(`  NOT FOUND! Available IDs: ${notifications.map(n => n.id.slice(0, 20)).join(", ")}`);
+    return false;
+  }
+  Object.assign(n, changes);
+  saveCacheToFile();
+  broadcastNotifications();
+  logPoll(`  Updated "${n.title.slice(0, 40)}" stage=${n.stage}`);
   return true;
 }
 
@@ -135,7 +256,7 @@ function loadCachedNotifications(): void {
 
 function saveCacheToFile(): void {
   try {
-    fs.writeFileSync(getCachePath(), JSON.stringify(notifications.filter(n => n.status !== "dismissed")));
+    fs.writeFileSync(getCachePath(), JSON.stringify(notifications));
   } catch {}
 }
 
@@ -150,9 +271,17 @@ async function poll(): Promise<void> {
   }
 
   if (!isBridgeReady()) {
-    logPoll("Bridge not ready, waiting...");
-    isPolling = false;
-    return;
+    logPoll("Bridge not ready, waiting up to 60s...");
+    const waitStart = Date.now();
+    while (!isBridgeReady() && Date.now() - waitStart < 60000) {
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    if (!isBridgeReady()) {
+      logPoll("Bridge still not ready after 60s — aborting poll");
+      isPolling = false;
+      return;
+    }
+    logPoll("Bridge became ready after waiting");
   }
 
   // Don't seed from context refs — only use real triage results
@@ -161,61 +290,128 @@ async function poll(): Promise<void> {
     const hours = nextLookbackHours;
     nextLookbackHours = 168;
     logPoll(`Polling (lookback: ${hours}h)`);
-    const timeDesc = hours <= 6 ? `the last ${hours} hours` : hours <= 24 ? `the last ${hours} hours` : hours <= 48 ? "the last 2 days" : "the last week";
 
-    // PASS 1: Gather raw data (dedicated prompt, nothing else)
-    logPoll("Pass 1: Gathering raw data");
-    const gatherPrompt = `Gather ALL of the following data for Kieran Williams (kwilliams, Slack U02PKBZSB9Q, team Vector at Monte Carlo Data) from ${timeDesc}.
+    // Compute date cutoff for search queries
+    const cutoffDate = new Date(Date.now() - hours * 60 * 60 * 1000);
+    const cutoffStr = cutoffDate.toISOString().split("T")[0]; // YYYY-MM-DD
+    const slackAfter = cutoffStr; // Slack search supports "after:YYYY-MM-DD"
 
-You MUST check EVERY source listed below. Do not skip any.
+    // PASS 1: Gather raw data — one request per source for deterministic results
+    logPoll("Pass 1: Gathering raw data (per-source)");
 
-1. **Slack** — Use slack_search_public_and_private:
-   - Search: "<@U02PKBZSB9Q>" (personal mentions)
-   - Search: "@frontend" (team mentions)
-   - Check DMs
-   - Read channels: #team-vector (C0AMSV2SK4Z), #team-vector-standup (C0AMT1AGN7K)
-   - For EACH mention: who said it, exact quote, channel, timestamp, and whether Kieran replied
+    const sources: Array<{ name: string; prompt: string; timeoutMs: number }> = [
+      {
+        name: "Slack",
+        timeoutMs: 240000, // 4 min — Slack is the most important source
+        prompt: `You MUST execute ALL of these Slack API calls. Do not skip any.
 
-2. **Linear** — Use list_issues:
-   - ALL issues assigned to kwilliams
-   - For each: title, status, priority, recent comments
+Step 1: Use mcp__claude_ai_Slack__slack_search_public_and_private with query "<@U02PKBZSB9Q> after:${slackAfter}"
+Step 2: Use mcp__claude_ai_Slack__slack_search_public_and_private with query "to:U02PKBZSB9Q after:${slackAfter}"
+Step 3: Use mcp__claude_ai_Slack__slack_read_channel with channel_id "C0AMSV2SK4Z"
+Step 4: Use mcp__claude_ai_Slack__slack_read_channel with channel_id "C0AMT1AGN7K"
+Step 5: Use mcp__claude_ai_Slack__slack_read_channel with channel_id "C054VQW7EGG"
 
-3. **GitHub** — Use Bash with gh CLI:
-   - Open PRs where Kieran is reviewer: gh pr list --search "review-requested:@me"
-   - Kieran's open PRs: gh pr list --author @me
-   - VERIFY each PR is actually open (not merged/closed)
+CRITICAL RULES:
+- Only include messages from AFTER ${cutoffStr}. DISCARD anything older.
+- For each message/thread: who said it, exact quote, channel name, timestamp
+- HIGHEST PRIORITY: Flag any thread or DM where someone messaged Kieran (U02PKBZSB9Q) and Kieran has NOT replied yet. Mark as "NEEDS RESPONSE".
+- For #agentic-engineering (C054VQW7EGG): flag actionable tips, tools, or scripts as "ACTIONABLE TIP".
+- Be thorough — Slack is the most important data source. Include everything relevant.
+Return ALL results as plain text.`
+      },
+      {
+        name: "Linear",
+        timeoutMs: 180000, // 3 min (60s init + 2 min fetch)
+        prompt: `Use mcp__claude_ai_Linear__list_issues with assignee "kwilliams" and limit 20.
 
-4. **Gmail** — Use gmail_search_messages:
-   - Unread emails from ${timeDesc}
-   - Subject, sender, preview for each
+From the results, ONLY include issues where status is NOT "Done" and NOT "Canceled".
 
-5. **Google Calendar** — Use gcal_list_events:
-   - Events in the next 24 hours
-   - Title, time, attendees for each
+For each open issue, return: identifier (e.g. VEC-10), title, status, priority. Keep it concise — one line per issue. Return as plain text.`
+      },
+      {
+        name: "Calendar",
+        timeoutMs: 150000, // 2.5 min (60s init + 1.5 min fetch)
+        prompt: `You MUST execute this Google Calendar API call.
 
-6. **Notion** — Use notion-search:
-   - Recent mentions of Kieran
-   - Recently updated specs/docs
+Step 1: Use mcp__claude_ai_Google_Calendar__gcal_list_events to get events for the next 24 hours
 
-Return a COMPLETE structured report. If a source returns no results, explicitly say "No results from [source]" so I know you checked.`;
+Return for each event: title, start time, end time, attendees, location or video link. Flag any meetings in the next 2 hours. Return as plain text.`
+      },
+      {
+        name: "Gmail",
+        timeoutMs: 150000, // 2.5 min (60s init + 1.5 min fetch)
+        prompt: `You MUST execute this Gmail API call.
 
-    const rawData = await askBridge(gatherPrompt, 180000);
-    logPoll(`Pass 1 complete: ${rawData.length} chars`);
+Step 1: Use mcp__claude_ai_Gmail__gmail_search_messages with query "is:unread newer_than:${hours <= 24 ? "1d" : hours <= 48 ? "2d" : "7d"}" and limit 20
 
-    if (rawData.length < 100) {
-      logPoll("Pass 1 returned too little data");
-      isPolling = false;
-      return;
+Return for each email: subject, sender name, and preview/snippet. Skip automated notifications from GitHub, Linear, Slack, Datadog, or other bots. Return as plain text.`
+      },
+      {
+        name: "Notion",
+        timeoutMs: 180000, // 3 min (60s init + 2 min fetch)
+        prompt: `You MUST execute these Notion API calls. Do not skip any.
+
+Step 1: Use mcp__claude_ai_Notion__notion-search with query "Kieran Williams"
+Step 2: Use mcp__claude_ai_Notion__notion-search with query "Vector team" to find recently updated team pages
+
+Only include pages updated after ${cutoffStr}. Return page titles, who edited them, and brief summaries. Return as plain text.`
+      },
+    ];
+
+    // Fetch sources sequentially via the shared bridge (which has MCP already loaded)
+    const rawResults: string[] = [];
+
+    for (let i = 0; i < sources.length; i++) {
+      const source = sources[i];
+      logPoll(`  Fetching: ${source.name} (${i + 1}/${sources.length})`);
+
+      for (const win of BrowserWindow.getAllWindows()) {
+        try {
+          if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", {
+            source: source.name,
+            current: i + 1,
+            total: sources.length + 1,
+          });
+        } catch {}
+      }
+
+      try {
+        const result = await askBridge(source.prompt, source.timeoutMs);
+        rawResults.push(`## ${source.name}\n${result}\n`);
+        logPoll(`  ${source.name}: ${result.length} chars`);
+      } catch (err) {
+        rawResults.push(`## ${source.name}\nError: ${String(err).slice(0, 100)}\n`);
+        logPoll(`  ${source.name}: ERROR ${String(err).slice(0, 60)}`);
+      }
     }
 
-    // Restart bridge to clear context before Pass 2
-    restartBridge();
-    // Wait for bridge to reinitialize
-    await new Promise(resolve => setTimeout(resolve, 20000));
+    const rawData = rawResults.join("\n---\n\n");
+    logPoll(`Pass 1 complete: ${rawData.length} total chars from ${rawResults.length} sources`);
 
-    // PASS 2: Triage the raw data (fresh bridge, no accumulated context)
+    // Restart bridge before triage to clear accumulated conversation context
+    restartBridge();
+    logPoll("Waiting for bridge restart before triage...");
+    const triageWaitStart = Date.now();
+    while (!isBridgeReady() && Date.now() - triageWaitStart < 90000) {
+      await new Promise(r => setTimeout(r, 1000));
+    }
+
+    // PASS 2: Triage the raw data (fresh bridge, clean context)
     logPoll("Pass 2: Triaging raw data");
-    const triagePrompt = `You are Kieran Williams's personal assistant. Here is everything from his Slack, Linear, GitHub, Gmail, Calendar, and Notion:
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", {
+        source: "Triaging",
+        current: sources.length + 1,
+        total: sources.length + 1,
+      });
+    }
+    const now = new Date();
+    const israelTime = now.toLocaleString("en-US", { timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hour12: false });
+    const triagePrompt = `You are Kieran Williams's personal assistant. Current time: ${now.toISOString()} (${israelTime} Israel Time / Asia/Jerusalem).
+
+Kieran is based in ISRAEL (Asia/Jerusalem timezone, UTC+2 or UTC+3). All meeting times must be evaluated relative to Israel time. A meeting at "9am Pacific" is 7pm Israel time. If a meeting has ALREADY PASSED in Israel time, do NOT flag it as needing prep.
+
+Here is everything from his Slack, Linear, GitHub, Gmail, Calendar, and Notion:
 
 ---
 ${rawData}
@@ -223,61 +419,48 @@ ${rawData}
 
 Process this like Kieran would going through his inbox.
 
-## CRITICAL RULES — read carefully
+## CRITICAL RULES
 
-1. **VERIFY before including**: If a PR is mentioned, CHECK its actual status. If it's already merged/closed/approved, DO NOT include it. If a ticket is Done/Cancelled, DO NOT include it. Don't trust mentions — verify the actual state.
+1. **VERIFY before including**: Done/merged/closed/resolved items → skip.
 
-2. **Direct asks from managers/leads = highest priority**: If Yael Chemla (Kieran's manager) or a team lead directly asks Kieran to do something, that's confidence 10.
+2. **Direct asks from managers/leads = highest priority**: Yael Chemla (manager) or team lead asks = confidence 10.
 
-3. **Consolidate aggressively**: A Slack mention about a Linear ticket is ONE item, not two. A PR review request and a Slack message about the same PR is ONE item.
+3. **Consolidate**: Slack mention + Linear ticket about same thing = ONE item with ALL links.
 
-4. **Include ALL relevant links**: Every ticket, PR, Slack thread, and Notion doc related to the item must be listed in the "links" field. Not just one URL — ALL of them.
+4. **UNREAD THREADS ARE HIGH PRIORITY**: If someone tagged/messaged Kieran in a thread and he hasn't replied, that is an actionable "response" item. Don't skip these.
 
-5. **Only OPEN/ACTIONABLE items**: If it's done, merged, closed, resolved — skip it completely.
-
-6. **Classify task type**: Each item must have a "task_type" field:
-   - "implementation" — code work needed (new feature, bug fix, ticket implementation)
+5. **Classify task type**:
+   - "implementation" — code work needed
    - "review" — PR needs review
    - "response" — someone messaged Kieran and expects a reply
    - "investigation" — "look into this" type request
-   - "planning" — needs a plan/RFC before any work
-   - "meeting_prep" — upcoming meeting that needs preparation
+   - "planning" — needs a plan/RFC
+   - "meeting_prep" — upcoming meeting (only if it HASN'T happened yet in Israel time)
+   - "follow_up" — Kieran already responded but needs to check back later (e.g., waiting for someone's reply)
 
-Return ONLY a JSON array, nothing else:
-[{
-  "source": "linear",
-  "priority": "urgent",
-  "confidence": 10,
-  "task_type": "implementation",
-  "title": "VEC-10: Add Fig Intelligence UI (from Yael)",
-  "summary": "Your manager Yael Chemla assigned this to you today. Port the Figs and Fig Intelligence dashboard from agent-hub to the frontend app using Mantine components. Status: In Progress. She mentioned this in #team-vector as a priority for this sprint.",
-  "links": [
-    {"type": "linear", "label": "VEC-10", "url": "https://linear.app/issue/VEC-10"},
-    {"type": "slack", "label": "#team-vector thread", "url": "https://montecarlodata.slack.com/archives/C0AMSV2SK4Z"},
-    {"type": "github", "label": "Related PR #12441", "url": "https://github.com/monte-carlo-data/frontend/pull/12441"}
-  ],
-  "author": "Yael Chemla",
-  "action_needed": "Start implementing the Fig Intelligence UI in the frontend repo"
-}]
+6. **Timezone**: Evaluate ALL times in Israel timezone. Past meetings = skip. Upcoming = include.
 
-Rules:
-- VERIFY status of every PR and ticket before including — no hallucinating about open PRs that are actually merged
-- Manager/lead asks = confidence 10
-- Product manager (Mor Ofir) asks = confidence 9
-- Include ALL related links (tickets, PRs, threads, docs) in the "links" array
-- Consolidate related items into single actions
-- Sort by confidence (highest first)
+7. **#agentic-engineering tips**: Actionable suggestions (scripts, tools, configs to try) = include as task_type "investigation".
 
-IMPORTANT — return TWO arrays in a JSON object:
+Return a JSON object with THREE arrays:
 {
-  "actionable": [... items that need action ...],
-  "skipped": [... items you considered but skipped, with WHY you skipped them ...]
+  "actionable": [... items needing immediate action ...],
+  "follow_up": [... items Kieran already handled but should recheck later (waiting for reply, monitoring, etc.) ...],
+  "skipped": [... items reviewed and not relevant ...]
 }
 
-The "skipped" array helps Kieran understand what you looked at. Each skipped item:
-{"source": "slack", "title": "Short description", "reason": "Why it was skipped — e.g., 'Already responded', 'Ticket is Done', 'Bot message', 'No action needed'"}
+Each actionable/follow_up item:
+{"source": "slack", "priority": "urgent|today|low", "confidence": 1-10, "task_type": "...", "title": "...", "summary": "...", "links": [{"type": "...", "label": "...", "url": "..."}], "author": "...", "action_needed": "..."}
 
-Include EVERYTHING you looked at in either actionable or skipped. Nothing should be silently dropped.`;
+Each skipped item:
+{"source": "slack", "title": "Short description", "reason": "Why skipped"}
+
+Rules:
+- Manager/lead asks = confidence 10, PM (Mor Ofir) = confidence 9
+- Unread thread where Kieran was tagged = confidence 8+
+- Include ALL related links per item
+- Sort by confidence (highest first)
+- Include EVERYTHING in one of the three arrays. Nothing silently dropped.`;
 
     const response = await askBridge(triagePrompt, 180000); // 3 min — single combined request
     logPoll(`Poll complete: ${response.length} chars`);
@@ -290,6 +473,7 @@ Include EVERYTHING you looked at in either actionable or skipped. Nothing should
 
     // Try to parse as {actionable, skipped} object first, then fall back to array
     let actionableItems: unknown[] = [];
+    let followUpItems: unknown[] = [];
     let skippedItems: Array<{ source?: string; title?: string; reason?: string }> = [];
 
     const objMatch = cleanResponse.match(/\{[\s\S]*"actionable"[\s\S]*\}/);
@@ -297,8 +481,9 @@ Include EVERYTHING you looked at in either actionable or skipped. Nothing should
       try {
         const parsed = JSON.parse(objMatch[0]);
         actionableItems = parsed.actionable ?? [];
+        followUpItems = parsed.follow_up ?? [];
         skippedItems = parsed.skipped ?? [];
-        logPoll(`Parsed object: ${actionableItems.length} actionable, ${skippedItems.length} skipped`);
+        logPoll(`Parsed: ${actionableItems.length} actionable, ${followUpItems.length} follow-up, ${skippedItems.length} skipped`);
         for (const s of skippedItems) {
           logPoll(`  SKIPPED: [${s.source}] ${s.title} — ${s.reason}`);
         }
@@ -328,11 +513,15 @@ Include EVERYTHING you looked at in either actionable or skipped. Nothing should
       task_type?: string; author?: string; confidence?: number; action_needed?: string;
     }>;
 
-    logPoll(`Parsed ${items.length} actionable notifications`);
+    // Also parse follow-up items with same shape
+    const followItems = followUpItems as typeof items;
+    logPoll(`Parsed ${items.length} actionable, ${followItems.length} follow-up notifications`);
     lastSkippedItems = skippedItems;
+    saveCachedSkipped();
 
-    // Clear existing notifications — each poll is a fresh, complete picture
-    notifications.length = 0;
+    // NEVER delete existing notifications — only add new ones
+    // Build a set of existing keys to deduplicate
+    const existingKeys = new Set(notifications.map(n => extractKey(n)));
 
     // Dedup within this batch by extracting a stable resource key
     function extractKey(n: { source: string; title: string; url?: string }): string {
@@ -354,14 +543,12 @@ Include EVERYTHING you looked at in either actionable or skipped. Nothing should
       return `${n.source}:${n.title.toLowerCase().replace(/\s+/g, " ").trim()}`;
     }
 
-    const existingKeys = new Set(notifications.map(n => extractKey(n)));
-
     let added = 0;
+    // Add actionable items (skip if already exists)
     for (const item of items) {
       const key = extractKey(item);
       if (existingKeys.has(key)) continue;
       existingKeys.add(key);
-      // Only include items with confidence >= 5
       if (item.confidence !== undefined && item.confidence < 5) continue;
 
       notifications.unshift({
@@ -382,6 +569,31 @@ Include EVERYTHING you looked at in either actionable or skipped. Nothing should
       added++;
     }
 
+    // Add follow-up items with "follow_up" stage
+    for (const item of followItems) {
+      const key = extractKey(item);
+      if (existingKeys.has(key)) continue;
+      existingKeys.add(key);
+
+      notifications.push({
+        id: `poll-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        source: item.source as PollNotification["source"],
+        priority: item.priority as PollNotification["priority"],
+        status: "new",
+        title: item.title,
+        summary: item.summary,
+        url: item.url ?? item.links?.[0]?.url,
+        links: item.links,
+        taskType: item.task_type as PollNotification["taskType"],
+        author: item.author,
+        confidence: item.confidence,
+        actionNeeded: item.action_needed,
+        createdAt: new Date().toISOString(),
+        stage: "follow_up",
+      });
+      added++;
+    }
+
     if (added > 0) {
       logPoll(`Added ${added} new notifications`);
       saveCacheToFile();
@@ -393,6 +605,11 @@ Include EVERYTHING you looked at in either actionable or skipped. Nothing should
     isPolling = false;
     hasCompletedFirstPoll = true;
     broadcastNotifications();
+
+    // Broadcast that polling is complete so UI can stop loading indicator
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send("notifications:polling-finished");
+    }
 
     // Restart the bridge to clear conversation context for next poll
     restartBridge();

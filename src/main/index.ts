@@ -10,7 +10,7 @@ import { enrichExternalAgents } from "./agents/session-enricher";
 import { startSessionTailing, stopSessionTailing } from "./agents/session-tailer";
 import { addContextFromUrl } from "./agents/context-tracker";
 import { listAllSessions } from "./agents/session-history";
-import { startPolling, stopPolling, getNotifications, dismissNotification, startWorkOnNotification, clearAllNotifications, forcePoll, hasPolledOnce, getSkippedItems, updateNotificationByTitle } from "./notifications/poll-service";
+import { startPolling, stopPolling, getNotifications, dismissNotification, startWorkOnNotification, clearAllNotifications, forcePoll, hasPolledOnce, getSkippedItems, updateNotificationByTitle, updateNotificationById } from "./notifications/poll-service";
 import { startBridge, stopBridge, getBridgeDebugLog } from "./mcp-bridge";
 import { prepareWorkPlan, iteratePlan, startWorkAgent, getPlan, getAllPlans, getActiveWorkAgents } from "./notifications/work-dispatcher";
 import { startMonitoring, stopMonitoring } from "./notifications/agent-monitor";
@@ -27,6 +27,8 @@ import {
 } from "./manager/manager-ai";
 import type { StoreState, FleetMetrics, SpawnAgentConfig } from "../shared/types";
 import { ipcMain } from "electron";
+import { initTray, updateTrayBadge } from "./tray";
+import { checkClaudeAuth } from "./auth-check";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require("electron-squirrel-startup")) {
@@ -59,6 +61,9 @@ function buildStoreState(): StoreState {
     totalTokens: agents.reduce((sum, a) => sum + a.inputTokens + a.outputTokens, 0),
     totalCostUsd: agents.reduce((sum, a) => sum + a.costUsd, 0),
   };
+
+  // Update tray badge with active agent count
+  updateTrayBadge(metrics.active);
 
   return { agents, messages, approvals, contextRefs, events, metrics };
 }
@@ -94,6 +99,14 @@ const createWindow = () => {
 app.whenReady().then(() => {
   // Initialize database
   initDatabase();
+
+  // Run auth check (non-blocking — logs result, renderer queries via IPC)
+  checkClaudeAuth()
+    .then((status) => console.log("[auth-check]", status))
+    .catch((err) => console.error("[auth-check] failed:", err));
+
+  // Auth IPC handler
+  ipcMain.handle("auth:check", () => checkClaudeAuth());
 
   // Register IPC handlers with real agent logic
   registerIpcHandlers({
@@ -149,6 +162,9 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("notifications:update-by-title", (_event, data: { titleSubstring: string; changes: Record<string, unknown> }) => {
     return updateNotificationByTitle(data.titleSubstring, data.changes);
+  });
+  ipcMain.handle("notifications:update-by-id", (_event, data: { id: string; changes: Record<string, unknown> }) => {
+    return updateNotificationById(data.id, data.changes);
   });
 
   // Work dispatcher
@@ -256,9 +272,19 @@ app.whenReady().then(() => {
       res.end(JSON.stringify({ endpoints: ["/api/store", "/api/notifications", "/api/sessions", "/api/debug"] }));
     }
   });
+  debugServer.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      console.warn("Debug server port 9876 in use, skipping");
+    } else {
+      console.error("Debug server error:", err);
+    }
+  });
   debugServer.listen(9876, () => {});
 
   createWindow();
+
+  // Initialize system tray after window is created
+  initTray();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {

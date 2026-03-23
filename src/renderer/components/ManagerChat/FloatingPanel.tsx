@@ -6,7 +6,7 @@ import { ConversationSidebar } from "./ConversationSidebar";
 import { ContextChips } from "./ContextChips";
 import { ManagerMessages } from "./ManagerMessages";
 import { ManagerInput } from "./ManagerInput";
-import type { ManagerMessage } from "../../stores/manager-store";
+import type { ManagerMessage, ManagerConversation } from "../../stores/manager-store";
 
 export function FloatingPanel({ dockedWidth = 480 }: { dockedWidth?: number }) {
   const isOpen = useManagerStore((s) => s.isOpen);
@@ -23,10 +23,12 @@ export function FloatingPanel({ dockedWidth = 480 }: { dockedWidth?: number }) {
 
   useEffect(() => {
     (async () => {
-      const convos = await window.deck.getManagerConversations();
-      if (convos) setConversations(convos);
-      const msgs = await window.deck.getManagerMessages();
-      if (msgs) setMessages(msgs);
+      try {
+        const convos = await window.deck.getManagerConversations?.();
+        if (convos) setConversations(convos);
+        const msgs = await window.deck.getManagerMessages?.();
+        if (msgs) setMessages(msgs);
+      } catch {}
     })();
   }, [setConversations, setMessages]);
 
@@ -40,7 +42,7 @@ export function FloatingPanel({ dockedWidth = 480 }: { dockedWidth?: number }) {
           setStreaming(false);
           clearStreamingText();
           if (evt.message) addMessage(evt.message);
-          window.deck.getManagerConversations().then((convos) => { if (convos) setConversations(convos); });
+          window.deck.getManagerConversations().then((convos: ManagerConversation[]) => { if (convos) setConversations(convos); });
           break;
         case "error": setStreaming(false); clearStreamingText(); break;
       }
@@ -128,7 +130,7 @@ export function FloatingPanel({ dockedWidth = 480 }: { dockedWidth?: number }) {
           right: 0,
           bottom: 0,
           width: dockedWidth,
-          zIndex: 200,
+          zIndex: 90,
           backgroundColor: "var(--mantine-color-dark-8)",
           borderLeft: "1px solid var(--mantine-color-default-border)",
           display: "flex",

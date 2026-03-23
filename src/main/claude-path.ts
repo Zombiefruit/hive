@@ -11,7 +11,9 @@ export function getClaudeCodePath(): string {
   if (cachedPath) return cachedPath;
 
   try {
-    cachedPath = execSync("which claude", { encoding: "utf-8" }).trim();
+    const result = execSync("which claude", { encoding: "utf-8" }).trim();
+    if (!result) throw new Error("which claude returned empty");
+    cachedPath = result;
   } catch {
     // Fallback to common locations
     const fs = require("node:fs");
@@ -25,11 +27,11 @@ export function getClaudeCodePath(): string {
     for (const candidate of candidates) {
       if (fs.existsSync(candidate)) {
         cachedPath = candidate;
-        return cachedPath;
+        return candidate;
       }
     }
     throw new Error("Could not find Claude Code executable. Is it installed?");
   }
 
-  return cachedPath;
+  return cachedPath!;
 }

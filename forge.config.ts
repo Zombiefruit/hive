@@ -6,12 +6,23 @@ import { FuseV1Options, FuseVersion } from "@electron/fuses";
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    name: "Claude Deck",
+    executableName: "claude-deck",
+    appBundleId: "com.kieranwilliams.claude-deck",
+    appCategoryType: "public.app-category.developer-tools",
   },
   rebuildConfig: {},
   makers: [
     {
       name: "@electron-forge/maker-zip",
       platforms: ["darwin"],
+    },
+    {
+      name: "@electron-forge/maker-dmg",
+      config: {
+        name: "Claude Deck",
+        format: "ULFO",
+      },
     },
   ],
   plugins: [

@@ -7,6 +7,7 @@ import { getClaudeCodePath } from "../claude-path";
 import { executeManagerTool } from "./manager-tools";
 import { getAllAgents, getPendingApprovals } from "../db/database";
 import { broadcastStoreUpdate } from "../ipc/bridge";
+import { getMonitorSummary } from "../notifications/agent-monitor";
 
 const MODEL = "claude-opus-4-6";
 const CALL_DIR = path.join(os.tmpdir(), "claude-deck-mcp");
@@ -176,6 +177,9 @@ ${fleetSummary}
 
 ## Pending Approvals
 ${approvalSummary}
+
+## Work Agent Monitor
+${getMonitorSummary()}
 
 Be concise and action-oriented. Use your fleet tools — don't use Read/Write/Bash.`;
 }

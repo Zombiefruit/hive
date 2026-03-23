@@ -179,9 +179,9 @@ export function ChatPanel({ agentId, agentStatus, isReadOnly }: ChatPanelProps) 
   const isActive = agentStatus === "active" && !isReadOnly;
 
   return (
-    <Stack gap={0} h="100%">
-      <ScrollArea ref={scrollRef} style={{ flex: 1 }} offsetScrollbars>
-        <Stack gap={4} p="md" pb={60} style={{ display: "flex", flexDirection: "column" }}>
+    <Stack gap={0} style={{ flex: 1, minHeight: 0, height: "100%" }}>
+      <ScrollArea ref={scrollRef} style={{ flex: 1, minHeight: 0 }} offsetScrollbars scrollbarSize={8}>
+        <Stack gap={4} p="md" pb="md" style={{ display: "flex", flexDirection: "column" }}>
           {messages.length === 0 ? (
             <div style={{ textAlign: "center", padding: "48px 24px" }}>
               <Text size="sm" c="dimmed" mb="xs">No messages loaded yet</Text>
@@ -198,7 +198,7 @@ export function ChatPanel({ agentId, agentStatus, isReadOnly }: ChatPanelProps) 
       </ScrollArea>
 
       {!isReadOnly && (
-        <Paper p="sm" style={{ borderTop: "1px solid var(--mantine-color-default-border)" }}>
+        <Paper p="sm" style={{ borderTop: "1px solid var(--mantine-color-default-border)", flexShrink: 0 }}>
           {sendError && (
             <Text size="xs" c="red" mb="xs">{sendError}</Text>
           )}

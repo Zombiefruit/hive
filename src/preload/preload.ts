@@ -45,6 +45,8 @@ const api = {
   clearNotifications: () => ipcRenderer.invoke("notifications:clear"),
   updateNotificationByTitle: (titleSubstring: string, changes: Record<string, unknown>) =>
     ipcRenderer.invoke("notifications:update-by-title", { titleSubstring, changes }),
+  updateNotificationById: (id: string, changes: Record<string, unknown>) =>
+    ipcRenderer.invoke("notifications:update-by-id", { id, changes }),
   refreshNotifications: (lookbackHours?: number) => ipcRenderer.invoke("notifications:refresh", lookbackHours),
   onNotificationsUpdate: (callback: (notifications: unknown[]) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, data: unknown[]) => callback(data);
@@ -55,6 +57,16 @@ const api = {
     const listener = () => callback();
     ipcRenderer.on("notifications:polling-started", listener);
     return () => ipcRenderer.removeListener("notifications:polling-started", listener);
+  },
+  onPollingFinished: (callback: () => void) => {
+    const listener = () => callback();
+    ipcRenderer.on("notifications:polling-finished", listener);
+    return () => ipcRenderer.removeListener("notifications:polling-finished", listener);
+  },
+  onPollingProgress: (callback: (data: { source: string; current: number; total: number }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: { source: string; current: number; total: number }) => callback(data);
+    ipcRenderer.on("notifications:polling-progress", listener);
+    return () => ipcRenderer.removeListener("notifications:polling-progress", listener);
   },
 
   // Store sync — renderer subscribes to state updates from main
@@ -110,6 +122,14 @@ const api = {
     return () =>
       ipcRenderer.removeListener("agent:approval-request", listener);
   },
+
+  // Auth check
+  checkAuth: () =>
+    ipcRenderer.invoke("auth:check") as Promise<{
+      installed: boolean;
+      version: string | null;
+      authenticated: boolean;
+    }>,
 } as const;
 
 export type DeckAPI = typeof api;

@@ -1,10 +1,11 @@
-import { Badge, Code, Group, Loader, ScrollArea, Stack, Text, UnstyledButton } from "@mantine/core";
+import { Badge, Group, Loader, Stack, Text, Tooltip, UnstyledButton } from "@mantine/core";
 import {
   IconInbox, IconSparkles, IconClock, IconPlayerPlay, IconGitPullRequest, IconCircleCheck,
   IconBrandGithub, IconHash, IconMail, IconFileText, IconChevronRight, IconChevronDown,
+  IconGripVertical, IconEyeOff,
 } from "@tabler/icons-react";
 import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Markdown } from "../components/Markdown";
 import { AddToManagerButton } from "../components/AddToManagerButton";
 import { useNavigate } from "react-router-dom";
@@ -27,13 +28,21 @@ interface NotificationItem {
 }
 
 const STAGES = [
-  { key: "new", label: "Inbox", Icon: IconInbox, color: "#3b82f6" },
-  { key: "planning", label: "Planning", Icon: IconSparkles, color: "#a855f7" },
-  { key: "awaiting_approval", label: "Approval", Icon: IconClock, color: "#eab308" },
-  { key: "in_progress", label: "In Progress", Icon: IconPlayerPlay, color: "#22c55e" },
-  { key: "pr_ready", label: "PR Ready", Icon: IconGitPullRequest, color: "#06b6d4" },
-  { key: "done", label: "Done", Icon: IconCircleCheck, color: "#6b7280" },
+  { key: "new", label: "Inbox", Icon: IconInbox, color: "#3b82f6", tip: "New items from Slack, Linear, Gmail, etc. Drag to Planning to start working." },
+  { key: "follow_up", label: "Follow Up", Icon: IconClock, color: "#f59e0b", tip: "Items you've handled but need to recheck later. Rechecked each refresh." },
+  { key: "planning", label: "Planning", Icon: IconSparkles, color: "#a855f7", tip: "Drop here to have AI create a work plan. Opens the detail view for review." },
+  { key: "working", label: "Working", Icon: IconPlayerPlay, color: "#22c55e", tip: "Drop here from Planning to spawn an agent that executes the plan." },
+  { key: "done", label: "Done", Icon: IconCircleCheck, color: "#6b7280", tip: "Completed items. Persisted so you can review what you've done." },
+  { key: "skipped", label: "Reviewed", Icon: IconEyeOff, color: "#525252", tip: "AI reviewed these and skipped them. Drag to Inbox if you disagree." },
 ];
+
+// What each stage transition does:
+// Inbox → Planning: triggers prepareWorkPlan (AI creates a plan)
+// Inbox → Follow Up: just moves it (recheck later)
+// Planning → Working: triggers startWorkAgent (only if plan exists)
+// Any → Done: marks complete
+// Any → Inbox: moves back (resets)
+// Reviewed → Inbox: promotes a skipped item to actionable
 
 const sourceIcons: Record<string, React.FC<{ size?: number; color?: string }>> = {
   linear: SiLinear as React.FC<{ size?: number; color?: string }>,
@@ -47,24 +56,38 @@ const sourceColors: Record<string, string> = {
   linear: "#5E6AD2", slack: "#E01E5A", github: "#FFFFFF", notion: "#FFFFFF", email: "#EA4335",
 };
 
-function formatAge(iso: string): string {
+function formatTimeSince(iso: string): string {
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 60) return `${mins}m`;
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
   const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  return `${Math.round(hours / 24)}d`;
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
 }
+
+// Modal for adding context before stage transitions
+// No modal needed — drag-and-drop triggers actions immediately.
+// Context can be added from the detail pane after the card moves.
 
 export function Notifications() {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [fetching, setFetching] = useState(true);
+  const [lastRefreshed, setLastRefreshed] = useState<string | null>(null);
+  const [pollProgress, setPollProgress] = useState<{ source: string; current: number; total: number } | null>(null);
   const [skippedItems, setSkippedItems] = useState<Array<{ source?: string; title?: string; reason?: string }>>([]);
   const [showSkipped, setShowSkipped] = useState(false);
+  const [authStatus, setAuthStatus] = useState<{ installed: boolean; version: string | null; authenticated: boolean } | null>(null);
 
   useEffect(() => {
+    window.deck.checkAuth?.().then(setAuthStatus).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    // Load cached notifications + current state on mount
     const load = async () => {
+      if (!window.deck) return;
       try {
         const result = await window.deck.getNotifications();
         if (result) {
@@ -73,54 +96,117 @@ export function Notifications() {
           const skipped = Array.isArray(data) ? [] : (data.skipped ?? []);
           const hasPolled = Array.isArray(data) ? items.length > 0 : (data.hasPolled ?? false);
 
-          const mapped = items.map(n => ({ ...n, stage: n.stage ?? "new" }));
-          if (mapped.length > 0) setNotifications(mapped);
+          // Items from server already have persisted stages
+          const serverItems = items.map(n => ({ ...n, stage: n.stage ?? "new" }));
+
+          // Convert skipped items to cards (only if they don't already exist in server items)
+          const serverIds = new Set(serverItems.map(n => n.id));
+          const skippedCards: NotificationItem[] = skipped.map((s, i) => ({
+            id: `skipped-${i}-${(s.title ?? "").slice(0, 20).replace(/\s/g, "")}`,
+            source: s.source ?? "unknown",
+            priority: "low",
+            status: "new",
+            title: s.title ?? "Unknown item",
+            summary: s.reason ?? "",
+            actionNeeded: s.reason,
+            createdAt: new Date().toISOString(),
+            stage: "skipped",
+          })).filter(s => !serverIds.has(s.id));
+
+          // Server state is the source of truth
+          setNotifications([...serverItems, ...skippedCards]);
           if (skipped.length > 0) setSkippedItems(skipped);
+          // Only clear fetching if polling has completed AND we're not currently polling
           if (hasPolled) setFetching(false);
         }
       } catch {}
     };
 
     load();
-    // Re-fetch every 5s until we get data, then every 15s
-    const interval = setInterval(load, fetching ? 5000 : 15000);
+    const interval = setInterval(load, 15000);
 
+    // Update notification list when new data arrives (but DON'T clear fetching here)
     const unsub = window.deck.onNotificationsUpdate?.((data: unknown) => {
       const items = (data as NotificationItem[]).map(n => ({ ...n, stage: n.stage ?? "new" }));
+      console.log(`[live] onNotificationsUpdate: ${items.length} items, stages: ${[...new Set(items.map(n => n.stage))].join(",")}`);
       if (items.length > 0) {
-        setNotifications(items);
-        setFetching(false);
+        setNotifications(prev => {
+          const skippedCards = prev.filter(n => n.id.startsWith("skipped-"));
+          return [...items, ...skippedCards];
+        });
       }
     });
 
-    // Listen for polling-started to re-show loading
-    const unsubPolling = window.deck.onPollingStarted?.(() => {
+    // Polling lifecycle events — these are the ONLY way to control the loading indicator
+    const unsubStarted = window.deck.onPollingStarted?.(() => {
       setFetching(true);
+      setPollProgress(null);
+    });
+    const unsubFinished = window.deck.onPollingFinished?.(() => {
+      setFetching(false);
+      setPollProgress(null);
+      setLastRefreshed(new Date().toISOString());
+    });
+    const unsubProgress = window.deck.onPollingProgress?.((data: { source: string; current: number; total: number }) => {
+      setPollProgress(data);
     });
 
-    // Stop showing fetching after 3 min max
-    const fetchTimeout = setTimeout(() => setFetching(false), 180000);
+    // Safety: stop showing fetching after 10 min max (5 sources + triage can take a while)
+    const fetchTimeout = setTimeout(() => setFetching(false), 600000);
 
     return () => {
       clearInterval(interval);
       clearTimeout(fetchTimeout);
       unsub?.();
-      unsubPolling?.();
+      unsubStarted?.();
+      unsubFinished?.();
+      unsubProgress?.();
     };
-  }, [fetching]);
+  }, []);
 
-  const advanceStage = (id: string) => {
-    setNotifications(prev => prev.map(n => {
-      if (n.id !== id) return n;
-      const idx = STAGES.findIndex(s => s.key === (n.stage ?? "new"));
-      const nextStage = STAGES[Math.min(idx + 1, STAGES.length - 1)].key;
-      return { ...n, stage: nextStage };
-    }));
-  };
+  // Move card visually + persist. Always call this first so the card doesn't freeze.
+  const moveCardToStage = useCallback((id: string, newStage: string) => {
+    console.log(`[DnD] moveCardToStage: ${id.slice(0, 20)} → ${newStage}`);
+    setNotifications(prev => {
+      const updated = prev.map(n => n.id === id ? { ...n, stage: newStage } : n);
+      console.log(`[DnD] setNotifications: ${updated.filter(n => n.stage === newStage).length} items now in ${newStage}`);
+      return updated;
+    });
+    window.deck.updateNotificationById?.(id, { stage: newStage })
+      .then((result: unknown) => console.log(`[DnD] persist result: ${result}`))
+      .catch((err: unknown) => console.error(`[DnD] persist error:`, err));
+  }, []);
+
+  // Trigger agent actions for a card (call AFTER moveCardToStage)
+  const triggerStageAction = useCallback((id: string, newStage: string, context?: string) => {
+    const n = notifications.find(n => n.id === id);
+    if (!n) return;
+
+    const enrichedSummary = context ? `${n.summary}\n\nUser context: ${context}` : n.summary;
+
+    if (newStage === "planning") {
+      setSelectedId(id);
+      window.deck.prepareWorkPlan?.({
+        id: n.id, source: n.source, title: n.title, summary: enrichedSummary, url: n.url,
+        taskType: n.taskType, links: n.links,
+      }).catch(() => {});
+    } else if (newStage === "working") {
+      window.deck.startWorkAgent?.(id).catch(() => {});
+    }
+  }, [notifications]);
+
+  const handleStageButton = useCallback((id: string, newStage: string) => {
+    moveCardToStage(id, newStage);
+    triggerStageAction(id, newStage);
+  }, [moveCardToStage, triggerStageAction]);
+
+  // Native HTML5 drag-and-drop state
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverStage, setDragOverStage] = useState<string | null>(null);
 
   const dismiss = (id: string) => {
-    window.deck.dismissNotification(id);
-    setNotifications(prev => prev.filter(n => n.id !== id));
+    // Don't delete — move to done
+    moveCardToStage(id, "done");
     if (selectedId === id) setSelectedId(null);
   };
 
@@ -146,13 +232,20 @@ export function Notifications() {
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--mantine-color-body)" }}>
+      <style>{`
+        .notif-card:hover { background-color: var(--mantine-color-dark-6) !important; }
+        .notif-card:hover .drag-handle { opacity: 1 !important; }
+        .notif-action-btn { transition: filter 0.15s ease; }
+        .notif-action-btn:hover { filter: brightness(1.2); }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+      `}</style>
       {/* Header with tabs */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           padding: "8px 24px",
-          paddingLeft: 80,
+          paddingLeft: 90,
           gap: 12,
           borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
           backgroundColor: "color-mix(in srgb, var(--mantine-color-dark-8) 80%, transparent)",
@@ -161,7 +254,21 @@ export function Notifications() {
           flexShrink: 0,
         }}
       >
-        <Text size="md" fw={700} style={{ WebkitAppRegion: "no-drag", minWidth: 120 }}>Claude Deck</Text>
+        <Group gap={6} style={{ WebkitAppRegion: "no-drag", minWidth: 120 }} wrap="nowrap">
+          <Text size="md" fw={700}>Claude Deck</Text>
+          {authStatus && (
+            <div
+              title={authStatus.authenticated ? `Authenticated (${authStatus.version ?? "unknown version"})` : authStatus.installed ? "Not authenticated" : "CLI not found"}
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                backgroundColor: authStatus.authenticated ? "#22c55e" : "#ef4444",
+                flexShrink: 0,
+              }}
+            />
+          )}
+        </Group>
         {/* Centered tabs */}
         <Group gap={4} style={{ WebkitAppRegion: "no-drag", position: "absolute", left: "50%", transform: "translateX(-50%)" }}>
           <UnstyledButton
@@ -176,17 +283,23 @@ export function Notifications() {
             Inbox
           </UnstyledButton>
         </Group>
-        <Group gap={8} style={{ WebkitAppRegion: "no-drag" }}>
+        <Group gap={8} style={{ WebkitAppRegion: "no-drag", marginLeft: "auto" }}>
           {fetching ? (
             <>
               <div style={{ width: 14, height: 14, border: "2px solid var(--mantine-color-blue-5)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-              <Text size="xs" c="blue">Fetching from Slack, Linear, GitHub...</Text>
+              <Text size="xs" c="blue">
+                {pollProgress
+                  ? `Fetching ${pollProgress.source} (${pollProgress.current}/${pollProgress.total})...`
+                  : "Fetching notifications..."}
+              </Text>
               <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </>
           ) : (
             <>
               <div style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#22c55e" }} />
-              <Text size="xs" c="dimmed">{notifications.length} items</Text>
+              <Text size="xs" c="dimmed">
+                {notifications.length} items{lastRefreshed ? ` · Updated ${formatTimeSince(lastRefreshed)}` : ""}
+              </Text>
             </>
           )}
           <select
@@ -207,7 +320,7 @@ export function Notifications() {
             <option value={168}>Last week</option>
           </select>
           <UnstyledButton
-            onClick={() => { setFetching(true); setNotifications([]); setSkippedItems([]); window.deck.refreshNotifications(lookbackHours); }}
+            onClick={() => { setFetching(true); setPollProgress(null); setNotifications([]); setSkippedItems([]); window.deck.refreshNotifications(lookbackHours); }}
             style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-dimmed)" }}
           >
             Refresh
@@ -230,238 +343,184 @@ export function Notifications() {
       </div>
 
       {/* Kanban board */}
-      <ScrollArea type="auto" style={{ flex: 1 }}>
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            padding: 16,
-            minWidth: "fit-content",
-            height: "100%",
-          }}
-        >
-          {STAGES.map((stage, si) => {
-            const items = notifications
-              .filter(n => (n.stage ?? "new") === stage.key)
-              .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
-            return (
-              <div key={stage.key} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                <div
-                  style={{
-                    width: selectedId ? 200 : 240,
-                    flexShrink: 0,
-                    transition: "width 0.2s ease",
-                  }}
-                >
-                  {/* Column header */}
-                  <Group gap={6} mb={8} px={4}>
-                    <stage.Icon size={14} color={items.length > 0 ? stage.color : "var(--mantine-color-dimmed)"} />
-                    <Text size="xs" fw={600} c={items.length > 0 ? undefined : "dimmed"}>
-                      {stage.label}
-                    </Text>
-                    {items.length > 0 && (
-                      <Badge size="xs" variant="light" color="gray" circle>
-                        {items.length}
-                      </Badge>
-                    )}
-                  </Group>
-
-                  {/* Cards */}
-                  <Stack gap={6}>
-                    {items.length === 0 ? (
-                      <div
-                        style={{
-                          padding: 16,
-                          borderRadius: 6,
-                          border: "1px dashed color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-                          textAlign: "center",
-                        }}
-                      >
-                        <Text size="xs" c="dimmed">Empty</Text>
-                      </div>
-                    ) : (
-                      items.map(n => {
-                        const SrcIcon = sourceIcons[n.source] ?? IconFileText;
-                        const srcColor = sourceColors[n.source] ?? "#6b7280";
-                        return (
-                          <div
-                            key={n.id}
-                            onClick={() => setSelectedId(n.id === selectedId ? null : n.id)}
-                            style={{
-                              padding: "10px 12px",
-                              borderRadius: 6,
-                              border: `1px solid ${n.id === selectedId ? "var(--mantine-color-blue-5)" : "color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)"}`,
-                              backgroundColor: "var(--mantine-color-dark-7)",
-                              width: "100%",
-                              textAlign: "left",
-                              cursor: "pointer",
-                            }}
-                          >
-                            <Group gap={6} mb={4} justify="space-between">
-                              <Group gap={4}>
-                                <SrcIcon size={12} color={srcColor} />
-                                {n.author && <Text size="xs" c="dimmed" truncate style={{ maxWidth: 80 }}>{n.author}</Text>}
-                              </Group>
-                              <Group gap={4}>
-                                <AddToManagerButton id={n.id} label={n.title} type="notification" data={{ source: n.source, summary: n.summary }} />
-                                {n.confidence && (
-                                  <div style={{
-                                    width: 16, height: 16, borderRadius: "50%", fontSize: "0.55rem", fontWeight: 700,
-                                    display: "flex", alignItems: "center", justifyContent: "center",
-                                    backgroundColor: n.confidence >= 8 ? "#ef4444" : n.confidence >= 6 ? "#eab308" : "#6b7280",
-                                    color: "white",
-                                  }}>
-                                    {n.confidence}
-                                  </div>
-                                )}
-                                <Text size="xs" c="dimmed">{formatAge(n.createdAt)}</Text>
-                              </Group>
-                            </Group>
-                            <Text size="xs" fw={500} lineClamp={2} mb={4}>
-                              {n.title}
-                            </Text>
-                            {n.taskType && (
-                              <Badge size="xs" variant="outline" color="gray" radius="sm" mb={4} style={{ fontSize: "0.55rem" }}>
-                                {n.taskType}
-                              </Badge>
-                            )}
-                            {n.actionNeeded && (
-                              <Text size="xs" c="blue.4" lineClamp={1} mb={4} style={{ fontSize: "0.65rem" }}>
-                                → {n.actionNeeded}
-                              </Text>
-                            )}
-                            <Group gap={4}>
-                              {stage.key === "new" && (
-                                <UnstyledButton
-                                  onClick={(e) => { e.stopPropagation(); advanceStage(n.id); }}
-                                  style={{
-                                    padding: "2px 8px",
-                                    borderRadius: 4,
-                                    fontSize: "0.65rem",
-                                    fontWeight: 600,
-                                    backgroundColor: "var(--mantine-color-blue-5)",
-                                    color: "white",
-                                  }}
-                                >
-                                  Analyze
-                                </UnstyledButton>
-                              )}
-                              {stage.key === "awaiting_approval" && (
-                                <UnstyledButton
-                                  onClick={(e) => { e.stopPropagation(); advanceStage(n.id); }}
-                                  style={{
-                                    padding: "2px 8px",
-                                    borderRadius: 4,
-                                    fontSize: "0.65rem",
-                                    fontWeight: 600,
-                                    backgroundColor: "#22c55e",
-                                    color: "white",
-                                  }}
-                                >
-                                  Approve
-                                </UnstyledButton>
-                              )}
-                              {stage.key === "pr_ready" && (
-                                <UnstyledButton
-                                  onClick={(e) => { e.stopPropagation(); advanceStage(n.id); }}
-                                  style={{
-                                    padding: "2px 8px",
-                                    borderRadius: 4,
-                                    fontSize: "0.65rem",
-                                    fontWeight: 600,
-                                    backgroundColor: "#06b6d4",
-                                    color: "white",
-                                  }}
-                                >
-                                  Merge
-                                </UnstyledButton>
-                              )}
-                              {(stage.key === "planning" || stage.key === "in_progress") && (
-                                <UnstyledButton
-                                  onClick={(e) => { e.stopPropagation(); advanceStage(n.id); }}
-                                  style={{ padding: "2px 4px", borderRadius: 4, color: "var(--mantine-color-dimmed)" }}
-                                >
-                                  <IconChevronRight size={12} />
-                                </UnstyledButton>
-                              )}
-                              {/* Mark as done — available on all stages except done */}
-                              {stage.key !== "done" && (
-                                <UnstyledButton
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setNotifications(prev => prev.map(item =>
-                                      item.id === n.id ? { ...item, stage: "done" } : item
-                                    ));
-                                    window.deck.dismissNotification(n.id);
-                                  }}
-                                  style={{ padding: "2px 4px", borderRadius: 4, color: "var(--mantine-color-dimmed)", opacity: 0.5 }}
-                                >
-                                  <IconCircleCheck size={12} />
-                                </UnstyledButton>
-                              )}
-                            </Group>
-                          </div>
-                        );
-                      })
-                    )}
-                  </Stack>
-                </div>
-
-                {/* Arrow separator */}
-                {si < STAGES.length - 1 && (
-                  <div style={{ display: "flex", alignItems: "center", paddingTop: 40, color: "var(--mantine-color-dimmed)", opacity: 0.3 }}>
-                    <IconChevronRight size={14} />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </ScrollArea>
-
-      {/* Skipped items section */}
-      {skippedItems.length > 0 && (
-        <div style={{
-          borderTop: "1px solid var(--mantine-color-default-border)",
-          flexShrink: 0,
-          maxHeight: showSkipped ? 200 : 32,
-          overflow: "hidden",
-          transition: "max-height 0.2s ease",
-        }}>
-          <UnstyledButton
-            onClick={() => setShowSkipped(!showSkipped)}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              width: "100%", padding: "6px 16px",
-              fontSize: "0.7rem", color: "var(--mantine-color-dimmed)",
-            }}
-          >
-            {showSkipped ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />}
-            {skippedItems.length} items reviewed and skipped
-          </UnstyledButton>
-          {showSkipped && (
-            <div style={{ padding: "0 16px 8px", overflowY: "auto", maxHeight: 160 }}>
-              {skippedItems.map((item, i) => (
-                <div key={i} style={{ display: "flex", gap: 6, padding: "3px 0", fontSize: "0.65rem" }}>
-                  <Text size="xs" c="dimmed" style={{ flexShrink: 0, width: 50 }}>{item.source}</Text>
-                  <Text size="xs" c="dimmed" truncate style={{ flex: 1 }}>{item.title}</Text>
-                  <Text size="xs" c="dimmed" fs="italic" style={{ flexShrink: 0 }}>{item.reason}</Text>
-                </div>
-              ))}
+        <div style={{ flex: 1, overflowX: "auto", overflowY: "auto" }}>
+          {notifications.length === 0 && !fetching ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 300 }}>
+              <Stack align="center" gap={8}>
+                <IconInbox size={32} color="var(--mantine-color-dimmed)" style={{ opacity: 0.4 }} />
+                <Text size="sm" c="dimmed">No notifications yet. Click Refresh to fetch.</Text>
+              </Stack>
             </div>
+          ) : (
+          <div style={{ display: "flex", gap: 8, padding: 16, minWidth: "fit-content", height: "100%" }}>
+            {STAGES.map((stage, si) => {
+              const items = notifications
+                .filter(n => (n.stage ?? "new") === stage.key)
+                .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
+              const isOver = dragOverStage === stage.key;
+              return (
+                <div key={stage.key} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  <div
+                    style={{ width: 240, minWidth: 200, flexShrink: 0 }}
+                    onDragOver={(e) => { e.preventDefault(); setDragOverStage(stage.key); }}
+                    onDragLeave={() => setDragOverStage(null)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOverStage(null);
+                      const id = e.dataTransfer.getData("text/plain");
+                      if (id) {
+                        moveCardToStage(id, stage.key);
+                        triggerStageAction(id, stage.key);
+                      }
+                    }}
+                  >
+                    <Tooltip label={stage.tip} position="bottom" withArrow multiline w={220} fz="xs">
+                      <Group gap={6} mb={8} px={4} style={{ cursor: "help" }}>
+                        <stage.Icon size={14} color={items.length > 0 || isOver ? stage.color : "var(--mantine-color-dimmed)"} />
+                        <Text size="xs" fw={600} c={items.length > 0 || isOver ? undefined : "dimmed"}>{stage.label}</Text>
+                        {items.length > 0 && <Badge size="xs" variant="light" color="gray" circle>{items.length}</Badge>}
+                      </Group>
+                    </Tooltip>
+
+                    <div style={{
+                      minHeight: 60, padding: 4, borderRadius: 8,
+                      transition: "all 0.15s ease",
+                      backgroundColor: isOver ? `color-mix(in srgb, ${stage.color} 10%, transparent)` : "transparent",
+                      border: isOver ? `1px dashed ${stage.color}` : "1px dashed transparent",
+                    }}>
+                      <Stack gap={6}>
+                        {items.length === 0 && (
+                          <div style={{
+                            padding: 16, borderRadius: 6, textAlign: "center",
+                            border: "1px dashed color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
+                          }}>
+                            <Text size="xs" c="dimmed">{isOver ? "Drop here" : "Empty"}</Text>
+                          </div>
+                        )}
+                        {items.map(n => {
+                          const SrcIcon = sourceIcons[n.source] ?? IconFileText;
+                          const srcColor = sourceColors[n.source] ?? "#6b7280";
+                          const isDragging = draggingId === n.id;
+                          return (
+                            <div
+                              key={n.id}
+                              draggable
+                              onDragStart={(e) => { e.dataTransfer.setData("text/plain", n.id); setDraggingId(n.id); }}
+                              onDragEnd={() => { setDraggingId(null); setDragOverStage(null); }}
+                              onClick={() => setSelectedId(n.id === selectedId ? null : n.id)}
+                              className="notif-card"
+                              style={{
+                                padding: "10px 12px", borderRadius: 6, cursor: "grab", userSelect: "none",
+                                border: `1px solid ${
+                                  n.id === selectedId ? "var(--mantine-color-blue-5)"
+                                  : "color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)"
+                                }`,
+                                backgroundColor: "var(--mantine-color-dark-7)",
+                                opacity: isDragging ? 0.4 : 1,
+                                transition: "opacity 0.15s ease, background-color 0.15s ease",
+                              }}
+                            >
+                              <Group gap={6} mb={4} justify="space-between">
+                                <Group gap={4}>
+                                  <IconGripVertical size={10} color="var(--mantine-color-dimmed)" style={{ opacity: 0.3 }} />
+                                  <SrcIcon size={12} color={srcColor} />
+                                  {n.author && <Text size="xs" c="dimmed" truncate style={{ maxWidth: 70 }}>{n.author}</Text>}
+                                </Group>
+                                <Group gap={4}>
+                                  <AddToManagerButton id={n.id} label={n.title} type="notification" data={{ source: n.source, summary: n.summary }} />
+                                  {n.confidence && (
+                                    <div style={{
+                                      width: 16, height: 16, borderRadius: "50%", fontSize: "0.55rem", fontWeight: 700,
+                                      display: "flex", alignItems: "center", justifyContent: "center",
+                                      backgroundColor: n.confidence >= 8 ? "#ef4444" : n.confidence >= 6 ? "#eab308" : "#6b7280",
+                                      color: "white",
+                                    }}>
+                                      {n.confidence}
+                                    </div>
+                                  )}
+                                  <Badge size="xs" variant="light" color="gray" radius="sm" style={{ fontSize: "0.55rem" }}>{n.source}</Badge>
+                                </Group>
+                              </Group>
+                              <Text size="xs" fw={500} lineClamp={2} mb={4}>{n.title}</Text>
+                              {n.taskType && (
+                                <Badge size="xs" variant="outline" color="gray" radius="sm" mb={4} style={{ fontSize: "0.55rem" }}>
+                                  {n.taskType}
+                                </Badge>
+                              )}
+                              {n.actionNeeded && (
+                                <Text size="xs" c="blue.4" lineClamp={1} mb={4} style={{ fontSize: "0.65rem" }}>
+                                  → {n.actionNeeded}
+                                </Text>
+                              )}
+                              <Group gap={4}>
+                                {(stage.key === "new" || stage.key === "skipped") && (
+                                  <UnstyledButton
+                                    className="notif-action-btn"
+                                    onClick={(e) => { e.stopPropagation(); handleStageButton(n.id, "planning"); }}
+                                    style={{ padding: "3px 10px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 600, backgroundColor: "var(--mantine-color-blue-5)", color: "white", lineHeight: 1.4 }}
+                                  >
+                                    Plan
+                                  </UnstyledButton>
+                                )}
+                                {stage.key === "planning" && (
+                                  <UnstyledButton
+                                    className="notif-action-btn"
+                                    onClick={(e) => { e.stopPropagation(); handleStageButton(n.id, "working"); }}
+                                    style={{ padding: "3px 10px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 600, backgroundColor: "#22c55e", color: "white", lineHeight: 1.4 }}
+                                  >
+                                    Start Work
+                                  </UnstyledButton>
+                                )}
+                                {stage.key !== "done" && stage.key !== "skipped" && (
+                                  <UnstyledButton
+                                    onClick={(e) => { e.stopPropagation(); moveCardToStage(n.id, "done"); }}
+                                    style={{ padding: "2px 4px", borderRadius: 4, color: "var(--mantine-color-dimmed)", opacity: 0.5 }}
+                                  >
+                                    <IconCircleCheck size={12} />
+                                  </UnstyledButton>
+                                )}
+                              </Group>
+                            </div>
+                          );
+                        })}
+                      </Stack>
+                    </div>
+                  </div>
+
+                  {si < STAGES.length - 1 && (
+                    <div style={{ display: "flex", alignItems: "center", paddingTop: 40, color: "var(--mantine-color-dimmed)", opacity: 0.3 }}>
+                      <IconChevronRight size={14} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
           )}
         </div>
-      )}
 
       {/* Detail pane */}
       {selected && (
-        <DetailPane
-          notification={selected}
-          onClose={() => setSelectedId(null)}
-          onAdvance={() => advanceStage(selected.id)}
-          onDismiss={() => dismiss(selected.id)}
-        />
+        <>
+          {/* Backdrop — click to close */}
+          <div
+            onClick={() => setSelectedId(null)}
+            style={{ position: "fixed", inset: 0, top: 42, zIndex: 99, backgroundColor: "rgba(0,0,0,0.2)" }}
+          />
+          <DetailPane
+            notification={selected}
+            onClose={() => setSelectedId(null)}
+            onAdvance={() => {
+              const currentStage = selected.stage ?? "new";
+              if (currentStage === "new" || currentStage === "skipped") handleStageButton(selected.id, "planning");
+              else if (currentStage === "planning") handleStageButton(selected.id, "working");
+              else moveCardToStage(selected.id, "done");
+            }}
+            onDismiss={() => dismiss(selected.id)}
+          />
+        </>
       )}
+
 
       {/* Debug sidebar */}
       {showDebug && (
@@ -582,7 +641,8 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss }: {
 
   return (
     <div style={{
-      position: "fixed", top: 52, right: 0, bottom: 0, width: "45%",
+      position: "fixed", top: 42, right: 0, bottom: 0, width: "45%",
+      animation: "slideIn 0.2s ease",
       backgroundColor: "var(--mantine-color-dark-8)",
       borderLeft: "1px solid var(--mantine-color-default-border)",
       zIndex: 100, display: "flex", flexDirection: "column",

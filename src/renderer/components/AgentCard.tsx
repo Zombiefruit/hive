@@ -42,6 +42,7 @@ export function AgentCard({ agent }: { agent: Agent }) {
         backgroundColor: "var(--mantine-color-dark-7)",
         cursor: "pointer",
         transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+        height: "100%",
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = "var(--mantine-color-default-border)";
