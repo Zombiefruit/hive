@@ -12,7 +12,7 @@ import { addContextFromUrl } from "./agents/context-tracker";
 import { listAllSessions } from "./agents/session-history";
 import { startPolling, stopPolling, getNotifications, dismissNotification, startWorkOnNotification, clearAllNotifications, forcePoll } from "./notifications/poll-service";
 import { startBridge, stopBridge, getBridgeDebugLog } from "./mcp-bridge";
-import { prepareWorkPlan, iteratePlan, startWorkAgent, getPlan, getAllPlans } from "./notifications/work-dispatcher";
+import { prepareWorkPlan, iteratePlan, startWorkAgent, getPlan, getAllPlans, getActiveWorkAgents } from "./notifications/work-dispatcher";
 import { startMonitoring, stopMonitoring } from "./notifications/agent-monitor";
 import {
   initManager,
@@ -245,6 +245,8 @@ app.whenReady().then(() => {
       res.end(JSON.stringify(getNotifications()));
     } else if (req.url === "/api/sessions") {
       res.end(JSON.stringify(listAllSessions()));
+    } else if (req.url === "/api/tasks") {
+      res.end(JSON.stringify(getActiveWorkAgents()));
     } else if (req.url === "/api/debug") {
       res.end(JSON.stringify(getBridgeDebugLog()));
     } else {

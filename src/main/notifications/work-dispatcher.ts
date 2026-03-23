@@ -18,6 +18,16 @@ import path from "node:path";
 import os from "node:os";
 
 const LOG_PATH = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "dispatcher.log");
+
+const activeWorkAgents = new Map<string, { process: ChildProcess; title: string; startedAt: number }>();
+
+export function getActiveWorkAgents(): Array<{ agentId: string; title: string; elapsedMs: number }> {
+  return Array.from(activeWorkAgents.entries()).map(([id, a]) => ({
+    agentId: id,
+    title: a.title,
+    elapsedMs: Date.now() - a.startedAt,
+  }));
+}
 function log(msg: string): void {
   try { fs.appendFileSync(LOG_PATH, `${new Date().toISOString()} ${msg}\n`); } catch {}
 }
@@ -240,6 +250,7 @@ Write the prompt as if you're giving instructions to a skilled developer. Be tho
     session_id: "",
   });
   proc.stdin?.write(message + "\n");
+  activeWorkAgents.set(agentId, { process: proc, title: plan.title, startedAt: Date.now() });
   registerAgent(agentId, plan.title);
 
   // Parse agent output and broadcast events to the UI
