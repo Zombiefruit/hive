@@ -199,6 +199,21 @@ app.whenReady().then(() => {
   // Start periodic store sync to renderer (every 100ms)
   startStoreSync(buildStoreState, 100);
 
+  // Debug HTTP API — lets browser/Playwright access real data
+  const http = require("node:http");
+  const debugServer = http.createServer((req: { url?: string }, res: { writeHead: Function; end: Function }) => {
+    res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+    if (req.url === "/api/store") {
+      res.end(JSON.stringify(buildStoreState()));
+    } else if (req.url === "/api/notifications") {
+      res.end(JSON.stringify(getNotifications()));
+    } else if (req.url === "/api/sessions") {
+      res.end(JSON.stringify(listAllSessions()));
+    } else {
+      res.end(JSON.stringify({ endpoints: ["/api/store", "/api/notifications", "/api/sessions"] }));
+    }
+  });
+  debugServer.listen(9876, () => {});
 
   createWindow();
 

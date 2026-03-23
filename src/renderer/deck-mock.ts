@@ -137,10 +137,20 @@ function buildMockState(): StoreState {
 // Detect Electron reliably via userAgent (not window.deck which has timing issues with contextBridge)
 const isElectron = navigator.userAgent.toLowerCase().includes("electron");
 
-if (!isElectron) {
-  console.warn("[Claude Deck] Running in browser mode with mock data");
+const API_BASE = "http://localhost:9876";
 
-  const mockState = buildMockState();
+async function fetchApi(path: string): Promise<unknown> {
+  try {
+    const res = await fetch(`${API_BASE}${path}`);
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+if (!isElectron) {
+  console.warn("[Claude Deck] Running in browser mode — connecting to debug API on port 9876");
+
   let storeCallback: ((state: unknown) => void) | null = null;
 
   (window as unknown as { deck: unknown }).deck = {
@@ -150,8 +160,8 @@ if (!isElectron) {
     sendMessage: noop,
     interruptAgent: noop,
     resumeSession: noop,
-    listAllSessions: () => Promise.resolve([]),
-    getNotifications: () => Promise.resolve([]),
+    listAllSessions: () => fetchApi("/api/sessions"),
+    getNotifications: () => fetchApi("/api/notifications"),
     dismissNotification: noop,
     startWorkOnNotification: noop,
     onNotificationsUpdate: () => () => {},
@@ -168,9 +178,13 @@ if (!isElectron) {
     getManagerMessages: () => Promise.resolve([]),
     onStoreUpdate: (cb: (state: unknown) => void) => {
       storeCallback = cb;
-      // Send mock state immediately and then every 2s
-      setTimeout(() => cb(mockState), 100);
-      const interval = setInterval(() => cb(mockState), 2000);
+      // Fetch real data from debug API, fall back to mock
+      const fetchStore = async () => {
+        const data = await fetchApi("/api/store");
+        if (data) cb(data);
+      };
+      setTimeout(fetchStore, 200);
+      const interval = setInterval(fetchStore, 2000);
       return () => clearInterval(interval);
     },
     onAgentStream: () => () => {},
