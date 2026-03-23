@@ -7,6 +7,19 @@
 import { BrowserWindow } from "electron";
 import { query as sdkQuery } from "@anthropic-ai/claude-agent-sdk";
 import { getClaudeCodePath } from "../claude-path";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
+
+const POLL_LOG = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "poll.log");
+
+function logPoll(msg: string): void {
+  try {
+    const dir = path.dirname(POLL_LOG);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.appendFileSync(POLL_LOG, `${new Date().toISOString()} ${msg}\n`);
+  } catch {}
+}
 
 export interface PollNotification {
   id: string;
@@ -25,9 +38,10 @@ let isPolling = false;
 
 export function startPolling(): void {
   if (pollInterval) return;
+  logPoll("startPolling called");
 
   // First poll after 10 seconds (let the app settle)
-  setTimeout(() => poll(), 10000);
+  setTimeout(() => { logPoll("first poll firing"); poll(); }, 10000);
 
   // Then every 2 minutes
   pollInterval = setInterval(() => poll(), 120000);
@@ -81,14 +95,7 @@ async function poll(): Promise<void> {
       broadcastNotifications();
     }
   } catch (err) {
-    // Log to file since console.error isn't visible in Electron
-    try {
-      const fs = require("node:fs");
-      const os = require("node:os");
-      const path = require("node:path");
-      const logPath = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "poll.log");
-      fs.appendFileSync(logPath, `${new Date().toISOString()} ERROR: ${String(err)}\n`);
-    } catch {}
+    logPoll(`ERROR: ${String(err)}`);
   } finally {
     isPolling = false;
   }
@@ -171,13 +178,7 @@ If nothing new is found, return: []`;
       createdAt: new Date().toISOString(),
     }));
   } catch (err) {
-    try {
-      const fs = require("node:fs");
-      const os = require("node:os");
-      const path = require("node:path");
-      const logPath = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "poll.log");
-      fs.appendFileSync(logPath, `${new Date().toISOString()} TRIAGE_ERROR: ${String(err)}\n${(err as Error)?.stack?.split("\n")[1] ?? ""}\n`);
-    } catch {}
+    logPoll(`TRIAGE_ERROR: ${String(err)}`);
     return [];
   }
 }
