@@ -29,6 +29,20 @@ let isReady = false;
 let pendingRequests = new Map<string, { resolve: (text: string) => void; timeout: ReturnType<typeof setTimeout> }>();
 let outputBuffer = "";
 
+// Debug log of all bridge I/O for the debug tab
+const debugLog: Array<{ timestamp: string; direction: "in" | "out"; content: string }> = [];
+const MAX_DEBUG_LOG = 200;
+
+function addDebugEntry(direction: "in" | "out", content: string): void {
+  debugLog.push({ timestamp: new Date().toISOString(), direction, content: content.slice(0, 2000) });
+  if (debugLog.length > MAX_DEBUG_LOG) debugLog.shift();
+}
+
+/** Get the debug log for the UI. */
+export function getBridgeDebugLog(): typeof debugLog {
+  return debugLog;
+}
+
 /**
  * Start the MCP Bridge process.
  * This spawns an interactive Claude Code session that loads all MCP connectors.
@@ -45,6 +59,9 @@ export function startBridge(): void {
     "--input-format", "stream-json",
     "--no-chrome",
     "--model", "claude-haiku-4-5-20251001",
+    // READ-ONLY: block all write/mutating tools
+    "--disallowedTools", "Write,Edit,Bash,NotebookEdit,Agent,EnterWorktree,ExitWorktree",
+    "--system-prompt", "You are a READ-ONLY data fetcher. You can ONLY read and search data from Slack, Linear, Notion, Gmail, GitHub, and other connected services. You must NEVER write, edit, send messages, create issues, or modify anything. Only fetch and return data. Always return structured JSON when asked.",
   ], {
     cwd: os.homedir(),
     env: { ...process.env },
@@ -52,7 +69,9 @@ export function startBridge(): void {
   });
 
   bridgeProcess.stdout?.on("data", (chunk: Buffer) => {
-    outputBuffer += chunk.toString("utf-8");
+    const text = chunk.toString("utf-8");
+    addDebugEntry("out", text);
+    outputBuffer += text;
     processOutputBuffer();
   });
 
@@ -160,6 +179,7 @@ export function askBridge(prompt: string, timeoutMs = 60000): Promise<string> {
       session_id: sessionId,
     });
 
+    addDebugEntry("in", message);
     bridgeProcess.stdin.write(message + "\n");
   });
 }

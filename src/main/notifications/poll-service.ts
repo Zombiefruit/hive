@@ -108,16 +108,22 @@ async function poll(): Promise<void> {
 
   try {
     // Ask the bridge to check for notifications using natural language
-    const prompt = `Check the following and return a JSON array of notifications for Kieran Williams (kwilliams, Slack ID U02PKBZSB9Q):
+    const prompt = `Check the following for Kieran Williams (kwilliams, Slack ID U02PKBZSB9Q, Linear user kwilliams, team Vector):
 
-1. Search Slack for recent messages mentioning <@U02PKBZSB9Q> or DMs to me in the last 2 hours
-2. List Linear issues assigned to "kwilliams" that were updated in the last 24 hours
-3. Check for any GitHub PR review requests
+1. **Slack**: Search for messages mentioning <@U02PKBZSB9Q> or DMs to me in the last 2 hours. For each mention, include WHO said it and WHAT they said (quote the key part).
+2. **Linear**: List issues assigned to "kwilliams" updated in the last 24 hours. Include status and any recent comments.
+3. **GitHub**: Check for PR review requests directed at me.
 
-For each item, classify priority as "actionable" (needs me to do something) or "fyi" (just informational).
+For each item, include rich detail:
+- "source": "slack" | "linear" | "github"
+- "priority": "actionable" (I need to DO something) | "fyi" (just informational)
+- "title": Short descriptive title
+- "summary": 2-3 sentences with context. WHO is involved, WHAT they need, and WHY it matters. Include quotes from messages where relevant.
+- "url": Direct link to the item
+- "author": Who created/sent this (name if available)
 
-Return ONLY a JSON array like this, no other text:
-[{"source":"slack","priority":"actionable","title":"#team-vector: Yael asked about deployment","summary":"Thread about deployment timeline","url":"https://montecarlodata.slack.com/archives/C0AMSV2SK4Z"}]
+Return ONLY a JSON array, no other text:
+[{"source":"slack","priority":"actionable","title":"#team-vector: Yael asked about retry logic","summary":"Yael Chemla asked: 'Hey Kieran, what's the status on the retry logic? We need it for the Thursday deploy.' This is in the deployment planning thread.","url":"https://montecarlodata.slack.com/archives/C0AMSV2SK4Z","author":"Yael Chemla"}]
 
 If nothing found, return: []`;
 

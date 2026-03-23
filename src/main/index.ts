@@ -11,7 +11,7 @@ import { startSessionTailing, stopSessionTailing } from "./agents/session-tailer
 import { addContextFromUrl } from "./agents/context-tracker";
 import { listAllSessions } from "./agents/session-history";
 import { startPolling, stopPolling, getNotifications, dismissNotification, startWorkOnNotification } from "./notifications/poll-service";
-import { startBridge, stopBridge } from "./mcp-bridge";
+import { startBridge, stopBridge, getBridgeDebugLog } from "./mcp-bridge";
 import {
   initManager,
   setManagerStreamCallback,
@@ -213,8 +213,10 @@ app.whenReady().then(() => {
       res.end(JSON.stringify(getNotifications()));
     } else if (req.url === "/api/sessions") {
       res.end(JSON.stringify(listAllSessions()));
+    } else if (req.url === "/api/debug") {
+      res.end(JSON.stringify(getBridgeDebugLog()));
     } else {
-      res.end(JSON.stringify({ endpoints: ["/api/store", "/api/notifications", "/api/sessions"] }));
+      res.end(JSON.stringify({ endpoints: ["/api/store", "/api/notifications", "/api/sessions", "/api/debug"] }));
     }
   });
   debugServer.listen(9876, () => {});

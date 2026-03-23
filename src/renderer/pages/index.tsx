@@ -194,7 +194,7 @@ export function Dashboard() {
             <UnstyledButton onClick={() => navigate("/notifications")} style={{ padding: 8, borderRadius: 8 }}>
               <IconBell size={16} color="var(--mantine-color-dimmed)" />
             </UnstyledButton>
-            <UnstyledButton style={{ padding: 8, borderRadius: 8 }}>
+            <UnstyledButton onClick={() => navigate("/debug")} style={{ padding: 8, borderRadius: 8 }}>
               <IconSettings size={16} color="var(--mantine-color-dimmed)" />
             </UnstyledButton>
           </Group>
