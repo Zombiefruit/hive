@@ -52,43 +52,44 @@ export function Notifications() {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       try {
         const result = await window.deck.getNotifications();
-        if (result && (result as NotificationItem[]).length > 0) {
-          setNotifications(prev => {
-            const existing = new Set(prev.map(n => n.id));
-            const newItems = (result as NotificationItem[])
-              .filter(n => !existing.has(n.id))
-              .map(n => ({ ...n, stage: n.stage ?? "new" }));
-            return [...newItems, ...prev];
-          });
+        if (result) {
+          const items = (result as NotificationItem[]).map(n => ({ ...n, stage: n.stage ?? "new" }));
+          // Replace entirely — the backend handles dedup
+          if (items.length > 0) {
+            setNotifications(items);
+            setFetching(false);
+          }
         }
       } catch {}
     };
+
     load();
-    // Re-fetch every 10s to catch new polls
-    const refetchInterval = setInterval(load, 10000);
+    // Re-fetch every 5s until we get data, then every 15s
+    const interval = setInterval(load, fetching ? 5000 : 15000);
 
     const unsub = window.deck.onNotificationsUpdate?.((data: unknown) => {
-      const items = data as NotificationItem[];
-      setNotifications(prev => {
-        const existingIds = new Set(prev.map(n => n.id));
-        const newItems = items
-          .filter(n => !existingIds.has(n.id))
-          .map(n => ({ ...n, stage: n.stage ?? "new" }));
-        if (newItems.length === 0) return prev;
-        return [...newItems, ...prev];
-      });
+      const items = (data as NotificationItem[]).map(n => ({ ...n, stage: n.stage ?? "new" }));
+      if (items.length > 0) {
+        setNotifications(items);
+        setFetching(false);
+      }
     });
 
+    // Stop showing fetching after 45s max
+    const fetchTimeout = setTimeout(() => setFetching(false), 45000);
+
     return () => {
-      clearInterval(refetchInterval);
+      clearInterval(interval);
+      clearTimeout(fetchTimeout);
       unsub?.();
     };
-  }, []);
+  }, [fetching]);
 
   const advanceStage = (id: string) => {
     setNotifications(prev => prev.map(n => {
@@ -140,15 +141,18 @@ export function Notifications() {
           </UnstyledButton>
         </Group>
         <div style={{ WebkitAppRegion: "no-drag", display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{
-            width: 6, height: 6, borderRadius: "50%",
-            backgroundColor: notifications.length > 0 ? "#22c55e" : "#eab308",
-            animation: "pulse-dot 2s ease-in-out infinite",
-          }} />
-          <Text size="xs" c="dimmed">
-            {notifications.length} items · Polling every 2m
-          </Text>
-          <style>{`@keyframes pulse-dot { 0%,100% { opacity:1; } 50% { opacity:0.4; } }`}</style>
+          {fetching ? (
+            <>
+              <div style={{ width: 14, height: 14, border: "2px solid var(--mantine-color-blue-5)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+              <Text size="xs" c="blue">Fetching from Slack, Linear, GitHub...</Text>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            </>
+          ) : (
+            <>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#22c55e" }} />
+              <Text size="xs" c="dimmed">{notifications.length} items · Next poll in ~2m</Text>
+            </>
+          )}
         </div>
       </div>
 
