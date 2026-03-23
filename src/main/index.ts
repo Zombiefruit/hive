@@ -158,10 +158,9 @@ app.whenReady().then(() => {
       );
     }
     cleanupStaleExternalAgents(activeSessionIds);
+    // Enrich after each discovery update
+    try { enrichExternalAgents(); } catch {}
   });
-
-  // Enrich external agents with conversation history (runs once after discovery)
-  setTimeout(() => enrichExternalAgents().catch(console.error), 3000);
 
   // Resume session IPC handler
   ipcMain.handle("agent:resume", async (_event, data: { agentId: string; sessionId: string; cwd: string }) => {
