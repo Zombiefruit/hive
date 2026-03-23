@@ -7,6 +7,7 @@
  */
 
 import { spawn, ChildProcess } from "node:child_process";
+import { app } from "electron";
 import { getClaudeCodePath } from "./claude-path";
 import fs from "node:fs";
 import path from "node:path";
