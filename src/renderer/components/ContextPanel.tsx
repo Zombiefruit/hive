@@ -1,14 +1,14 @@
-import { Group, Stack, Text } from "@mantine/core";
-import { IconBrandSlack, IconBrandGithub } from "@tabler/icons-react";
+import { Accordion, Group, Stack, Text } from "@mantine/core";
+import { IconBrandGithub, IconHash } from "@tabler/icons-react";
 import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
 import { useAgentContextRefs } from "../stores/agent-store";
 import type { ContextRefType } from "../../shared/types";
 
-const typeConfig: Record<ContextRefType, { label: string; Icon: React.FC<{ size?: number; color?: string }>; color: string }> = {
+const typeConfig: Record<ContextRefType, { label: string; Icon: React.FC<{ size?: number; color?: string; stroke?: number }>; color: string }> = {
   linear: { label: "Linear", Icon: SiLinear as React.FC<{ size?: number; color?: string }>, color: "#5E6AD2" },
-  slack: { label: "Slack", Icon: IconBrandSlack as React.FC<{ size?: number; color?: string }>, color: "#E01E5A" },
+  slack: { label: "Slack", Icon: IconHash as React.FC<{ size?: number; color?: string; stroke?: number }>, color: "#E01E5A" },
   notion: { label: "Notion", Icon: SiNotion as React.FC<{ size?: number; color?: string }>, color: "#FFFFFF" },
-  github: { label: "GitHub", Icon: IconBrandGithub as React.FC<{ size?: number; color?: string }>, color: "#FFFFFF" },
+  github: { label: "GitHub", Icon: IconBrandGithub as React.FC<{ size?: number; color?: string; stroke?: number }>, color: "#FFFFFF" },
 };
 
 interface ContextPanelProps {
@@ -43,35 +43,44 @@ export function ContextPanel({ agentId }: ContextPanelProps) {
   return (
     <Stack gap="sm" p="xs">
       <Text size="sm" fw={600}>Context</Text>
-      {types.map((type) => {
-        const cfg = typeConfig[type];
-        const Icon = cfg?.Icon;
-        return (
-          <Stack key={type} gap={4}>
-            <Group gap={6}>
-              {Icon && <Icon size={14} color={cfg.color} />}
-              <Text size="xs" fw={600}>{cfg?.label ?? type}</Text>
-              <Text size="xs" c="dimmed">{grouped[type].length}</Text>
-            </Group>
-            <Stack gap={2} pl={20}>
-              {grouped[type].map((ref) => (
-                <Text
-                  key={ref.id}
-                  size="xs"
-                  truncate
-                  style={{
-                    cursor: ref.url ? "pointer" : undefined,
-                    color: ref.url ? "var(--mantine-color-blue-4)" : undefined,
-                  }}
-                  onClick={() => { if (ref.url) window.deck.openExternal(ref.url); }}
-                >
-                  {ref.title || ref.resourceId}
-                </Text>
-              ))}
-            </Stack>
-          </Stack>
-        );
-      })}
+      <Accordion variant="separated" radius="sm">
+        {types.map((type) => {
+          const cfg = typeConfig[type];
+          const Icon = cfg?.Icon;
+          return (
+            <Accordion.Item key={type} value={type}>
+              <Accordion.Control>
+                <Group gap="xs">
+                  {Icon && <Icon size={14} color={cfg.color} />}
+                  <Text size="sm">{cfg?.label ?? type}</Text>
+                  <Text size="xs" c="dimmed">{grouped[type].length} items</Text>
+                </Group>
+              </Accordion.Control>
+              <Accordion.Panel>
+                <Stack gap="xs">
+                  {grouped[type].map((ref) => (
+                    <Group
+                      key={ref.id}
+                      gap="xs"
+                      wrap="nowrap"
+                      style={{ cursor: ref.url ? "pointer" : undefined }}
+                      onClick={() => { if (ref.url) window.deck.openExternal(ref.url); }}
+                    >
+                      <Text
+                        size="xs"
+                        truncate
+                        style={{ minWidth: 0, color: ref.url ? "var(--mantine-color-blue-4)" : undefined }}
+                      >
+                        {ref.title || ref.resourceId}
+                      </Text>
+                    </Group>
+                  ))}
+                </Stack>
+              </Accordion.Panel>
+            </Accordion.Item>
+          );
+        })}
+      </Accordion>
     </Stack>
   );
 }
