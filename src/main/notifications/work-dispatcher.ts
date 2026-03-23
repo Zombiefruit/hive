@@ -340,4 +340,3 @@ function broadcastTaskEvent(agentId: string, event: TaskEvent): void {
     }
   }
 }
-}
