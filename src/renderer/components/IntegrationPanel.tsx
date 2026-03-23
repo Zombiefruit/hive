@@ -1,10 +1,11 @@
 import { Group, Stack, Text } from "@mantine/core";
-import { SiSlack, SiLinear, SiNotion, SiGmail, SiGithub, SiGooglecalendar } from "@icons-pack/react-simple-icons";
+import { SiLinear, SiNotion, SiGmail, SiGithub, SiGooglecalendar } from "@icons-pack/react-simple-icons";
+import { IconBrandSlack } from "@tabler/icons-react";
 import { StatusDot } from "./StatusDot";
 
 const integrations = [
   { name: "Linear", Icon: SiLinear, color: "#5E6AD2", description: "Issues & project tracking" },
-  { name: "Slack", Icon: SiSlack, color: "#4A154B", description: "Channels, threads & messages" },
+  { name: "Slack", Icon: IconBrandSlack, color: "#E01E5A", description: "Channels, threads & messages" },
   { name: "Notion", Icon: SiNotion, color: "#FFFFFF", description: "Pages, docs & databases" },
   { name: "Gmail", Icon: SiGmail, color: "#EA4335", description: "Email inbox" },
   { name: "GitHub", Icon: SiGithub, color: "#FFFFFF", description: "Repos, PRs & issues" },

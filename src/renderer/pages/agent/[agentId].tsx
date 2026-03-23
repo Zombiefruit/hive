@@ -131,6 +131,7 @@ export function AgentDetail() {
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
+          minHeight: 0,
         }}
       >
         {/* Agent info card */}
@@ -175,7 +176,7 @@ export function AgentDetail() {
       </div>
 
       {/* Center: Chat (shown for ALL agents, external get a banner + read-only) */}
-      <div style={{ overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <div style={{ overflow: "hidden", display: "flex", flexDirection: "column", minHeight: 0 }}>
         {isExternal && (
           <Group
             gap="xs"
