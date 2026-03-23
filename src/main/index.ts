@@ -6,6 +6,7 @@ import { spawnAgent, sendMessage, interruptAgent, killAgent, resumeSession } fro
 import { handleApprovalResponse } from "./agents/approval-handler";
 import { watchSessions } from "./agents/session-discovery";
 import { enrichExternalAgents } from "./agents/session-enricher";
+import { startSessionTailing, stopSessionTailing } from "./agents/session-tailer";
 import { addContextFromUrl } from "./agents/context-tracker";
 import {
   initManager,
@@ -158,8 +159,9 @@ app.whenReady().then(() => {
       );
     }
     cleanupStaleExternalAgents(activeSessionIds);
-    // Enrich after each discovery update
+    // Enrich history + start live tailing for active sessions
     try { enrichExternalAgents(); } catch {}
+    try { startSessionTailing(); } catch {}
   });
 
   // Resume session IPC handler
@@ -188,6 +190,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  stopSessionTailing();
   stopStoreSync();
   stopManager();
   closeDatabase();
