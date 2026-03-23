@@ -3,10 +3,9 @@ import path from "node:path";
 import { initDatabase, closeDatabase, getAllAgents, getMessages, getPendingApprovals, getAllContextRefs, getRecentEvents, upsertExternalAgent, cleanupStaleExternalAgents } from "./db/database";
 import { registerIpcHandlers, startStoreSync, stopStoreSync } from "./ipc/bridge";
 import { spawnAgent, sendMessage, interruptAgent, killAgent, resumeSession } from "./agents/agent-manager";
-import { handleSmartApprovalResponse } from "./agents/approval-delegate";
+import { handleApprovalResponse } from "./agents/approval-handler";
 import { watchSessions } from "./agents/session-discovery";
 import { enrichExternalAgents } from "./agents/session-enricher";
-import { startHealthMonitor, stopHealthMonitor } from "./agents/health-monitor";
 import { addContextFromUrl } from "./agents/context-tracker";
 import {
   initManager,
@@ -106,7 +105,7 @@ app.whenReady().then(() => {
       await interruptAgent(agentId as string);
     },
     onApprovalResponse: async (data) => {
-      handleSmartApprovalResponse(data.approvalId, data.approved);
+      handleApprovalResponse(data.approvalId, data.approved);
     },
   });
 
@@ -173,8 +172,6 @@ app.whenReady().then(() => {
   // Start periodic store sync to renderer (every 100ms)
   startStoreSync(buildStoreState, 100);
 
-  // Start proactive health monitoring
-  startHealthMonitor();
 
   createWindow();
 
@@ -192,7 +189,6 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
-  stopHealthMonitor();
   stopStoreSync();
   stopManager();
   closeDatabase();
