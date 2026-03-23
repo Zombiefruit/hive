@@ -176,7 +176,7 @@ export function ChatPanel({ agentId, agentStatus, isReadOnly }: ChatPanelProps) 
   return (
     <Stack gap={0} h="100%">
       <ScrollArea ref={scrollRef} style={{ flex: 1 }} offsetScrollbars>
-        <Stack gap={4} p="md" style={{ display: "flex", flexDirection: "column" }}>
+        <Stack gap={4} p="md" pb={60} style={{ display: "flex", flexDirection: "column" }}>
           {messages.length === 0 ? (
             <div style={{ textAlign: "center", padding: "48px 24px" }}>
               <Text size="sm" c="dimmed" mb="xs">No messages loaded yet</Text>

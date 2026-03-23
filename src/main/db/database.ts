@@ -188,7 +188,7 @@ export function updateAgentTask(id: string, task: string, branch?: string): void
 
 export function updateAgent(
   id: string,
-  updates: Partial<Pick<Agent, "status" | "sessionId" | "pid" | "costUsd" | "inputTokens" | "outputTokens">>
+  updates: Partial<Pick<Agent, "status" | "source" | "sessionId" | "pid" | "costUsd" | "inputTokens" | "outputTokens">>
 ): void {
   const fields = Object.entries(updates)
     .filter(([, v]) => v !== undefined)

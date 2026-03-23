@@ -1,8 +1,8 @@
-import { contextBridge, ipcRenderer, shell } from "electron";
+import { contextBridge, ipcRenderer } from "electron";
 
 const api = {
-  // Open URL in default browser
-  openExternal: (url: string) => shell.openExternal(url),
+  // Open URL in default browser (via IPC to main process)
+  openExternal: (url: string) => ipcRenderer.invoke("shell:open-external", url),
 
   // Agent lifecycle
   spawnAgent: (config: unknown) => ipcRenderer.invoke("agent:spawn", config),

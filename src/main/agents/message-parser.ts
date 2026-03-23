@@ -168,6 +168,14 @@ const KNOWN_SLACK_CHANNELS: Record<string, string> = {
   "C0ALAC5N91S": "kieran-task-bot",
 };
 
+function resolveSlackChannelName(channelId: string): string {
+  if (KNOWN_SLACK_CHANNELS[channelId]) return KNOWN_SLACK_CHANNELS[channelId];
+  // D = DM, G = group DM
+  if (channelId.startsWith("D")) return "Direct Message";
+  if (channelId.startsWith("G")) return "Group DM";
+  return channelId;
+}
+
 export function detectContextFromLines(lines: string[]): DetectedContext[] {
   const contexts: DetectedContext[] = [];
   const seen = new Set<string>();
@@ -196,7 +204,7 @@ export function detectContextFromLines(lines: string[]): DetectedContext[] {
         const channel = String(input.channel_id ?? input.channel ?? "");
         if (channel && !seen.has(`slack:${channel}`)) {
           seen.add(`slack:${channel}`);
-          const channelName = KNOWN_SLACK_CHANNELS[channel] ?? String(input.channel_name ?? channel);
+          const channelName = resolveSlackChannelName(channel);
           contexts.push({ type: "slack", resourceId: channel, title: `#${channelName}`, url: `https://app.slack.com/client/T//${channel}` });
         }
       }

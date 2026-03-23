@@ -1,15 +1,14 @@
-import { Group, Stack, Text, UnstyledButton } from "@mantine/core";
-import { IconChevronRight } from "@tabler/icons-react";
+import { Group, Stack, Text } from "@mantine/core";
+import { SiSlack, SiLinear, SiNotion, SiGmail, SiGithub, SiGooglecalendar } from "@icons-pack/react-simple-icons";
 import { StatusDot } from "./StatusDot";
 
-// These reflect Claude Code's MCP connectors (claude.ai integrations)
 const integrations = [
-  { name: "Linear", icon: "◆", description: "Issues & project tracking", connected: true },
-  { name: "Slack", icon: "#", description: "Channels, threads & messages", connected: true },
-  { name: "Notion", icon: "◻", description: "Pages, docs & databases", connected: true },
-  { name: "Gmail", icon: "✉", description: "Email inbox", connected: true },
-  { name: "GitHub", icon: "⑉", description: "Repos, PRs & issues", connected: true },
-  { name: "Google Calendar", icon: "◫", description: "Events & scheduling", connected: true },
+  { name: "Linear", Icon: SiLinear, color: "#5E6AD2", description: "Issues & project tracking" },
+  { name: "Slack", Icon: SiSlack, color: "#4A154B", description: "Channels, threads & messages" },
+  { name: "Notion", Icon: SiNotion, color: "#FFFFFF", description: "Pages, docs & databases" },
+  { name: "Gmail", Icon: SiGmail, color: "#EA4335", description: "Email inbox" },
+  { name: "GitHub", Icon: SiGithub, color: "#FFFFFF", description: "Repos, PRs & issues" },
+  { name: "Google Calendar", Icon: SiGooglecalendar, color: "#4285F4", description: "Events & scheduling" },
 ];
 
 export function IntegrationPanel() {
@@ -36,16 +35,14 @@ export function IntegrationPanel() {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 12,
+              gap: 10,
               padding: "8px 12px",
               borderBottom: i < integrations.length - 1
                 ? "1px solid color-mix(in srgb, var(--mantine-color-default-border) 20%, transparent)"
                 : undefined,
             }}
           >
-            <Text size="sm" style={{ width: 20, textAlign: "center", opacity: 0.5 }}>
-              {integration.icon}
-            </Text>
+            <integration.Icon size={16} color={integration.color} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <Text size="xs" fw={500}>{integration.name}</Text>
               <Text size="xs" c="dimmed" style={{ fontSize: "0.65rem" }}>{integration.description}</Text>

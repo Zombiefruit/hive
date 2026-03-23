@@ -199,10 +199,7 @@ async function processAgentStream(
           break;
 
         default:
-          // Forward other event types (status, rate_limit, etc.) as events
-          if ("type" in message) {
-            addEvent(agentId, message.type, JSON.stringify(message).slice(0, 200));
-          }
+          // Skip internal events (rate_limit, system init, etc.) — they clutter the timeline
           break;
       }
 
@@ -305,9 +302,9 @@ export async function resumeSession(agentId: string, sessionId: string, cwd: str
   activeAgent.query = q;
   activeAgents.set(agentId, activeAgent);
 
-  // Update agent source to deck (now managed)
-  updateAgent(agentId, { status: "active" });
-  addEvent(agentId, "task_start", "Resumed external session — now interactive");
+  // Update agent to deck-managed (enables chat input)
+  updateAgent(agentId, { status: "active", source: "deck" as "deck" });
+  addEvent(agentId, "task_start", "Resumed session — now interactive");
 
   processAgentStream(agentId, q).catch((err) => {
     console.error(`[AgentManager] Resume ${agentId} stream error:`, err);

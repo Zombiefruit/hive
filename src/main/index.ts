@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, shell } from "electron";
 import path from "node:path";
 import { initDatabase, closeDatabase, getAllAgents, getMessages, getPendingApprovals, getAllContextRefs, getRecentEvents, upsertExternalAgent, cleanupStaleExternalAgents } from "./db/database";
 import { registerIpcHandlers, startStoreSync, stopStoreSync } from "./ipc/bridge";
@@ -113,6 +113,11 @@ app.whenReady().then(() => {
   // Register context URL handler
   ipcMain.handle("context:add-url", (_event, data: { agentId: string; url: string }) => {
     return addContextFromUrl(data.agentId, data.url);
+  });
+
+  // Open URL in default browser
+  ipcMain.handle("shell:open-external", (_event, url: string) => {
+    return shell.openExternal(url);
   });
 
   // Initialize Manager AI
