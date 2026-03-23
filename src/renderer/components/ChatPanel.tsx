@@ -149,12 +149,17 @@ export function ChatPanel({ agentId, agentStatus, isReadOnly }: ChatPanelProps) 
     }
   }, [messages.length]);
 
+  const [sendError, setSendError] = useState<string | null>(null);
+
   const handleSend = useCallback(async () => {
     if (!input.trim() || sending) return;
     setSending(true);
+    setSendError(null);
     try {
       await window.deck.sendMessage(agentId, input.trim());
       setInput("");
+    } catch (err) {
+      setSendError("Agent is not connected. Try resuming the session first.");
     } finally {
       setSending(false);
     }
@@ -194,9 +199,12 @@ export function ChatPanel({ agentId, agentStatus, isReadOnly }: ChatPanelProps) 
 
       {!isReadOnly && (
         <Paper p="sm" style={{ borderTop: "1px solid var(--mantine-color-default-border)" }}>
+          {sendError && (
+            <Text size="xs" c="red" mb="xs">{sendError}</Text>
+          )}
           <Group gap="xs" align="flex-end">
             <Textarea
-              placeholder={isActive ? "Send a message..." : "Agent is not active"}
+              placeholder={isActive ? "Send a message..." : "Agent is not active — resume to chat"}
               value={input}
               onChange={(e) => setInput(e.currentTarget.value)}
               onKeyDown={handleKeyDown}

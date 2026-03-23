@@ -195,7 +195,7 @@ export function detectContextFromLines(lines: string[]): DetectedContext[] {
         const id = String(input.issueId ?? input.id ?? input.identifier ?? "");
         if (id && !seen.has(`linear:${id}`)) {
           seen.add(`linear:${id}`);
-          contexts.push({ type: "linear", resourceId: id, title: String(input.title ?? id), url: `https://linear.app/monte-carlo/issue/${id}` });
+          contexts.push({ type: "linear", resourceId: id, title: String(input.title ?? id), url: `https://linear.app/issue/${id}` });
         }
       }
 
