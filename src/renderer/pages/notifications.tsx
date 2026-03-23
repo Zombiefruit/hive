@@ -724,9 +724,14 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss }: {
   const [hasApproved, setHasApproved] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Live activity feed — shows bridge tool calls while plan is being prepared
+  const [activity, setActivity] = useState<string[]>([]);
+
   // Load existing plan on mount, and poll while in planning stage
   useEffect(() => {
     let cancelled = false;
+    const isPreparingStage = n.stage === "planning" || n.stage === "prepared";
+
     const loadPlan = async () => {
       try {
         const existing = await window.deck?.getPlan?.(n.id);
@@ -734,16 +739,38 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss }: {
         if (existing && (existing as { conversationHistory: typeof conversation }).conversationHistory?.length > 0) {
           setConversation((existing as { conversationHistory: typeof conversation }).conversationHistory);
           setLoading(false);
-        } else if (n.stage === "planning" || n.stage === "prepared") {
-          // Plan/briefing is being prepared — show loading and keep polling
+          setActivity([]);
+        } else if (isPreparingStage) {
           setLoading(true);
         }
       } catch {}
     };
+
+    // Poll bridge debug log for live activity while loading
+    const loadActivity = async () => {
+      try {
+        const res = await fetch("http://localhost:9876/api/debug");
+        if (cancelled) return;
+        const entries = await res.json() as Array<{ timestamp: string; direction: string; content: string }>;
+        // Show last 10 outgoing entries (tool calls, text)
+        const recent = entries
+          .filter((e: { direction: string }) => e.direction === "out")
+          .slice(-10)
+          .map((e: { content: string }) => e.content);
+        setActivity(recent);
+      } catch {}
+    };
+
     loadPlan();
-    // Poll every 3s while preparing to pick up updates
-    const interval = (n.stage === "planning" || n.stage === "prepared") ? setInterval(loadPlan, 3000) : undefined;
-    return () => { cancelled = true; if (interval) clearInterval(interval); };
+    const planInterval = isPreparingStage ? setInterval(loadPlan, 3000) : undefined;
+    const activityInterval = isPreparingStage ? setInterval(loadActivity, 2000) : undefined;
+    if (isPreparingStage) loadActivity();
+
+    return () => {
+      cancelled = true;
+      if (planInterval) clearInterval(planInterval);
+      if (activityInterval) clearInterval(activityInterval);
+    };
   }, [n.id, n.stage]);
 
   // Auto-scroll on new messages
@@ -889,10 +916,28 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss }: {
         ))}
 
         {loading && (
-          <Group gap={8} py="sm">
-            <Loader size={14} />
-            <Text size="xs" c="dimmed">{conversation.length === 0 ? "Fetching context and analyzing..." : "Thinking..."}</Text>
-          </Group>
+          <div>
+            <Group gap={8} py="sm">
+              <Loader size={14} />
+              <Text size="xs" c="dimmed">{conversation.length === 0 ? "Fetching context and analyzing..." : "Thinking..."}</Text>
+            </Group>
+            {activity.length > 0 && (
+              <div style={{
+                padding: "8px 12px", borderRadius: 6, marginTop: 4,
+                backgroundColor: "var(--mantine-color-dark-8)",
+                border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
+                maxHeight: 200, overflowY: "auto",
+                fontSize: "0.7rem", fontFamily: "var(--mantine-font-family-monospace)",
+                color: "var(--mantine-color-dimmed)",
+              }}>
+                {activity.map((line, i) => (
+                  <div key={i} style={{ padding: "2px 0", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                    {line}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
 
