@@ -11,6 +11,7 @@
 import { askBridge, isBridgeReady } from "../mcp-bridge";
 import { spawn, ChildProcess } from "node:child_process";
 import { getClaudeCodePath } from "../claude-path";
+import { BrowserWindow } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -239,9 +240,89 @@ Write the prompt as if you're giving instructions to a skilled developer. Be tho
   });
   proc.stdin?.write(message + "\n");
 
+  // Parse agent output and broadcast events to the UI
+  let outputBuffer = "";
+  proc.stdout?.on("data", (chunk: Buffer) => {
+    outputBuffer += chunk.toString("utf-8");
+    const lines = outputBuffer.split("\n");
+    outputBuffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const msg = JSON.parse(line);
+        const event = parseAgentEvent(msg);
+        if (event) {
+          broadcastTaskEvent(agentId, event);
+        }
+      } catch {}
+    }
+  });
+
+  proc.stderr?.on("data", (chunk: Buffer) => {
+    broadcastTaskEvent(agentId, {
+      timestamp: new Date().toISOString(),
+      type: "error",
+      content: chunk.toString("utf-8").slice(0, 200),
+    });
+  });
+
   proc.on("exit", (code) => {
     log(`Work agent ${agentId} exited: ${code}`);
+    activeWorkAgents.delete(agentId);
+    broadcastTaskEvent(agentId, {
+      timestamp: new Date().toISOString(),
+      type: "completed",
+      content: `Agent finished with exit code ${code}`,
+    });
   });
 
   return agentId;
+}
+
+interface TaskEvent {
+  timestamp: string;
+  type: "started" | "progress" | "tool_use" | "error" | "completed" | "escalation" | "text";
+  content: string;
+}
+
+function parseAgentEvent(msg: { type?: string; message?: { content?: unknown }; subtype?: string; result?: string }): TaskEvent | null {
+  const now = new Date().toISOString();
+
+  if (msg.type === "system" && msg.subtype === "init") {
+    return { timestamp: now, type: "started", content: "Agent initialized" };
+  }
+
+  if (msg.type === "assistant" && Array.isArray(msg.message?.content)) {
+    const blocks = msg.message!.content as Array<{ type: string; text?: string; name?: string; input?: Record<string, unknown> }>;
+    for (const block of blocks) {
+      if (block.type === "text" && block.text?.trim()) {
+        return { timestamp: now, type: "text", content: block.text };
+      }
+      if (block.type === "tool_use" && block.name) {
+        const input = block.input ?? {};
+        let detail = block.name;
+        if (block.name === "Bash") detail = `Run: ${String(input.command ?? "").slice(0, 80)}`;
+        else if (block.name === "Read") detail = `Read: ${input.file_path}`;
+        else if (block.name === "Write") detail = `Write: ${input.file_path}`;
+        else if (block.name === "Edit") detail = `Edit: ${input.file_path}`;
+        return { timestamp: now, type: "tool_use", content: detail };
+      }
+    }
+  }
+
+  if (msg.type === "result") {
+    return { timestamp: now, type: "completed", content: String(msg.result ?? "Agent finished").slice(0, 500) };
+  }
+
+  return null;
+}
+
+function broadcastTaskEvent(agentId: string, event: TaskEvent): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send("task:event", { agentId, event });
+    }
+  }
+}
 }

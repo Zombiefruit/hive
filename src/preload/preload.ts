@@ -28,6 +28,13 @@ const api = {
   startWorkAgent: (notificationId: string) =>
     ipcRenderer.invoke("work:start-agent", notificationId),
 
+  // Task events (work agent stream)
+  onTaskEvent: (callback: (data: { agentId: string; event: unknown }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: { agentId: string; event: unknown }) => callback(data);
+    ipcRenderer.on("task:event", listener);
+    return () => ipcRenderer.removeListener("task:event", listener);
+  },
+
   // Session history
   listAllSessions: () => ipcRenderer.invoke("sessions:list-all"),
 

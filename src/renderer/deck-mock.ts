@@ -168,6 +168,7 @@ if (!isElectron) {
     refreshNotifications: noop,
     prepareWorkPlan: noop,
     startWorkAgent: noop,
+    onTaskEvent: () => () => {},
     onNotificationsUpdate: () => () => {},
     respondToApproval: noop,
     addContextUrl: noop,
