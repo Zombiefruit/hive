@@ -81,7 +81,14 @@ async function poll(): Promise<void> {
       broadcastNotifications();
     }
   } catch (err) {
-    console.error("[PollService] Error:", err);
+    // Log to file since console.error isn't visible in Electron
+    try {
+      const fs = require("node:fs");
+      const os = require("node:os");
+      const path = require("node:path");
+      const logPath = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "poll.log");
+      fs.appendFileSync(logPath, `${new Date().toISOString()} ERROR: ${String(err)}\n`);
+    } catch {}
   } finally {
     isPolling = false;
   }
@@ -164,7 +171,13 @@ If nothing new is found, return: []`;
       createdAt: new Date().toISOString(),
     }));
   } catch (err) {
-    console.error("[PollService] Triage agent failed:", err);
+    try {
+      const fs = require("node:fs");
+      const os = require("node:os");
+      const path = require("node:path");
+      const logPath = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "poll.log");
+      fs.appendFileSync(logPath, `${new Date().toISOString()} TRIAGE_ERROR: ${String(err)}\n${(err as Error)?.stack?.split("\n")[1] ?? ""}\n`);
+    } catch {}
     return [];
   }
 }
