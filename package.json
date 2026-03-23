@@ -11,7 +11,7 @@
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "dev:browser": "vite --config vite.renderer.config.ts",
-    "dev:clean": "pkill -f 'electron.*claude-deck' 2>/dev/null; pkill -f 'vite.*claude-deck' 2>/dev/null; rm -f \"$HOME/Library/Application Support/claude-deck/claude-deck.db\" && rm -f \"$HOME/Library/Application Support/claude-deck/manager-state.json\" && rm -rf .vite && electron-forge start",
+    "dev:clean": "pnpm kill; pnpm reset && rm -rf .vite && electron-forge start",
     "kill": "pkill -f 'electron.*claude-deck' 2>/dev/null; pkill -f 'vite.*claude-deck' 2>/dev/null; echo 'All claude-deck processes killed'",
     "reset": "rm -f \"$HOME/Library/Application Support/claude-deck/claude-deck.db\" && rm -f \"$HOME/Library/Application Support/claude-deck/manager-state.json\" && echo 'Database and manager state reset'",
     "lint": "echo \"No linting configured\""
