@@ -17,6 +17,7 @@ interface NotificationItem {
   summary: string;
   url?: string;
   links?: Array<{ type: string; label: string; url: string }>;
+  taskType?: string;
   author?: string;
   confidence?: number;
   actionNeeded?: string;
@@ -306,6 +307,11 @@ export function Notifications() {
                             <Text size="xs" fw={500} lineClamp={2} mb={4}>
                               {n.title}
                             </Text>
+                            {n.taskType && (
+                              <Badge size="xs" variant="outline" color="gray" radius="sm" mb={4} style={{ fontSize: "0.55rem" }}>
+                                {n.taskType}
+                              </Badge>
+                            )}
                             {n.actionNeeded && (
                               <Text size="xs" c="blue.4" lineClamp={1} mb={4} style={{ fontSize: "0.65rem" }}>
                                 → {n.actionNeeded}

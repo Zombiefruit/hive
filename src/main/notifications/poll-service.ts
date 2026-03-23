@@ -14,6 +14,7 @@ export interface PollNotification {
   summary: string;
   url?: string;
   links?: Array<{ type: string; label: string; url: string }>;
+  taskType?: "implementation" | "review" | "response" | "investigation" | "planning";
   author?: string;
   confidence?: number;
   actionNeeded?: string;
@@ -178,11 +179,19 @@ Now process this like Kieran would going through his inbox.
 
 5. **Only OPEN/ACTIONABLE items**: If it's done, merged, closed, resolved — skip it completely.
 
+6. **Classify task type**: Each item must have a "task_type" field:
+   - "implementation" — code work needed (new feature, bug fix, ticket implementation)
+   - "review" — PR needs review
+   - "response" — someone messaged Kieran and expects a reply
+   - "investigation" — "look into this" type request
+   - "planning" — needs a plan/RFC before any work
+
 Return ONLY a JSON array, nothing else:
 [{
   "source": "linear",
   "priority": "urgent",
   "confidence": 10,
+  "task_type": "implementation",
   "title": "VEC-10: Add Fig Intelligence UI (from Yael)",
   "summary": "Your manager Yael Chemla assigned this to you today. Port the Figs and Fig Intelligence dashboard from agent-hub to the frontend app using Mantine components. Status: In Progress. She mentioned this in #team-vector as a priority for this sprint.",
   "links": [
@@ -223,7 +232,7 @@ Rules:
     const items = JSON.parse(jsonMatch[0]) as Array<{
       source: string; priority: string; title: string; summary: string;
       url?: string; links?: Array<{ type: string; label: string; url: string }>;
-      author?: string; confidence?: number; action_needed?: string;
+      task_type?: string; author?: string; confidence?: number; action_needed?: string;
     }>;
 
     logPoll(`Parsed ${items.length} notifications`);
@@ -267,6 +276,7 @@ Rules:
         summary: item.summary,
         url: item.url ?? item.links?.[0]?.url,
         links: item.links,
+        taskType: item.task_type as PollNotification["taskType"],
         author: item.author,
         confidence: item.confidence,
         actionNeeded: item.action_needed,
