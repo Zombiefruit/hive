@@ -110,6 +110,23 @@ export function Notifications() {
     if (selectedId === id) setSelectedId(null);
   };
 
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugEntries, setDebugEntries] = useState<Array<{ timestamp: string; direction: string; content: string }>>([]);
+
+  useEffect(() => {
+    if (!showDebug) return;
+    const fetchDebug = async () => {
+      try {
+        const res = await fetch("http://localhost:9876/api/debug");
+        const data = await res.json();
+        setDebugEntries(data);
+      } catch {}
+    };
+    fetchDebug();
+    const interval = setInterval(fetchDebug, 2000);
+    return () => clearInterval(interval);
+  }, [showDebug]);
+
   const selected = notifications.find(n => n.id === selectedId);
 
   return (
@@ -162,6 +179,12 @@ export function Notifications() {
             style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-dimmed)" }}
           >
             Refresh
+          </UnstyledButton>
+          <UnstyledButton
+            onClick={() => setShowDebug(!showDebug)}
+            style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, color: showDebug ? "var(--mantine-color-blue-4)" : "var(--mantine-color-dimmed)" }}
+          >
+            {showDebug ? "Hide logs" : "Logs"}
           </UnstyledButton>
           {notifications.length > 0 && (
             <UnstyledButton
@@ -349,6 +372,49 @@ export function Notifications() {
           onAdvance={() => advanceStage(selected.id)}
           onDismiss={() => dismiss(selected.id)}
         />
+      )}
+
+      {/* Debug sidebar */}
+      {showDebug && (
+        <div style={{
+          position: "fixed", top: 52, right: 0, bottom: 0, width: 400,
+          backgroundColor: "var(--mantine-color-dark-9)",
+          borderLeft: "1px solid var(--mantine-color-default-border)",
+          zIndex: 50, display: "flex", flexDirection: "column",
+          fontSize: "0.7rem", fontFamily: "var(--mantine-font-family-monospace)",
+        }}>
+          <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--mantine-color-default-border)", flexShrink: 0 }}>
+            <Group justify="space-between">
+              <Text size="xs" fw={600}>Bridge Activity</Text>
+              <Text size="xs" c="dimmed">{debugEntries.length} entries</Text>
+            </Group>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
+            {debugEntries.length === 0 ? (
+              <Text size="xs" c="dimmed" ta="center" py="md">Waiting for bridge activity...</Text>
+            ) : (
+              debugEntries.slice(-50).map((entry, i) => (
+                <div key={i} style={{
+                  padding: "4px 8px", marginBottom: 4, borderRadius: 4,
+                  backgroundColor: entry.direction === "in"
+                    ? "color-mix(in srgb, var(--mantine-color-blue-5) 10%, transparent)"
+                    : "var(--mantine-color-dark-7)",
+                  borderLeft: `2px solid ${entry.direction === "in" ? "var(--mantine-color-blue-5)" : "var(--mantine-color-green-5)"}`,
+                }}>
+                  <Group gap={4} mb={2}>
+                    <Text size="xs" c={entry.direction === "in" ? "blue" : "green"} fw={600}>
+                      {entry.direction === "in" ? "→" : "←"}
+                    </Text>
+                    <Text size="xs" c="dimmed">{new Date(entry.timestamp).toLocaleTimeString()}</Text>
+                  </Group>
+                  <Text size="xs" style={{ whiteSpace: "pre-wrap", wordBreak: "break-all", maxHeight: 150, overflow: "auto" }}>
+                    {entry.content.slice(0, 1000)}
+                  </Text>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
