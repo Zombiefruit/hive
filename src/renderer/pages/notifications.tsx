@@ -90,8 +90,8 @@ export function Notifications() {
         style={{
           display: "flex",
           alignItems: "center",
-          padding: "12px 24px",
-          paddingLeft: 96,
+          padding: "8px 24px",
+          paddingLeft: 80,
           gap: 12,
           borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
           backgroundColor: "color-mix(in srgb, var(--mantine-color-dark-8) 80%, transparent)",

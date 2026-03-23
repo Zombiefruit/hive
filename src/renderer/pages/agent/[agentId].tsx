@@ -78,7 +78,7 @@ export function AgentDetail() {
         style={{
           gridColumn: "1 / -1",
           padding: "var(--mantine-spacing-sm) var(--mantine-spacing-md)",
-          paddingLeft: 96, // Clear macOS traffic lights
+          paddingLeft: 80, // Clear macOS traffic lights
           borderBottom: "1px solid var(--mantine-color-default-border)",
           WebkitAppRegion: "drag",
         }}
