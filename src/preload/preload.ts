@@ -18,6 +18,9 @@ const api = {
   respondToApproval: (approvalId: string, approved: boolean) =>
     ipcRenderer.invoke("agent:approval-response", { approvalId, approved }),
 
+  // Session history
+  listAllSessions: () => ipcRenderer.invoke("sessions:list-all"),
+
   // Store sync — renderer subscribes to state updates from main
   onStoreUpdate: (callback: (state: unknown) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, state: unknown) =>

@@ -8,6 +8,7 @@ import { watchSessions } from "./agents/session-discovery";
 import { enrichExternalAgents } from "./agents/session-enricher";
 import { startSessionTailing, stopSessionTailing } from "./agents/session-tailer";
 import { addContextFromUrl } from "./agents/context-tracker";
+import { listAllSessions } from "./agents/session-history";
 import {
   initManager,
   setManagerStreamCallback,
@@ -118,6 +119,11 @@ app.whenReady().then(() => {
   // Open URL in default browser
   ipcMain.handle("shell:open-external", (_event, url: string) => {
     return shell.openExternal(url);
+  });
+
+  // Session history
+  ipcMain.handle("sessions:list-all", () => {
+    return listAllSessions();
   });
 
   // Initialize Manager AI

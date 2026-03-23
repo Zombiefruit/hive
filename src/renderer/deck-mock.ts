@@ -150,6 +150,7 @@ if (!isElectron) {
     sendMessage: noop,
     interruptAgent: noop,
     resumeSession: noop,
+    listAllSessions: () => Promise.resolve([]),
     respondToApproval: noop,
     addContextUrl: noop,
     sendManagerMessage: async (msg: string) => {

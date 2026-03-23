@@ -14,11 +14,13 @@ import {
   IconPlus,
   IconSettings,
   IconBell,
+  IconHistory,
   IconRobotOff,
   IconShieldCheck,
   IconActivity,
 } from "@tabler/icons-react";
 import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { MetricsBar } from "../components/MetricsBar";
 import { AgentCard } from "../components/AgentCard";
 import { AgentFilterBar } from "../components/AgentFilterBar";
@@ -30,6 +32,7 @@ import { IntegrationPanel } from "../components/IntegrationPanel";
 import { useAgentStore, usePendingApprovals } from "../stores/agent-store";
 
 export function Dashboard() {
+  const navigate = useNavigate();
   const [modalOpened, { open: openModal, close: closeModal }] = useDisclosure(false);
   const agents = useAgentStore((s) => s.agents);
   const pendingCount = usePendingApprovals().length;
@@ -104,6 +107,9 @@ export function Dashboard() {
             >
               <IconPlus size={14} stroke={2} />
               Spawn Agent
+            </UnstyledButton>
+            <UnstyledButton onClick={() => navigate("/history")} style={{ padding: 8, borderRadius: 8 }}>
+              <IconHistory size={16} color="var(--mantine-color-dimmed)" />
             </UnstyledButton>
             <UnstyledButton style={{ padding: 8, borderRadius: 8 }}>
               <IconBell size={16} color="var(--mantine-color-dimmed)" />
