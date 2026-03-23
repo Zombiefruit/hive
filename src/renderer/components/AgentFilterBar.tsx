@@ -5,9 +5,7 @@ import { useState } from "react";
 
 const filters = [
   { value: "active", label: "Running", status: "active" },
-  { value: "idle", label: "Idle", status: "idle" },
-  { value: "errored", label: "Errored", status: "errored" },
-  { value: "completed", label: "Done", status: "completed" },
+  { value: "completed", label: "Completed", status: "completed" },
 ] as const;
 
 interface AgentFilterBarProps {

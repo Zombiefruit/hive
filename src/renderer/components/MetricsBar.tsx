@@ -1,33 +1,28 @@
 import { Group, SimpleGrid, Text } from "@mantine/core";
-import { IconPlayerPlay, IconClock, IconAlertTriangle, IconCheck, IconActivity } from "@tabler/icons-react";
+import { IconPlayerPlay, IconCheck, IconCoins, IconRobot } from "@tabler/icons-react";
 import { useAgentStore } from "../stores/agent-store";
-
-const items = [
-  { key: "active", label: "Active", color: "#22c55e", icon: IconPlayerPlay },
-  { key: "idle", label: "Idle", color: "#eab308", icon: IconClock },
-  { key: "errored", label: "Errored", color: "#ef4444", icon: IconAlertTriangle },
-  { key: "completed", label: "Completed", color: "#6b7280", icon: IconCheck },
-  { key: "tokens", label: "Total Tokens", color: "var(--mantine-color-blue-5)", icon: IconActivity },
-] as const;
 
 export function MetricsBar() {
   const metrics = useAgentStore((s) => s.metrics);
+  const totalAgents = metrics.active + metrics.idle + metrics.errored + metrics.completed;
 
-  const values: Record<string, string | number> = {
-    active: metrics.active,
-    idle: metrics.idle,
-    errored: metrics.errored,
-    completed: metrics.completed,
-    tokens: metrics.totalTokens > 1000
-      ? metrics.totalTokens.toLocaleString()
-      : String(metrics.totalTokens),
-  };
+  const items = [
+    { label: "Total Agents", value: totalAgents, color: "var(--mantine-color-text)", icon: IconRobot },
+    { label: "Running", value: metrics.active, color: "#22c55e", icon: IconPlayerPlay },
+    { label: "Completed", value: metrics.completed, color: "#6b7280", icon: IconCheck },
+    {
+      label: "Cost",
+      value: metrics.totalCostUsd > 0 ? `$${metrics.totalCostUsd.toFixed(2)}` : "$0",
+      color: "var(--mantine-color-blue-5)",
+      icon: IconCoins,
+    },
+  ];
 
   return (
-    <SimpleGrid cols={5}>
+    <SimpleGrid cols={4}>
       {items.map((item) => (
         <div
-          key={item.key}
+          key={item.label}
           style={{
             display: "flex",
             alignItems: "center",
@@ -40,17 +35,10 @@ export function MetricsBar() {
         >
           <item.icon size={16} color={item.color} stroke={1.5} />
           <div>
-            <Text
-              size="lg"
-              fw={600}
-              ff="monospace"
-              style={{ lineHeight: 1.2, color: Number(values[item.key]) > 0 ? item.color : undefined }}
-            >
-              {values[item.key]}
+            <Text size="lg" fw={600} ff="monospace" style={{ lineHeight: 1.2 }}>
+              {item.value}
             </Text>
-            <Text size="xs" c="dimmed" mt={2}>
-              {item.label}
-            </Text>
+            <Text size="xs" c="dimmed" mt={2}>{item.label}</Text>
           </div>
         </div>
       ))}
