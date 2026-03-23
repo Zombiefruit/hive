@@ -16,6 +16,7 @@ interface NotificationItem {
   title: string;
   summary: string;
   url?: string;
+  links?: Array<{ type: string; label: string; url: string }>;
   author?: string;
   confidence?: number;
   actionNeeded?: string;
@@ -515,12 +516,52 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss }: {
       <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--mantine-color-default-border)", flexShrink: 0 }}>
         <Text size="xs" c="dimmed">{n.summary}</Text>
         {n.actionNeeded && <Text size="xs" c="blue.4" mt={4}>→ {n.actionNeeded}</Text>}
-        {n.url && (
+        {/* Show all linked resources */}
+        {n.links && n.links.length > 0 && (
+          <Stack gap={2} mt={6}>
+            {n.links.map((link, i) => (
+              <UnstyledButton
+                key={i}
+                onClick={() => window.deck.openExternal(link.url)}
+                style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--mantine-color-blue-4)", fontSize: "0.7rem" }}
+              >
+                <Badge size="xs" variant="light" color="gray" radius="sm">{link.type}</Badge>
+                {link.label} →
+              </UnstyledButton>
+            ))}
+          </Stack>
+        )}
+        {!n.links?.length && n.url && (
           <UnstyledButton onClick={() => window.deck.openExternal(n.url!)} style={{ color: "var(--mantine-color-blue-4)", fontSize: "0.7rem", marginTop: 4 }}>
             Open in browser →
           </UnstyledButton>
         )}
       </div>
+
+      {/* Related links */}
+      {n.links && n.links.length > 0 && (
+        <div style={{ padding: "8px 20px", borderBottom: "1px solid var(--mantine-color-default-border)", flexShrink: 0 }}>
+          <Text size="xs" fw={600} c="dimmed" mb={4}>Related resources</Text>
+          <Group gap={6} wrap="wrap">
+            {n.links.map((link, i) => (
+              <UnstyledButton
+                key={i}
+                onClick={() => window.deck.openExternal(link.url)}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                  padding: "3px 8px", borderRadius: 4, fontSize: "0.65rem",
+                  backgroundColor: "var(--mantine-color-dark-6)",
+                  color: "var(--mantine-color-blue-4)",
+                  border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
+                }}
+              >
+                <Badge size="xs" variant="light" color="gray" radius="sm" style={{ fontSize: "0.55rem" }}>{link.type}</Badge>
+                {link.label}
+              </UnstyledButton>
+            ))}
+          </Group>
+        </div>
+      )}
 
       {/* Conversation area */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>

@@ -8,11 +8,12 @@ import os from "node:os";
 export interface PollNotification {
   id: string;
   source: "slack" | "linear" | "github" | "notion" | "email";
-  priority: "actionable" | "fyi" | "noise";
+  priority: "actionable" | "fyi" | "noise" | "urgent" | "today" | "low";
   status: "new" | "in_progress" | "done" | "dismissed";
   title: string;
   summary: string;
   url?: string;
+  links?: Array<{ type: string; label: string; url: string }>;
   author?: string;
   confidence?: number;
   actionNeeded?: string;
@@ -157,37 +158,44 @@ Return ALL of this as a structured text report. Don't skip anything — I need t
 ${rawData}
 ---
 
-Now, go through all of this the way Kieran would if he sat down to process his inbox. Think about:
-- What actually needs a response or action from Kieran?
-- What's urgent vs. can wait?
-- Are there related items that should be consolidated? (e.g., a Slack mention about a Linear ticket — that's ONE action item, not two)
-- What's just noise that can be ignored?
+Now process this like Kieran would going through his inbox.
 
-Create a PRIORITIZED action list. Each item should be a clear task with context. Consolidate related items into single actions.
+## CRITICAL RULES — read carefully
 
-Categories:
-- **urgent**: Someone is blocked waiting for Kieran, or there's a deadline
-- **today**: Should handle today but not immediately blocking anyone
-- **low**: Can wait, but worth knowing about
+1. **VERIFY before including**: If a PR is mentioned, CHECK its actual status. If it's already merged/closed/approved, DO NOT include it. If a ticket is Done/Cancelled, DO NOT include it. Don't trust mentions — verify the actual state.
+
+2. **Direct asks from managers/leads = highest priority**: If Yael Chemla (Kieran's manager) or a team lead directly asks Kieran to do something, that's confidence 10.
+
+3. **Consolidate aggressively**: A Slack mention about a Linear ticket is ONE item, not two. A PR review request and a Slack message about the same PR is ONE item.
+
+4. **Include ALL relevant links**: Every ticket, PR, Slack thread, and Notion doc related to the item must be listed in the "links" field. Not just one URL — ALL of them.
+
+5. **Only OPEN/ACTIONABLE items**: If it's done, merged, closed, resolved — skip it completely.
 
 Return ONLY a JSON array, nothing else:
 [{
-  "source": "slack",
+  "source": "linear",
   "priority": "urgent",
-  "confidence": 9,
-  "title": "Clear, actionable title",
-  "summary": "2-3 sentences explaining the full context. WHO needs what, WHY it matters, WHAT Kieran should do. Quote relevant messages.",
-  "url": "direct link to the item",
-  "author": "Person who needs Kieran's attention",
-  "action_needed": "Specific action: 'Reply to X about Y' or 'Review PR #123' or 'Start work on VEC-10'"
+  "confidence": 10,
+  "title": "VEC-10: Add Fig Intelligence UI (from Yael)",
+  "summary": "Your manager Yael Chemla assigned this to you today. Port the Figs and Fig Intelligence dashboard from agent-hub to the frontend app using Mantine components. Status: In Progress. She mentioned this in #team-vector as a priority for this sprint.",
+  "links": [
+    {"type": "linear", "label": "VEC-10", "url": "https://linear.app/issue/VEC-10"},
+    {"type": "slack", "label": "#team-vector thread", "url": "https://montecarlodata.slack.com/archives/C0AMSV2SK4Z"},
+    {"type": "github", "label": "Related PR #12441", "url": "https://github.com/monte-carlo-data/frontend/pull/12441"}
+  ],
+  "author": "Yael Chemla",
+  "action_needed": "Start implementing the Fig Intelligence UI in the frontend repo"
 }]
 
-Important:
-- Consolidate related items (don't list the same thing from Slack AND Linear separately)
-- Only include items where Kieran needs to DO something
-- Skip completed/done items entirely
-- Sort by priority (urgent first)
-- If nothing needs action, return []`;
+Rules:
+- VERIFY status of every PR and ticket before including — no hallucinating about open PRs that are actually merged
+- Manager/lead asks = confidence 10
+- Include ALL related links (tickets, PRs, threads, docs) in the "links" array
+- Consolidate related items into single actions
+- Skip anything already done/merged/closed/resolved
+- Sort by confidence (highest first)
+- If nothing genuinely needs action, return []`;
 
     const response = await askBridge(triagePrompt, 90000);
     logPoll(`Pass 2 complete: ${response.length} chars`);
@@ -208,7 +216,8 @@ Important:
 
     const items = JSON.parse(jsonMatch[0]) as Array<{
       source: string; priority: string; title: string; summary: string;
-      url?: string; author?: string; confidence?: number; action_needed?: string;
+      url?: string; links?: Array<{ type: string; label: string; url: string }>;
+      author?: string; confidence?: number; action_needed?: string;
     }>;
 
     logPoll(`Parsed ${items.length} notifications`);
@@ -250,7 +259,8 @@ Important:
         status: "new",
         title: item.title,
         summary: item.summary,
-        url: item.url,
+        url: item.url ?? item.links?.[0]?.url,
+        links: item.links,
         author: item.author,
         confidence: item.confidence,
         actionNeeded: item.action_needed,
