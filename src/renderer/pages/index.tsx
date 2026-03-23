@@ -24,6 +24,7 @@ import { useNavigate } from "react-router-dom";
 import { MetricsBar } from "../components/MetricsBar";
 import { AgentCard } from "../components/AgentCard";
 import { AgentFilterBar } from "../components/AgentFilterBar";
+import { StatusDot } from "../components/StatusDot";
 import { ActivityFeed } from "../components/ActivityFeed";
 import { ApprovalSidebar } from "../components/ApprovalSidebar";
 import { NewAgentModal } from "../components/NewAgentModal";
