@@ -153,7 +153,15 @@ export function enrichExternalAgents(): void {
 
     try {
       const messages = readSessionMessages(jsonlPath, 100);
-      logEnricher(`Agent ${agent.id.slice(0, 8)}: parsed ${messages.length} messages`);
+      const userCount = messages.filter(m => m.role === "user").length;
+      const assistantCount = messages.filter(m => m.role === "assistant").length;
+      const toolCount = messages.filter(m => m.role === "tool_use").length;
+      logEnricher(`Agent ${agent.id.slice(0, 8)}: parsed ${messages.length} total (${userCount} user, ${assistantCount} assistant, ${toolCount} tool)`);
+
+      // Log first few messages for debugging
+      for (const m of messages.slice(0, 5)) {
+        logEnricher(`  [${m.role}] ${m.content.slice(0, 80)}`);
+      }
 
       const title = extractTitle(messages);
       if (title) {
