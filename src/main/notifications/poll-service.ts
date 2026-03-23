@@ -112,9 +112,8 @@ If nothing found, return: []`;
       "--output-format", "json",
       "--model", "claude-haiku-4-5-20251001",
       "--max-turns", "5",
-      "--verbose",
     ], {
-      timeout: 60000, // 60s max
+      timeout: 60000,
       maxBuffer: 1024 * 1024,
       env: { ...process.env },
     }, (error, stdout, stderr) => {
@@ -124,17 +123,18 @@ If nothing found, return: []`;
         return;
       }
 
-      logPoll(`CLI stdout length: ${stdout.length}, first 500: ${stdout.slice(0, 500)}`);
+      logPoll(`CLI stdout length: ${stdout.length}`);
 
       try {
-        // The output-format json gives us a result object
+        // Without --verbose, --output-format json gives a single result object
         const result = JSON.parse(stdout);
-        const text = result.result ?? stdout;
+        const text = String(result.result ?? "");
+        logPoll(`Result text (first 300): ${text.slice(0, 300)}`);
 
-        // Extract JSON array from the response
-        const jsonMatch = String(text).match(/\[[\s\S]*\]/);
+        // Extract JSON array from the result text
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
         if (!jsonMatch) {
-          logPoll("No JSON array found in response");
+          logPoll("No JSON array found in result");
           resolve([]);
           return;
         }
