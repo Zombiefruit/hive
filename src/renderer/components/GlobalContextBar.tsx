@@ -26,7 +26,7 @@ export function GlobalContextBar() {
     if (refs.length > 0) {
       agentContexts.push({
         agentId: agent.id,
-        agentName: agent.cwd.split("/").pop() ?? "agent",
+        agentName: agent.task.length > 40 ? agent.task.slice(0, 40) + "..." : agent.task,
         refs,
       });
     }

@@ -54,16 +54,40 @@ export function Notifications() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
+    const load = async () => {
       try {
         const result = await window.deck.getNotifications();
-        if (result) setNotifications((result as NotificationItem[]).map(n => ({ ...n, stage: n.stage ?? (n.priority === "actionable" ? "new" : "new") })));
+        if (result && (result as NotificationItem[]).length > 0) {
+          setNotifications(prev => {
+            const existing = new Set(prev.map(n => n.id));
+            const newItems = (result as NotificationItem[])
+              .filter(n => !existing.has(n.id))
+              .map(n => ({ ...n, stage: n.stage ?? "new" }));
+            return [...newItems, ...prev];
+          });
+        }
       } catch {}
-    })();
+    };
+    load();
+    // Re-fetch every 10s to catch new polls
+    const refetchInterval = setInterval(load, 10000);
+
     const unsub = window.deck.onNotificationsUpdate?.((data: unknown) => {
-      setNotifications((data as NotificationItem[]).map(n => ({ ...n, stage: n.stage ?? "new" })));
+      const items = data as NotificationItem[];
+      setNotifications(prev => {
+        const existingIds = new Set(prev.map(n => n.id));
+        const newItems = items
+          .filter(n => !existingIds.has(n.id))
+          .map(n => ({ ...n, stage: n.stage ?? "new" }));
+        if (newItems.length === 0) return prev;
+        return [...newItems, ...prev];
+      });
     });
-    return unsub;
+
+    return () => {
+      clearInterval(refetchInterval);
+      unsub?.();
+    };
   }, []);
 
   const advanceStage = (id: string) => {
@@ -172,7 +196,7 @@ export function Notifications() {
                         const SrcIcon = sourceIcons[n.source] ?? IconFileText;
                         const srcColor = sourceColors[n.source] ?? "#6b7280";
                         return (
-                          <UnstyledButton
+                          <div
                             key={n.id}
                             onClick={() => setSelectedId(n.id === selectedId ? null : n.id)}
                             style={{
@@ -182,6 +206,7 @@ export function Notifications() {
                               backgroundColor: "var(--mantine-color-dark-7)",
                               width: "100%",
                               textAlign: "left",
+                              cursor: "pointer",
                             }}
                           >
                             <Group gap={6} mb={4}>
@@ -246,7 +271,7 @@ export function Notifications() {
                                 </UnstyledButton>
                               )}
                             </Group>
-                          </UnstyledButton>
+                          </div>
                         );
                       })
                     )}
