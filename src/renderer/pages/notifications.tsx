@@ -218,11 +218,18 @@ export function Notifications() {
     }
 
     if (newStage === "planning" || newStage === "prepared") {
-      // Start preparing plan in background — user can click the card to see progress
-      window.deck.prepareWorkPlan?.({
-        id: n.id, source: n.source, title: n.title, summary: n.summary, url: n.url,
-        taskType: n.taskType, links: n.links,
-      }).catch((err: unknown) => console.error("[planning] prepareWorkPlan failed:", err));
+      // Only start if no plan exists yet
+      window.deck.getPlan?.(id).then((existing: unknown) => {
+        if (existing && (existing as { conversationHistory?: unknown[] }).conversationHistory?.length) {
+          // Plan already exists — just mark as ready
+          setPlansReady(prev => new Set([...prev, id]));
+          return;
+        }
+        window.deck.prepareWorkPlan?.({
+          id: n.id, source: n.source, title: n.title, summary: n.summary, url: n.url,
+          taskType: n.taskType, links: n.links,
+        }).catch((err: unknown) => console.error("[planning] prepareWorkPlan failed:", err));
+      }).catch(() => {});
     } else if (newStage === "working") {
       window.deck.startWorkAgent?.(id).catch((err: unknown) => console.error("[working] startWorkAgent failed:", err));
     }
@@ -612,10 +619,16 @@ export function Notifications() {
                               </Group>
                               <Text size="xs" fw={500} lineClamp={2} mb={4}>{n.title}</Text>
                               {n.actionNeeded && <Text size="xs" c="blue.4" lineClamp={1} mb={4} style={{ fontSize: "0.65rem" }}>→ {n.actionNeeded}</Text>}
-                              {stage.key === "prepared" && (
+                              {stage.key === "prepared" && !plansReady.has(n.id) && (
                                 <Group gap={4} mt={2}>
                                   <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#06b6d4", animation: "pulse 1.5s infinite" }} />
                                   <Text size="xs" c="#06b6d4" fw={500} style={{ fontSize: "0.6rem" }}>Preparing...</Text>
+                                </Group>
+                              )}
+                              {stage.key === "prepared" && plansReady.has(n.id) && (
+                                <Group gap={4} mt={2}>
+                                  <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#22c55e" }} />
+                                  <Text size="xs" c="#22c55e" fw={500} style={{ fontSize: "0.6rem" }}>Ready</Text>
                                 </Group>
                               )}
                               {stage.key !== "done" && stage.key !== "prepared" && stage.key !== "skipped" && (
@@ -895,31 +908,6 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss, onPlanRead
           </UnstyledButton>
         )}
       </div>
-
-      {/* Related links */}
-      {n.links && n.links.length > 0 && (
-        <div style={{ padding: "8px 20px", borderBottom: "1px solid var(--mantine-color-default-border)", flexShrink: 0 }}>
-          <Text size="xs" fw={600} c="dimmed" mb={4}>Related resources</Text>
-          <Group gap={6} wrap="wrap">
-            {n.links.map((link, i) => (
-              <UnstyledButton
-                key={i}
-                onClick={() => window.deck.openExternal(link.url)}
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 4,
-                  padding: "3px 8px", borderRadius: 4, fontSize: "0.65rem",
-                  backgroundColor: "var(--mantine-color-dark-6)",
-                  color: "var(--mantine-color-blue-4)",
-                  border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-                }}
-              >
-                <Badge size="xs" variant="light" color="gray" radius="sm" style={{ fontSize: "0.55rem" }}>{link.type}</Badge>
-                {link.label}
-              </UnstyledButton>
-            ))}
-          </Group>
-        </div>
-      )}
 
       {/* Conversation area */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
