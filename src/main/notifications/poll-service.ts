@@ -1,25 +1,9 @@
-/**
- * Notification polling service.
- * Spawns lightweight Haiku agents to query Slack, Linear, GitHub
- * via Claude Code's MCP connections.
- */
-
 import { BrowserWindow } from "electron";
-import { query as sdkQuery } from "@anthropic-ai/claude-agent-sdk";
+import { execFile } from "node:child_process";
 import { getClaudeCodePath } from "../claude-path";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-
-const POLL_LOG = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "poll.log");
-
-function logPoll(msg: string): void {
-  try {
-    const dir = path.dirname(POLL_LOG);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.appendFileSync(POLL_LOG, `${new Date().toISOString()} ${msg}\n`);
-  } catch {}
-}
 
 export interface PollNotification {
   id: string;
@@ -32,6 +16,16 @@ export interface PollNotification {
   createdAt: string;
 }
 
+const POLL_LOG = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "poll.log");
+
+function logPoll(msg: string): void {
+  try {
+    const dir = path.dirname(POLL_LOG);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.appendFileSync(POLL_LOG, `${new Date().toISOString()} ${msg}\n`);
+  } catch {}
+}
+
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 const notifications: PollNotification[] = [];
 let isPolling = false;
@@ -39,19 +33,12 @@ let isPolling = false;
 export function startPolling(): void {
   if (pollInterval) return;
   logPoll("startPolling called");
-
-  // First poll after 10 seconds (let the app settle)
   setTimeout(() => { logPoll("first poll firing"); poll(); }, 10000);
-
-  // Then every 2 minutes
   pollInterval = setInterval(() => poll(), 120000);
 }
 
 export function stopPolling(): void {
-  if (pollInterval) {
-    clearInterval(pollInterval);
-    pollInterval = null;
-  }
+  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
 }
 
 export function getNotifications(): PollNotification[] {
@@ -82,12 +69,13 @@ function broadcastNotifications(): void {
 async function poll(): Promise<void> {
   if (isPolling) return;
   isPolling = true;
+  logPoll("poll starting");
 
   try {
-    const result = await runTriageAgent();
-    if (result && result.length > 0) {
+    const result = await runTriageViaCli();
+    logPoll(`poll got ${result.length} notifications`);
+    if (result.length > 0) {
       for (const n of result) {
-        // Deduplicate by title
         if (!notifications.some(existing => existing.title === n.title)) {
           notifications.unshift(n);
         }
@@ -95,90 +83,86 @@ async function poll(): Promise<void> {
       broadcastNotifications();
     }
   } catch (err) {
-    logPoll(`ERROR: ${String(err)}`);
+    logPoll(`poll ERROR: ${String(err)}`);
   } finally {
     isPolling = false;
   }
 }
 
 /**
- * Spawn a Haiku agent to check Slack mentions, Linear assignments,
- * and GitHub review requests. Returns classified notifications.
+ * Run the triage via claude CLI directly (not the SDK which hangs in Electron).
+ * Uses `claude -p "prompt" --output-format json --model haiku`
  */
-async function runTriageAgent(): Promise<PollNotification[]> {
-  const prompt = `You are a notification triage agent. Check the following and report back ONLY with a JSON array of notifications. No other text.
+function runTriageViaCli(): Promise<PollNotification[]> {
+  return new Promise((resolve) => {
+    const claudePath = getClaudeCodePath();
+    const prompt = `Check for recent notifications for Kieran Williams (kwilliams, Slack ID U02PKBZSB9Q) from the last 2 hours. Use the available MCP tools to check:
+1. Slack: search for messages mentioning <@U02PKBZSB9Q> or DMs
+2. Linear: list issues assigned to kwilliams updated recently
 
-Check these sources using the available MCP tools:
+Return ONLY a JSON array of notifications, no other text:
+[{"source":"slack","priority":"actionable","title":"Short title","summary":"Brief summary","url":"https://..."}]
 
-1. **Slack**: Search for recent messages mentioning @U02PKBZSB9Q (Kieran Williams) in the last 2 hours. Use slack_search_public_and_private with query "to:<@U02PKBZSB9Q>" or "<@U02PKBZSB9Q>".
+If nothing found, return: []`;
 
-2. **Linear**: Search for issues assigned to "kwilliams" that were recently updated. Use list_issues with assignee filter.
+    logPoll("spawning claude CLI for triage");
 
-3. **GitHub**: Check for any PR review requests. Search for PRs where review is requested.
-
-For each item found, classify as:
-- "actionable" — needs Kieran to DO something (respond, review, implement)
-- "fyi" — worth knowing, no action needed
-
-Return a JSON array (and NOTHING else) like:
-[{"source":"slack","priority":"actionable","title":"#team-vector: Yael asked about retry logic","summary":"Thread in #team-vector about deployment timeline","url":"https://montecarlodata.slack.com/archives/C0AMSV2SK4Z"}]
-
-If nothing new is found, return: []`;
-
-  try {
-    const q = sdkQuery({
-      prompt,
-      options: {
-        pathToClaudeCodeExecutable: getClaudeCodePath(),
-        model: "claude-haiku-4-5-20251001",
-        permissionMode: "bypassPermissions",
-        allowDangerouslySkipPermissions: true,
-        maxTurns: 5,
-        maxBudgetUsd: 0.05, // Keep costs low
-      },
-    });
-
-    let fullText = "";
-    for await (const message of q) {
-      if (message.type === "assistant") {
-        const content = message.message?.content;
-        if (Array.isArray(content)) {
-          for (const block of content as Array<{ type: string; text?: string }>) {
-            if (block.type === "text" && block.text) {
-              fullText += block.text;
-            }
-          }
-        }
-      } else if (message.type === "result") {
-        const result = (message as { result?: string }).result;
-        if (result) fullText = result;
+    const child = execFile(claudePath, [
+      "-p", prompt,
+      "--output-format", "json",
+      "--model", "claude-haiku-4-5-20251001",
+      "--max-turns", "5",
+      "--verbose",
+    ], {
+      timeout: 60000, // 60s max
+      maxBuffer: 1024 * 1024,
+      env: { ...process.env },
+    }, (error, stdout, stderr) => {
+      if (error) {
+        logPoll(`CLI error: ${error.message}`);
+        resolve([]);
+        return;
       }
-    }
 
-    // Parse the JSON response
-    const jsonMatch = fullText.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return [];
+      logPoll(`CLI stdout length: ${stdout.length}`);
 
-    const items = JSON.parse(jsonMatch[0]) as Array<{
-      source: string;
-      priority: string;
-      title: string;
-      summary: string;
-      url?: string;
-    }>;
+      try {
+        // The output-format json gives us a result object
+        const result = JSON.parse(stdout);
+        const text = result.result ?? stdout;
 
-    return items.map(item => ({
-      id: `poll-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      source: item.source as PollNotification["source"],
-      priority: item.priority as PollNotification["priority"],
-      status: "new" as const,
-      title: item.title,
-      summary: item.summary,
-      url: item.url,
-      createdAt: new Date().toISOString(),
-    }));
-  } catch (err) {
-    logPoll(`TRIAGE_ERROR: ${String(err)}`);
-    return [];
-  }
+        // Extract JSON array from the response
+        const jsonMatch = String(text).match(/\[[\s\S]*\]/);
+        if (!jsonMatch) {
+          logPoll("No JSON array found in response");
+          resolve([]);
+          return;
+        }
+
+        const items = JSON.parse(jsonMatch[0]) as Array<{
+          source: string;
+          priority: string;
+          title: string;
+          summary: string;
+          url?: string;
+        }>;
+
+        logPoll(`Parsed ${items.length} notifications`);
+
+        resolve(items.map(item => ({
+          id: `poll-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          source: item.source as PollNotification["source"],
+          priority: item.priority as PollNotification["priority"],
+          status: "new" as const,
+          title: item.title,
+          summary: item.summary,
+          url: item.url,
+          createdAt: new Date().toISOString(),
+        })));
+      } catch (parseErr) {
+        logPoll(`Parse error: ${String(parseErr)}`);
+        resolve([]);
+      }
+    });
+  });
 }
