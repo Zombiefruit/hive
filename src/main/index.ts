@@ -141,7 +141,7 @@ app.whenReady().then(() => {
   });
 
   // Start MCP Bridge (persistent Claude Code process for Slack/Linear/etc.)
-  startBridge();
+  try { startBridge(); } catch (err) { console.error("Bridge start failed:", err); }
 
   // Start notification polling (uses bridge for MCP access)
   startPolling();
