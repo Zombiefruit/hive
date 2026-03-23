@@ -18,7 +18,7 @@ import {
   IconShieldCheck,
   IconActivity,
 } from "@tabler/icons-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { MetricsBar } from "../components/MetricsBar";
 import { AgentCard } from "../components/AgentCard";
 import { AgentFilterBar } from "../components/AgentFilterBar";
@@ -34,6 +34,14 @@ export function Dashboard() {
   const agents = useAgentStore((s) => s.agents);
   const pendingCount = usePendingApprovals().length;
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+
+  // Show loading until we get first store sync with agents
+  useEffect(() => {
+    if (agents.length > 0) setLoading(false);
+    const timer = setTimeout(() => setLoading(false), 5000); // Max 5s wait
+    return () => clearTimeout(timer);
+  }, [agents.length]);
 
   const filteredAgents = useMemo(() => {
     if (activeFilters.size === 0) return agents;
@@ -106,8 +114,19 @@ export function Dashboard() {
           </Group>
         </div>
 
+        {/* Loading state */}
+        {loading && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 60 }}>
+            <Stack align="center" gap="sm">
+              <div style={{ width: 24, height: 24, border: "2px solid var(--mantine-color-blue-5)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+              <Text size="sm" c="dimmed">Discovering agents...</Text>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            </Stack>
+          </div>
+        )}
+
         {/* Content: two-column grid */}
-        <div
+        {!loading && <div
           style={{
             maxWidth: 1440,
             margin: "0 auto",
@@ -219,7 +238,7 @@ export function Dashboard() {
               </div>
             </div>
           </Stack>
-        </div>
+        </div>}
       </div>
 
       <NewAgentModal opened={modalOpened} onClose={closeModal} />
