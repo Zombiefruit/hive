@@ -205,7 +205,7 @@ export function detectContextFromLines(lines: string[]): DetectedContext[] {
         if (channel && !seen.has(`slack:${channel}`)) {
           seen.add(`slack:${channel}`);
           const channelName = resolveSlackChannelName(channel);
-          contexts.push({ type: "slack", resourceId: channel, title: `#${channelName}`, url: `https://app.slack.com/client/T//${channel}` });
+          contexts.push({ type: "slack", resourceId: channel, title: `#${channelName}`, url: `slack://channel?team=&id=${channel}` });
         }
       }
 
