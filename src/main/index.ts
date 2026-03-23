@@ -12,7 +12,7 @@ import { addContextFromUrl } from "./agents/context-tracker";
 import { listAllSessions } from "./agents/session-history";
 import { startPolling, stopPolling, getNotifications, dismissNotification, startWorkOnNotification, clearAllNotifications, forcePoll, hasPolledOnce, getSkippedItems, updateNotificationByTitle, updateNotificationById, upsertNotification } from "./notifications/poll-service";
 import { startBridge, stopBridge, getBridgeDebugLog } from "./mcp-bridge";
-import { prepareWorkPlan, iteratePlan, startWorkAgent, getPlan, getAllPlans, getActiveWorkAgents } from "./notifications/work-dispatcher";
+import { prepareWorkPlan, iteratePlan, startWorkAgent, getPlan, clearPlan, getAllPlans, getActiveWorkAgents } from "./notifications/work-dispatcher";
 import { startMonitoring, stopMonitoring } from "./notifications/agent-monitor";
 import {
   initManager,
@@ -181,6 +181,9 @@ app.whenReady().then(() => {
 
   ipcMain.handle("work:get-plan", (_event, notificationId: string) => {
     return getPlan(notificationId);
+  });
+  ipcMain.handle("work:clear-plan", (_event, notificationId: string) => {
+    clearPlan(notificationId);
   });
 
   ipcMain.handle("work:get-all-plans", () => {

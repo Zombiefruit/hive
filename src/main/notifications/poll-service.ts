@@ -2,32 +2,32 @@ import { app, BrowserWindow } from "electron";
 import { askBridge, isBridgeReady, restartBridge, addDebugEntry } from "../mcp-bridge";
 import { getClaudeCodePath } from "../claude-path";
 import { getAllAgents, getAllContextRefs } from "../db/database";
-import { spawn as spawnProcess } from "node:child_process";
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
 /**
  * One-shot Claude Code call with MCP access via stream-json interactive mode.
- * Each call spawns its own process so they can run in parallel.
- * Waits for init (which loads MCP connectors) before sending the prompt.
+ * Uses the same spawn pattern as the working bridge — identical args.
  */
 function askOneShot(prompt: string, timeoutMs: number): Promise<string> {
   return new Promise((resolve) => {
     const claudePath = getClaudeCodePath();
-    const systemPrompt = "You are a READ-ONLY data fetcher. Fetch the requested data using MCP tools and return it as plain text. Do not write, edit, or modify anything.";
 
-    const proc = spawnProcess(claudePath, [
+    // Use IDENTICAL args to the bridge (which works) — including --disallowedTools
+    const proc = spawn(claudePath, [
       "--output-format", "stream-json",
-      "--input-format", "stream-json",
       "--verbose",
+      "--input-format", "stream-json",
       "--no-chrome",
       "--model", "claude-haiku-4-5-20251001",
       "--no-session-persistence",
-      "--system-prompt", systemPrompt,
+      "--disallowedTools", "Write,Edit,Bash,NotebookEdit,Agent,EnterWorktree,ExitWorktree",
+      "--system-prompt", "You are a READ-ONLY data fetcher. Fetch data using MCP tools and return as plain text. Each request is independent.",
     ], {
-      env: { ...process.env },
       cwd: app.isPackaged ? os.homedir() : app.getAppPath(),
+      env: { ...process.env },
       stdio: ["pipe", "pipe", "pipe"],
     });
 
@@ -396,12 +396,13 @@ Only include pages updated after ${cutoffStr}. Return page titles, who edited th
     ];
 
     // Fetch ALL sources in PARALLEL — each spawns its own Claude Code process
-    // spawn works from Electron's Node.js (bridge proves it); processes init in parallel
+    // Uses identical spawn pattern to the working bridge
     logPoll(`  Launching ${sources.length} parallel fetchers...`);
+    addDebugEntry("in", `🚀 Launching ${sources.length} parallel source fetchers`);
     for (const win of BrowserWindow.getAllWindows()) {
       try {
         if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", {
-          source: "Fetching all sources",
+          source: "Fetching all sources in parallel",
           current: 1,
           total: 2,
         });
@@ -410,12 +411,15 @@ Only include pages updated after ${cutoffStr}. Return page titles, who edited th
 
     const fetchPromises = sources.map(async (source) => {
       logPoll(`  [parallel] Starting: ${source.name}`);
+      addDebugEntry("in", `📤 ${source.name}: starting...`);
       try {
         const result = await askOneShot(source.prompt, source.timeoutMs);
         logPoll(`  [parallel] ${source.name}: ${result.length} chars`);
+        addDebugEntry("out", `✅ ${source.name}: ${result.length} chars`);
         return `## ${source.name}\n${result}\n`;
       } catch (err) {
         logPoll(`  [parallel] ${source.name}: ERROR ${String(err).slice(0, 60)}`);
+        addDebugEntry("out", `❌ ${source.name}: ${String(err).slice(0, 60)}`);
         return `## ${source.name}\nError: ${String(err).slice(0, 100)}\n`;
       }
     });

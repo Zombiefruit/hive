@@ -25,6 +25,8 @@ const api = {
     ipcRenderer.invoke("work:iterate-plan", { notificationId, feedback }),
   getPlan: (notificationId: string) =>
     ipcRenderer.invoke("work:get-plan", notificationId),
+  clearPlan: (notificationId: string) =>
+    ipcRenderer.invoke("work:clear-plan", notificationId),
   startWorkAgent: (notificationId: string) =>
     ipcRenderer.invoke("work:start-agent", notificationId),
 

@@ -108,6 +108,11 @@ export function getPlan(notificationId: string): WorkPlan | null {
   return plans.get(notificationId) ?? null;
 }
 
+export function clearPlan(notificationId: string): void {
+  plans.delete(notificationId);
+  savePlans();
+}
+
 export function getAllPlans(): Record<string, WorkPlan> {
   return Object.fromEntries(plans);
 }

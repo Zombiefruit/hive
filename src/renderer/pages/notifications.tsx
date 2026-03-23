@@ -1030,6 +1030,7 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss, onPlanRead
               )}
               <UnstyledButton
                 onClick={() => {
+                  window.deck.clearPlan?.(n.id);
                   setConversation([]);
                   setLoading(true);
                   setActivity([]);
