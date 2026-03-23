@@ -54,6 +54,16 @@ export function getNotifications(): PollNotification[] {
   return notifications.filter(n => n.status !== "dismissed" && n.status !== "done");
 }
 
+export function clearAllNotifications(): void {
+  notifications.length = 0;
+  saveCacheToFile();
+  broadcastNotifications();
+}
+
+export function forcePoll(): void {
+  poll();
+}
+
 export function dismissNotification(id: string): void {
   const n = notifications.find(n => n.id === id);
   if (n) n.status = "dismissed";

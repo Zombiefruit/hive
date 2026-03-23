@@ -31,6 +31,8 @@ const api = {
   getNotifications: () => ipcRenderer.invoke("notifications:get"),
   dismissNotification: (id: string) => ipcRenderer.invoke("notifications:dismiss", id),
   startWorkOnNotification: (id: string) => ipcRenderer.invoke("notifications:start-work", id),
+  clearNotifications: () => ipcRenderer.invoke("notifications:clear"),
+  refreshNotifications: () => ipcRenderer.invoke("notifications:refresh"),
   onNotificationsUpdate: (callback: (notifications: unknown[]) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, data: unknown[]) => callback(data);
     ipcRenderer.on("notifications:update", listener);

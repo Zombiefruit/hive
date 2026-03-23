@@ -143,7 +143,7 @@ export function Notifications() {
             Inbox
           </UnstyledButton>
         </Group>
-        <div style={{ WebkitAppRegion: "no-drag", display: "flex", alignItems: "center", gap: 6 }}>
+        <Group gap={8} style={{ WebkitAppRegion: "no-drag" }}>
           {fetching ? (
             <>
               <div style={{ width: 14, height: 14, border: "2px solid var(--mantine-color-blue-5)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
@@ -153,10 +153,24 @@ export function Notifications() {
           ) : (
             <>
               <div style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#22c55e" }} />
-              <Text size="xs" c="dimmed">{notifications.length} items · Next poll in ~2m</Text>
+              <Text size="xs" c="dimmed">{notifications.length} items</Text>
             </>
           )}
-        </div>
+          <UnstyledButton
+            onClick={() => { setFetching(true); window.deck.refreshNotifications(); }}
+            style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-dimmed)" }}
+          >
+            Refresh
+          </UnstyledButton>
+          {notifications.length > 0 && (
+            <UnstyledButton
+              onClick={() => { window.deck.clearNotifications(); setNotifications([]); }}
+              style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, color: "var(--mantine-color-red-4)" }}
+            >
+              Clear
+            </UnstyledButton>
+          )}
+        </Group>
       </div>
 
       {/* Kanban board */}

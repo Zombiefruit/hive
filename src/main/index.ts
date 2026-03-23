@@ -10,7 +10,7 @@ import { enrichExternalAgents } from "./agents/session-enricher";
 import { startSessionTailing, stopSessionTailing } from "./agents/session-tailer";
 import { addContextFromUrl } from "./agents/context-tracker";
 import { listAllSessions } from "./agents/session-history";
-import { startPolling, stopPolling, getNotifications, dismissNotification, startWorkOnNotification } from "./notifications/poll-service";
+import { startPolling, stopPolling, getNotifications, dismissNotification, startWorkOnNotification, clearAllNotifications, forcePoll } from "./notifications/poll-service";
 import { startBridge, stopBridge, getBridgeDebugLog } from "./mcp-bridge";
 import { prepareWorkPlan, startWorkAgent } from "./notifications/work-dispatcher";
 import {
@@ -139,6 +139,12 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("notifications:start-work", (_event, id: string) => {
     startWorkOnNotification(id);
+  });
+  ipcMain.handle("notifications:clear", () => {
+    clearAllNotifications();
+  });
+  ipcMain.handle("notifications:refresh", () => {
+    forcePoll();
   });
 
   // Work dispatcher
