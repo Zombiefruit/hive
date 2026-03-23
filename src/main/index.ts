@@ -12,7 +12,7 @@ import { addContextFromUrl } from "./agents/context-tracker";
 import { listAllSessions } from "./agents/session-history";
 import { startPolling, stopPolling, getNotifications, dismissNotification, startWorkOnNotification, clearAllNotifications, forcePoll } from "./notifications/poll-service";
 import { startBridge, stopBridge, getBridgeDebugLog } from "./mcp-bridge";
-import { prepareWorkPlan, startWorkAgent } from "./notifications/work-dispatcher";
+import { prepareWorkPlan, iteratePlan, startWorkAgent, getPlan, getAllPlans } from "./notifications/work-dispatcher";
 import {
   initManager,
   setManagerStreamCallback,
@@ -152,8 +152,20 @@ app.whenReady().then(() => {
     return await prepareWorkPlan(notification);
   });
 
-  ipcMain.handle("work:start-agent", (_event, plan: { notificationId: string; title: string; context: string; plan: string; estimatedModel: string; estimatedCost: string }) => {
-    return startWorkAgent(plan);
+  ipcMain.handle("work:iterate-plan", async (_event, data: { notificationId: string; feedback: string }) => {
+    return await iteratePlan(data.notificationId, data.feedback);
+  });
+
+  ipcMain.handle("work:get-plan", (_event, notificationId: string) => {
+    return getPlan(notificationId);
+  });
+
+  ipcMain.handle("work:get-all-plans", () => {
+    return getAllPlans();
+  });
+
+  ipcMain.handle("work:start-agent", async (_event, notificationId: string) => {
+    return await startWorkAgent(notificationId);
   });
 
   // Start MCP Bridge (persistent Claude Code process for Slack/Linear/etc.)

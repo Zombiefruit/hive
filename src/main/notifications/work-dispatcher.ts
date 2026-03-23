@@ -1,28 +1,23 @@
 /**
- * Work Dispatcher — handles the "Start work" action from the inbox.
+ * Work Dispatcher — orchestrates the notification → plan → work flow.
  *
- * Flow:
- * 1. User clicks "Start work" on a notification
- * 2. Dispatcher asks the MCP bridge for full context
- * 3. Returns a plan summary to the user
- * 4. On user approval, spawns a non-headless work agent
+ * NO hardcoded logic. The Manager (via MCP bridge) does all the thinking:
+ * - Analyzes the notification context
+ * - Proposes a plan
+ * - Iterates on the plan based on user feedback
+ * - Composes the work agent prompt when approved
  */
 
 import { askBridge, isBridgeReady } from "../mcp-bridge";
 import { spawn, ChildProcess } from "node:child_process";
 import { getClaudeCodePath } from "../claude-path";
-import { BrowserWindow } from "electron";
-import { addEvent } from "../db/database";
-import os from "node:os";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 
 const LOG_PATH = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "dispatcher.log");
-
 function log(msg: string): void {
-  try {
-    fs.appendFileSync(LOG_PATH, `${new Date().toISOString()} ${msg}\n`);
-  } catch {}
+  try { fs.appendFileSync(LOG_PATH, `${new Date().toISOString()} ${msg}\n`); } catch {}
 }
 
 export interface WorkPlan {
@@ -32,13 +27,45 @@ export interface WorkPlan {
   plan: string;
   estimatedModel: string;
   estimatedCost: string;
+  conversationHistory: Array<{ role: "user" | "assistant"; content: string }>;
 }
 
-const activeWorkAgents = new Map<string, ChildProcess>();
+// Persist plans so they survive page refreshes
+const plans = new Map<string, WorkPlan>();
+
+function getPlanCachePath(): string {
+  return path.join(os.homedir(), "Library", "Application Support", "claude-deck", "plans-cache.json");
+}
+
+function savePlans(): void {
+  try {
+    const data = Object.fromEntries(plans);
+    fs.writeFileSync(getPlanCachePath(), JSON.stringify(data));
+  } catch {}
+}
+
+function loadPlans(): void {
+  try {
+    const raw = fs.readFileSync(getPlanCachePath(), "utf-8");
+    const data = JSON.parse(raw) as Record<string, WorkPlan>;
+    for (const [k, v] of Object.entries(data)) plans.set(k, v);
+  } catch {}
+}
+
+// Load on module init
+loadPlans();
+
+export function getPlan(notificationId: string): WorkPlan | null {
+  return plans.get(notificationId) ?? null;
+}
+
+export function getAllPlans(): Record<string, WorkPlan> {
+  return Object.fromEntries(plans);
+}
 
 /**
- * Fetch full context for a notification and generate a work plan.
- * Returns the plan for user approval — does NOT start work automatically.
+ * Ask the Manager to analyze a notification and propose a plan.
+ * The Manager uses the bridge to fetch full context and think about it.
  */
 export async function prepareWorkPlan(notification: {
   id: string;
@@ -55,102 +82,137 @@ export async function prepareWorkPlan(notification: {
       title: notification.title,
       context: notification.summary,
       plan: "MCP Bridge not ready — try again in a few seconds.",
-      estimatedModel: "claude-sonnet-4-6",
-      estimatedCost: "$0",
+      estimatedModel: "",
+      estimatedCost: "",
+      conversationHistory: [],
     };
   }
 
-  // Ask the bridge for full context
-  const contextPrompt = `I need full context for this work item:
+  // Step 1: Ask the bridge to fetch full context AND propose a plan
+  const prompt = `I need you to analyze this work item and create a detailed plan for me.
 
-Title: ${notification.title}
-Source: ${notification.source}
-Summary: ${notification.summary}
-${notification.url ? `URL: ${notification.url}` : ""}
+## Notification
+- **Source**: ${notification.source}
+- **Title**: ${notification.title}
+- **Summary**: ${notification.summary}
+${notification.url ? `- **URL**: ${notification.url}` : ""}
 
-Please fetch all relevant details:
-- If it's a Linear ticket, get the full description, comments, and related issues
-- If it's a Slack thread, get the full thread with all messages
-- If it's a GitHub PR, get the PR description, changed files summary, and review comments
-- Any related Notion specs or docs
+## What I need from you
 
-Return a comprehensive context summary in plain text (not JSON). Include everything I'd need to understand and work on this.`;
+1. **Fetch full context**: Use your MCP tools to get all relevant details:
+   - If Linear ticket: get the full description, acceptance criteria, comments, related issues
+   - If Slack thread: get the full conversation
+   - If GitHub PR: get the description, changed files, review comments
+   - Check for any related Notion docs or specs
 
-  const context = await askBridge(contextPrompt, 60000);
-  log(`Context received: ${context.length} chars`);
+2. **Analyze and propose a plan**: Based on the context, tell me:
+   - What exactly needs to be done (be specific)
+   - What approach you'd recommend
+   - Which files/areas of the codebase are likely involved
+   - What model would be best for this (Haiku for simple, Sonnet for moderate, Opus for complex)
+   - Estimated cost
+   - Any risks or things to watch out for
+   - What the agent will need access to (repos, branches, etc.)
 
-  // Generate a plan summary
-  const plan = generatePlanFromContext(notification, context);
+3. **Format your response** as a clear plan I can review and approve. Be specific and actionable — I want to know exactly what the agent will do before I approve it.`;
 
-  return {
+  const response = await askBridge(prompt, 90000);
+  log(`Plan response: ${response.length} chars`);
+
+  const plan: WorkPlan = {
     notificationId: notification.id,
     title: notification.title,
-    context: context.slice(0, 5000),
-    plan,
-    estimatedModel: estimateModel(notification, context),
-    estimatedCost: estimateCost(notification, context),
+    context: response,
+    plan: response,
+    estimatedModel: "", // Let the AI decide in its response
+    estimatedCost: "",
+    conversationHistory: [
+      { role: "user", content: `Prepare a plan for: ${notification.title}` },
+      { role: "assistant", content: response },
+    ],
   };
+
+  plans.set(notification.id, plan);
+  savePlans();
+  return plan;
 }
 
-function generatePlanFromContext(notification: { source: string; title: string }, context: string): string {
-  // Simple heuristic plan — in the future, the Manager AI generates this
-  if (notification.source === "github") {
-    return `1. Read the PR changes and understand the diff\n2. Review code for bugs, style, and best practices\n3. Check against CLAUDE.md coding standards\n4. Post review comments`;
-  }
-  if (notification.source === "linear") {
-    return `1. Understand the ticket requirements from the description\n2. Check related Slack threads for additional context\n3. Implement the changes in a new branch\n4. Write tests\n5. Create a draft PR`;
-  }
-  return `1. Review the notification context\n2. Determine required actions\n3. Execute the work\n4. Report results`;
-}
+/**
+ * Send feedback on a plan — the user pushes back or asks for changes.
+ * The Manager iterates on the plan based on the feedback.
+ */
+export async function iteratePlan(notificationId: string, userFeedback: string): Promise<WorkPlan> {
+  const existing = plans.get(notificationId);
+  if (!existing) throw new Error("No plan found for this notification");
 
-function estimateModel(notification: { source: string }, context: string): string {
-  if (notification.source === "github") return "claude-sonnet-4-6"; // Reviews are balanced
-  if (context.length > 3000) return "claude-opus-4-6"; // Complex context needs Opus
-  return "claude-sonnet-4-6";
-}
+  log(`iteratePlan: ${notificationId} feedback: ${userFeedback.slice(0, 100)}`);
 
-function estimateCost(notification: { source: string }, context: string): string {
-  if (notification.source === "github") return "~$0.50";
-  if (context.length > 3000) return "~$2.00";
-  return "~$1.00";
+  // Build conversation context
+  const historyText = existing.conversationHistory
+    .map(m => `${m.role === "user" ? "User" : "Manager"}: ${m.content}`)
+    .join("\n\n---\n\n");
+
+  const prompt = `We've been discussing a work plan. Here's the conversation so far:
+
+${historyText}
+
+---
+
+User's feedback: ${userFeedback}
+
+Please update your plan based on this feedback. Address the user's concerns and provide a revised plan.`;
+
+  const response = await askBridge(prompt, 90000);
+
+  existing.plan = response;
+  existing.context = response;
+  existing.conversationHistory.push(
+    { role: "user", content: userFeedback },
+    { role: "assistant", content: response },
+  );
+
+  savePlans();
+  return existing;
 }
 
 /**
  * Start a work agent for an approved plan.
- * The agent is a non-headless Claude Code process with full MCP access.
+ * The Manager composes the full prompt — no hardcoded templates.
  */
-export function startWorkAgent(plan: WorkPlan): string {
-  const agentId = `work-${Date.now()}`;
-  log(`Starting work agent ${agentId} for: ${plan.title}`);
+export async function startWorkAgent(notificationId: string): Promise<string> {
+  const plan = plans.get(notificationId);
+  if (!plan) throw new Error("No plan found");
 
-  const claudePath = getClaudeCodePath();
-  const workPrompt = `You are working on the following task:
+  log(`startWorkAgent: ${plan.title}`);
 
-## ${plan.title}
+  // Ask the Manager to compose the actual work prompt
+  const promptComposition = `Based on this approved plan, compose a complete prompt for a Claude Code agent that will execute this work. The agent has access to all MCP tools (Slack, Linear, GitHub, Notion) and standard code tools (Read, Write, Edit, Bash, etc.).
 
-## Context
-${plan.context}
-
-## Plan
+## The approved plan:
 ${plan.plan}
 
-## Instructions
-- Work through the plan step by step
-- Use MCP tools (Slack, Linear, GitHub) as needed to gather more context
-- For code changes, create a new git branch
-- Write tests for your changes
-- Create a draft PR when done
-- Report your progress clearly
+## What to include in the prompt:
+- Clear task description
+- All relevant context the agent needs
+- Step-by-step instructions
+- What to do when done (create PR, update ticket, etc.)
+- Any constraints or things to avoid
 
-Start working now.`;
+Write the prompt as if you're giving instructions to a skilled developer. Be thorough but clear.`;
+
+  const workPrompt = await askBridge(promptComposition, 60000);
+  log(`Work prompt composed: ${workPrompt.length} chars`);
+
+  // Spawn the work agent
+  const claudePath = getClaudeCodePath();
+  const agentId = `work-${Date.now()}`;
 
   const proc = spawn(claudePath, [
     "--output-format", "stream-json",
     "--verbose",
     "--input-format", "stream-json",
     "--no-chrome",
-    "--model", plan.estimatedModel,
-    // Work agents need approval for destructive operations
+    "--model", "claude-sonnet-4-6",
     "--permission-mode", "default",
   ], {
     cwd: os.homedir(),
@@ -158,7 +220,7 @@ Start working now.`;
     stdio: ["pipe", "pipe", "pipe"],
   });
 
-  // Send the initial prompt
+  // Send the composed prompt
   const message = JSON.stringify({
     type: "user",
     message: { role: "user", content: workPrompt },
@@ -168,16 +230,8 @@ Start working now.`;
   });
   proc.stdin?.write(message + "\n");
 
-  activeWorkAgents.set(agentId, proc);
-
-  // Broadcast status updates
-  proc.stdout?.on("data", (chunk: Buffer) => {
-    // TODO: parse stream-json and update agent status in DB
-  });
-
   proc.on("exit", (code) => {
-    log(`Work agent ${agentId} exited with code ${code}`);
-    activeWorkAgents.delete(agentId);
+    log(`Work agent ${agentId} exited: ${code}`);
   });
 
   return agentId;

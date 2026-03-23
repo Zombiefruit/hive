@@ -4,7 +4,8 @@ import {
   IconBrandGithub, IconHash, IconMail, IconFileText, IconChevronRight,
 } from "@tabler/icons-react";
 import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { Markdown } from "../components/Markdown";
 import { useNavigate } from "react-router-dom";
 
 interface NotificationItem {
@@ -359,29 +360,64 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss }: {
   onAdvance: () => void;
   onDismiss: () => void;
 }) {
-  const [plan, setPlan] = useState<{ title: string; context: string; plan: string; estimatedModel: string; estimatedCost: string } | null>(null);
-  const [preparing, setPreparing] = useState(false);
-  const [starting, setStarting] = useState(false);
+  const [conversation, setConversation] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
+  const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const [hasApproved, setHasApproved] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Load existing plan on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const existing = await window.deck.getPlan(n.id);
+        if (existing && (existing as { conversationHistory: typeof conversation }).conversationHistory?.length > 0) {
+          setConversation((existing as { conversationHistory: typeof conversation }).conversationHistory);
+        }
+      } catch {}
+    })();
+  }, [n.id]);
+
+  // Auto-scroll on new messages
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [conversation.length]);
 
   const handlePrepare = async () => {
-    setPreparing(true);
+    setLoading(true);
+    setConversation([{ role: "user", content: `Analyze and create a plan for: ${n.title}` }]);
     try {
       const result = await window.deck.prepareWorkPlan({
         id: n.id, source: n.source, title: n.title, summary: n.summary, url: n.url,
       });
-      setPlan(result as typeof plan);
+      const plan = result as { conversationHistory: typeof conversation };
+      if (plan?.conversationHistory) setConversation(plan.conversationHistory);
     } catch {}
-    setPreparing(false);
+    setLoading(false);
   };
 
-  const handleStart = async () => {
-    if (!plan) return;
-    setStarting(true);
+  const handleFeedback = async () => {
+    if (!feedback.trim() || loading) return;
+    const msg = feedback.trim();
+    setFeedback("");
+    setConversation(prev => [...prev, { role: "user", content: msg }]);
+    setLoading(true);
     try {
-      await window.deck.startWorkAgent(plan);
-      onAdvance(); // Move to "in_progress" stage
+      const result = await window.deck.iteratePlan(n.id, msg);
+      const plan = result as { conversationHistory: typeof conversation };
+      if (plan?.conversationHistory) setConversation(plan.conversationHistory);
     } catch {}
-    setStarting(false);
+    setLoading(false);
+  };
+
+  const handleApprove = async () => {
+    setHasApproved(true);
+    setLoading(true);
+    try {
+      await window.deck.startWorkAgent(n.id);
+      onAdvance();
+    } catch {}
+    setLoading(false);
   };
 
   const stage = STAGES.find(s => s.key === (n.stage ?? "new"));
@@ -389,161 +425,127 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss }: {
   const color = sourceColors[n.source] ?? "#6b7280";
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: 52,
-        right: 0,
-        bottom: 0,
-        width: "40%",
-        backgroundColor: "var(--mantine-color-dark-8)",
-        borderLeft: "1px solid var(--mantine-color-default-border)",
-        overflowY: "auto",
-        zIndex: 100,
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <div style={{
+      position: "fixed", top: 52, right: 0, bottom: 0, width: "45%",
+      backgroundColor: "var(--mantine-color-dark-8)",
+      borderLeft: "1px solid var(--mantine-color-default-border)",
+      zIndex: 100, display: "flex", flexDirection: "column",
+    }}>
       {/* Header */}
-      <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--mantine-color-default-border)" }}>
-        <Group justify="space-between" mb={8}>
+      <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--mantine-color-default-border)", flexShrink: 0 }}>
+        <Group justify="space-between" mb={4}>
           <Group gap="xs">
-            <Icon size={16} color={color} />
-            <Badge color={stage?.color ?? "gray"} size="sm">{stage?.label ?? n.stage}</Badge>
+            <Icon size={14} color={color} />
+            <Badge color={stage?.color ?? "gray"} size="xs">{stage?.label ?? n.stage}</Badge>
+            {n.confidence && <Badge size="xs" color={n.confidence >= 8 ? "red" : n.confidence >= 6 ? "yellow" : "gray"}>{n.confidence}/10</Badge>}
           </Group>
-          <UnstyledButton onClick={onClose}>
-            <Text size="xs" c="dimmed">Close</Text>
-          </UnstyledButton>
+          <UnstyledButton onClick={onClose}><Text size="xs" c="dimmed">Close</Text></UnstyledButton>
         </Group>
-        <Text size="lg" fw={600}>{n.title}</Text>
-        {n.author && <Text size="xs" c="dimmed" mt={4}>From: {n.author}</Text>}
+        <Text size="sm" fw={600}>{n.title}</Text>
+        {n.author && <Text size="xs" c="dimmed">{n.author}</Text>}
       </div>
 
-      {/* Content */}
-      <div style={{ flex: 1, padding: 24, overflowY: "auto" }}>
-        <Text size="sm" c="dimmed" mb="md">{n.summary}</Text>
-
-        {n.actionNeeded && (
-          <div style={{
-            padding: "10px 14px",
-            borderRadius: 6,
-            backgroundColor: "color-mix(in srgb, var(--mantine-color-blue-5) 10%, transparent)",
-            border: "1px solid color-mix(in srgb, var(--mantine-color-blue-5) 30%, transparent)",
-            marginBottom: 16,
-          }}>
-            <Text size="xs" fw={600} c="blue" mb={4}>Action needed</Text>
-            <Text size="sm">{n.actionNeeded}</Text>
-          </div>
-        )}
-
-        {n.confidence && (
-          <Group gap="xs" mb="md">
-            <Text size="xs" c="dimmed">Confidence:</Text>
-            <Badge
-              size="sm"
-              color={n.confidence >= 8 ? "red" : n.confidence >= 6 ? "yellow" : "gray"}
-            >
-              {n.confidence}/10
-            </Badge>
-          </Group>
-        )}
-
+      {/* Notification context */}
+      <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--mantine-color-default-border)", flexShrink: 0 }}>
+        <Text size="xs" c="dimmed">{n.summary}</Text>
+        {n.actionNeeded && <Text size="xs" c="blue.4" mt={4}>→ {n.actionNeeded}</Text>}
         {n.url && (
-          <UnstyledButton
-            onClick={() => window.deck.openExternal(n.url!)}
-            style={{ color: "var(--mantine-color-blue-4)", fontSize: "0.8rem", marginBottom: 16, display: "block" }}
-          >
+          <UnstyledButton onClick={() => window.deck.openExternal(n.url!)} style={{ color: "var(--mantine-color-blue-4)", fontSize: "0.7rem", marginTop: 4 }}>
             Open in browser →
           </UnstyledButton>
         )}
+      </div>
 
-        {/* Work plan section */}
-        {plan && (
-          <div style={{
-            padding: 16,
-            borderRadius: 8,
-            backgroundColor: "var(--mantine-color-dark-7)",
-            border: "1px solid color-mix(in srgb, var(--mantine-color-blue-5) 30%, transparent)",
-            marginBottom: 16,
+      {/* Conversation area */}
+      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
+        {conversation.length === 0 && !loading && (
+          <Stack align="center" py="xl" gap="sm">
+            <Text size="sm" c="dimmed">Click "Analyze" to have the Manager fetch context and propose a plan.</Text>
+          </Stack>
+        )}
+
+        {conversation.map((msg, i) => (
+          <div key={i} style={{
+            padding: "10px 14px", borderRadius: 8, marginBottom: 8,
+            backgroundColor: msg.role === "user"
+              ? "color-mix(in srgb, var(--mantine-color-blue-5) 15%, transparent)"
+              : "var(--mantine-color-dark-7)",
+            border: msg.role === "assistant" ? "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)" : undefined,
+            maxWidth: msg.role === "user" ? "80%" : "100%",
+            marginLeft: msg.role === "user" ? "auto" : 0,
           }}>
-            <Text size="xs" fw={600} c="blue" mb={8} tt="uppercase" style={{ letterSpacing: "0.05em" }}>
-              Work Plan
-            </Text>
-            <Text size="sm" style={{ whiteSpace: "pre-wrap" }} mb={8}>{plan.plan}</Text>
-            <Group gap="md">
-              <Text size="xs" c="dimmed">Model: {plan.estimatedModel.replace("claude-", "").replace("-4-6", " 4")}</Text>
-              <Text size="xs" c="dimmed">Est. cost: {plan.estimatedCost}</Text>
-            </Group>
-
-            {plan.context && (
-              <>
-                <Text size="xs" fw={600} c="dimmed" mt="md" mb={4}>Context fetched:</Text>
-                <Code block style={{ fontSize: "0.7rem", maxHeight: 200, overflow: "auto" }}>
-                  {plan.context.slice(0, 2000)}
-                </Code>
-              </>
-            )}
+            <Markdown content={msg.content} />
           </div>
+        ))}
+
+        {loading && (
+          <Group gap={8} py="sm">
+            <Loader size={14} />
+            <Text size="xs" c="dimmed">{conversation.length === 0 ? "Fetching context and analyzing..." : "Thinking..."}</Text>
+          </Group>
         )}
       </div>
 
-      {/* Actions */}
-      <div style={{ padding: "12px 24px", borderTop: "1px solid var(--mantine-color-default-border)" }}>
-        <Group gap="xs">
-          {!plan && n.stage === "new" && (
-            <UnstyledButton
-              onClick={handlePrepare}
-              style={{
-                padding: "8px 16px",
-                borderRadius: 6,
-                fontSize: "0.8rem",
-                fontWeight: 600,
-                backgroundColor: "var(--mantine-color-blue-5)",
-                color: "white",
-                opacity: preparing ? 0.7 : 1,
-              }}
-            >
-              {preparing ? <Group gap={6}><Loader size={12} color="white" /> Fetching context...</Group> : "Prepare work plan"}
+      {/* Input + actions */}
+      <div style={{ padding: "12px 20px", borderTop: "1px solid var(--mantine-color-default-border)", flexShrink: 0 }}>
+        {conversation.length === 0 ? (
+          <Group gap="xs">
+            <UnstyledButton onClick={handlePrepare} style={{
+              padding: "8px 16px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 600,
+              backgroundColor: "var(--mantine-color-blue-5)", color: "white",
+            }}>
+              Analyze & plan
             </UnstyledButton>
-          )}
-
-          {plan && !starting && (
-            <UnstyledButton
-              onClick={handleStart}
-              style={{
-                padding: "8px 16px",
-                borderRadius: 6,
-                fontSize: "0.8rem",
-                fontWeight: 600,
-                backgroundColor: "#22c55e",
-                color: "white",
-              }}
-            >
-              Approve & start agent
+            <UnstyledButton onClick={onDismiss} style={{
+              padding: "8px 16px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500,
+              backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-dimmed)",
+            }}>
+              Dismiss
             </UnstyledButton>
-          )}
-
-          {starting && (
-            <Group gap={6}>
-              <Loader size={14} />
-              <Text size="sm">Starting agent...</Text>
+          </Group>
+        ) : (
+          <Stack gap="xs">
+            <Group gap="xs">
+              <input
+                type="text"
+                placeholder="Push back, ask questions, or refine the plan..."
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleFeedback(); }}
+                disabled={loading || hasApproved}
+                style={{
+                  flex: 1, padding: "8px 12px", borderRadius: 6, fontSize: "0.8rem",
+                  backgroundColor: "var(--mantine-color-dark-6)",
+                  border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
+                  color: "var(--mantine-color-text)", outline: "none",
+                  fontFamily: "inherit",
+                }}
+              />
+              <UnstyledButton onClick={handleFeedback} disabled={!feedback.trim() || loading} style={{
+                padding: "8px 12px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500,
+                backgroundColor: "var(--mantine-color-dark-5)", color: "var(--mantine-color-dimmed)",
+              }}>
+                Send
+              </UnstyledButton>
             </Group>
-          )}
-
-          <UnstyledButton
-            onClick={onDismiss}
-            style={{
-              padding: "8px 16px",
-              borderRadius: 6,
-              fontSize: "0.8rem",
-              fontWeight: 500,
-              backgroundColor: "var(--mantine-color-dark-6)",
-              color: "var(--mantine-color-dimmed)",
-            }}
-          >
-            Dismiss
-          </UnstyledButton>
-        </Group>
+            <Group gap="xs">
+              {!hasApproved && (
+                <UnstyledButton onClick={handleApprove} style={{
+                  padding: "8px 16px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 600,
+                  backgroundColor: "#22c55e", color: "white",
+                }}>
+                  Approve plan & start agent
+                </UnstyledButton>
+              )}
+              <UnstyledButton onClick={onDismiss} style={{
+                padding: "8px 16px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500,
+                color: "var(--mantine-color-dimmed)",
+              }}>
+                Dismiss
+              </UnstyledButton>
+            </Group>
+          </Stack>
+        )}
       </div>
     </div>
   );

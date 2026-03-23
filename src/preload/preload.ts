@@ -21,8 +21,12 @@ const api = {
   // Work dispatcher
   prepareWorkPlan: (notification: { id: string; source: string; title: string; summary: string; url?: string }) =>
     ipcRenderer.invoke("work:prepare-plan", notification),
-  startWorkAgent: (plan: unknown) =>
-    ipcRenderer.invoke("work:start-agent", plan),
+  iteratePlan: (notificationId: string, feedback: string) =>
+    ipcRenderer.invoke("work:iterate-plan", { notificationId, feedback }),
+  getPlan: (notificationId: string) =>
+    ipcRenderer.invoke("work:get-plan", notificationId),
+  startWorkAgent: (notificationId: string) =>
+    ipcRenderer.invoke("work:start-agent", notificationId),
 
   // Session history
   listAllSessions: () => ipcRenderer.invoke("sessions:list-all"),
