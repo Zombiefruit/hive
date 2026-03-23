@@ -1,16 +1,12 @@
 /**
  * Notification polling service.
- * Periodically checks Slack, Linear, GitHub, Notion for new items
- * relevant to Kieran, using Claude Code's MCP connections.
- *
- * For now, this is a stub that produces mock notifications.
- * Real implementation will spawn lightweight Haiku agents to:
- * 1. Query each service via MCP tools
- * 2. Classify items as actionable/fyi/noise
- * 3. Store notifications in SQLite
+ * Spawns lightweight Haiku agents to query Slack, Linear, GitHub
+ * via Claude Code's MCP connections.
  */
 
 import { BrowserWindow } from "electron";
+import { query as sdkQuery } from "@anthropic-ai/claude-agent-sdk";
+import { getClaudeCodePath } from "../claude-path";
 
 export interface PollNotification {
   id: string;
@@ -25,19 +21,16 @@ export interface PollNotification {
 
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 const notifications: PollNotification[] = [];
+let isPolling = false;
 
-/**
- * Start the notification polling service.
- * Polls each source at different intervals.
- */
 export function startPolling(): void {
   if (pollInterval) return;
 
-  // Initial poll after 5 seconds
-  setTimeout(() => poll(), 5000);
+  // First poll after 10 seconds (let the app settle)
+  setTimeout(() => poll(), 10000);
 
-  // Then every 60 seconds
-  pollInterval = setInterval(() => poll(), 60000);
+  // Then every 2 minutes
+  pollInterval = setInterval(() => poll(), 120000);
 }
 
 export function stopPolling(): void {
@@ -48,7 +41,7 @@ export function stopPolling(): void {
 }
 
 export function getNotifications(): PollNotification[] {
-  return notifications;
+  return notifications.filter(n => n.status !== "dismissed" && n.status !== "done");
 }
 
 export function dismissNotification(id: string): void {
@@ -64,36 +57,114 @@ export function startWorkOnNotification(id: string): void {
 }
 
 function broadcastNotifications(): void {
+  const active = getNotifications();
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {
-      win.webContents.send("notifications:update", notifications.filter(n => n.status !== "dismissed" && n.status !== "done"));
+      win.webContents.send("notifications:update", active);
     }
   }
 }
 
 async function poll(): Promise<void> {
-  // TODO: Replace with real MCP tool calls
-  // For now, this is a stub. In production:
-  // 1. Spawn a Haiku agent with MCP tools
-  // 2. Ask it to check Slack mentions, Linear tickets, GitHub PRs
-  // 3. Classify each item
-  // 4. Store in notifications array
-  // 5. Broadcast to renderer
+  if (isPolling) return;
+  isPolling = true;
 
-  // Mock: occasionally add a notification
-  if (Math.random() < 0.3 && notifications.length < 10) {
-    const sources = ["slack", "linear", "github", "notion", "email"] as const;
-    const source = sources[Math.floor(Math.random() * sources.length)];
-    const n: PollNotification = {
-      id: `poll-${Date.now()}`,
-      source,
-      priority: Math.random() < 0.4 ? "actionable" : "fyi",
-      status: "new",
-      title: `[${source}] New activity detected`,
-      summary: `Polling service detected new ${source} activity.`,
+  try {
+    const result = await runTriageAgent();
+    if (result && result.length > 0) {
+      for (const n of result) {
+        // Deduplicate by title
+        if (!notifications.some(existing => existing.title === n.title)) {
+          notifications.unshift(n);
+        }
+      }
+      broadcastNotifications();
+    }
+  } catch (err) {
+    console.error("[PollService] Error:", err);
+  } finally {
+    isPolling = false;
+  }
+}
+
+/**
+ * Spawn a Haiku agent to check Slack mentions, Linear assignments,
+ * and GitHub review requests. Returns classified notifications.
+ */
+async function runTriageAgent(): Promise<PollNotification[]> {
+  const prompt = `You are a notification triage agent. Check the following and report back ONLY with a JSON array of notifications. No other text.
+
+Check these sources using the available MCP tools:
+
+1. **Slack**: Search for recent messages mentioning @U02PKBZSB9Q (Kieran Williams) in the last 2 hours. Use slack_search_public_and_private with query "to:<@U02PKBZSB9Q>" or "<@U02PKBZSB9Q>".
+
+2. **Linear**: Search for issues assigned to "kwilliams" that were recently updated. Use list_issues with assignee filter.
+
+3. **GitHub**: Check for any PR review requests. Search for PRs where review is requested.
+
+For each item found, classify as:
+- "actionable" — needs Kieran to DO something (respond, review, implement)
+- "fyi" — worth knowing, no action needed
+
+Return a JSON array (and NOTHING else) like:
+[{"source":"slack","priority":"actionable","title":"#team-vector: Yael asked about retry logic","summary":"Thread in #team-vector about deployment timeline","url":"https://montecarlodata.slack.com/archives/C0AMSV2SK4Z"}]
+
+If nothing new is found, return: []`;
+
+  try {
+    const q = sdkQuery({
+      prompt,
+      options: {
+        pathToClaudeCodeExecutable: getClaudeCodePath(),
+        model: "claude-haiku-4-5-20251001",
+        permissionMode: "bypassPermissions",
+        allowDangerouslySkipPermissions: true,
+        maxTurns: 5,
+        maxBudgetUsd: 0.05, // Keep costs low
+      },
+    });
+
+    let fullText = "";
+    for await (const message of q) {
+      if (message.type === "assistant") {
+        const content = message.message?.content;
+        if (Array.isArray(content)) {
+          for (const block of content as Array<{ type: string; text?: string }>) {
+            if (block.type === "text" && block.text) {
+              fullText += block.text;
+            }
+          }
+        }
+      } else if (message.type === "result") {
+        const result = (message as { result?: string }).result;
+        if (result) fullText = result;
+      }
+    }
+
+    // Parse the JSON response
+    const jsonMatch = fullText.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) return [];
+
+    const items = JSON.parse(jsonMatch[0]) as Array<{
+      source: string;
+      priority: string;
+      title: string;
+      summary: string;
+      url?: string;
+    }>;
+
+    return items.map(item => ({
+      id: `poll-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      source: item.source as PollNotification["source"],
+      priority: item.priority as PollNotification["priority"],
+      status: "new" as const,
+      title: item.title,
+      summary: item.summary,
+      url: item.url,
       createdAt: new Date().toISOString(),
-    };
-    notifications.unshift(n);
-    broadcastNotifications();
+    }));
+  } catch (err) {
+    console.error("[PollService] Triage agent failed:", err);
+    return [];
   }
 }

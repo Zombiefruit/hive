@@ -88,7 +88,34 @@ export function Dashboard() {
         >
           <Group gap="sm" style={{ WebkitAppRegion: "no-drag" }}>
             <Title order={4}>Claude Deck</Title>
-            <Text size="xs" c="dimmed">Agent fleet orchestration</Text>
+          </Group>
+          <Group gap={4} style={{ WebkitAppRegion: "no-drag" }}>
+            {[
+              { key: "agents", label: "Agents" },
+              { key: "inbox", label: "Inbox" },
+            ].map(tab => (
+              <UnstyledButton
+                key={tab.key}
+                onClick={() => {
+                  if (tab.key === "inbox") navigate("/notifications");
+                }}
+                style={{
+                  padding: "4px 12px",
+                  borderRadius: 6,
+                  fontSize: "0.8rem",
+                  fontWeight: 500,
+                  backgroundColor: tab.key === "agents" ? "var(--mantine-color-dark-6)" : "transparent",
+                  color: tab.key === "agents" ? "var(--mantine-color-text)" : "var(--mantine-color-dimmed)",
+                }}
+              >
+                {tab.label}
+                {tab.key === "inbox" && (
+                  <Badge variant="filled" color="blue" size="xs" ml={6}>
+                    {pendingCount || "0"}
+                  </Badge>
+                )}
+              </UnstyledButton>
+            ))}
           </Group>
           <Group gap="xs" style={{ WebkitAppRegion: "no-drag" }}>
             <UnstyledButton
