@@ -179,22 +179,28 @@ export function Notifications() {
   }, []);
 
   // Trigger agent actions for a card (call AFTER moveCardToStage)
-  const triggerStageAction = useCallback((id: string, newStage: string, context?: string) => {
-    const n = notifications.find(n => n.id === id);
-    if (!n) return;
+  // Use a ref to always have current notifications (avoids stale closure)
+  const notificationsRef = useRef(notifications);
+  notificationsRef.current = notifications;
 
-    const enrichedSummary = context ? `${n.summary}\n\nUser context: ${context}` : n.summary;
+  const triggerStageAction = useCallback((id: string, newStage: string) => {
+    // Use ref to get current state, not stale closure
+    const n = notificationsRef.current.find(n => n.id === id);
+    if (!n) {
+      console.warn(`[triggerStageAction] notification ${id} not found`);
+      return;
+    }
 
     if (newStage === "planning") {
       setSelectedId(id);
       window.deck.prepareWorkPlan?.({
-        id: n.id, source: n.source, title: n.title, summary: enrichedSummary, url: n.url,
+        id: n.id, source: n.source, title: n.title, summary: n.summary, url: n.url,
         taskType: n.taskType, links: n.links,
-      }).catch(() => {});
+      }).catch((err: unknown) => console.error("[planning] prepareWorkPlan failed:", err));
     } else if (newStage === "working") {
-      window.deck.startWorkAgent?.(id).catch(() => {});
+      window.deck.startWorkAgent?.(id).catch((err: unknown) => console.error("[working] startWorkAgent failed:", err));
     }
-  }, [notifications]);
+  }, []);
 
   const handleStageButton = useCallback((id: string, newStage: string) => {
     moveCardToStage(id, newStage);
@@ -368,6 +374,7 @@ export function Notifications() {
                     onDrop={(e) => {
                       e.preventDefault();
                       setDragOverStage(null);
+                      setDraggingId(null);
                       const id = e.dataTransfer.getData("text/plain");
                       if (id) {
                         moveCardToStage(id, stage.key);

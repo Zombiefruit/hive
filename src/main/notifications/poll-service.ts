@@ -420,32 +420,37 @@ Process this like Kieran would going through his inbox.
 
 ## CRITICAL RULES
 
-1. **VERIFY before including**: Done/merged/closed/resolved items → skip.
+1. **TIME FILTER — MOST IMPORTANT**: The current time in Israel is ${israelTime}. ANY event, meeting, or deadline that has ALREADY PASSED must go to "skipped" with reason "Already passed". Do NOT include past meetings as actionable. A meeting at "7 PM Israel time yesterday" is OVER — skip it.
 
-2. **Direct asks from managers/leads = highest priority**: Yael Chemla (manager) or team lead asks = confidence 10.
+2. **AGGRESSIVE CROSS-SOURCE DEDUP**: A Linear ticket and a Slack thread about the SAME deliverable = ONE item. A PR review request in GitHub AND a Slack message about the same PR = ONE item. When merging, keep the item with the most context and add ALL links from both sources. If a Slack thread is just discussing a Linear ticket, the ticket is the item — include the Slack thread as a link.
 
-3. **Consolidate**: Slack mention + Linear ticket about same thing = ONE item with ALL links.
+3. **Done/merged/closed/resolved → skip.** Don't include completed work.
 
-4. **UNREAD THREADS ARE HIGH PRIORITY**: If someone tagged/messaged Kieran in a thread and he hasn't replied, that is an actionable "response" item. Don't skip these.
+4. **Direct asks from managers/leads = highest priority**: Yael Chemla (manager) or team lead asks = confidence 10.
 
-5. **Classify task type**:
+5. **UNREAD THREADS ARE HIGH PRIORITY**: If someone tagged/messaged Kieran in a thread and he hasn't replied, that is an actionable "response" item. Don't skip these.
+
+6. **Classify task type**:
    - "implementation" — code work needed
    - "review" — PR needs review
    - "response" — someone messaged Kieran and expects a reply
    - "investigation" — "look into this" type request
    - "planning" — needs a plan/RFC
-   - "meeting_prep" — upcoming meeting (only if it HASN'T happened yet in Israel time)
-   - "follow_up" — Kieran already responded but needs to check back later (e.g., waiting for someone's reply)
-
-6. **Timezone**: Evaluate ALL times in Israel timezone. Past meetings = skip. Upcoming = include.
+   - "meeting_prep" — upcoming meeting that HASN'T happened yet
+   - "follow_up" — Kieran already responded but needs to check back later
 
 7. **#agentic-engineering tips**: Actionable suggestions (scripts, tools, configs to try) = include as task_type "investigation".
+
+## DEDUP EXAMPLES
+- Linear VEC-10 "Add Fig Intelligence UI" + Slack thread from Yael about FIG → ONE item titled "VEC-10: Add Fig Intelligence UI" with links to both
+- Slack DM about PR #12441 + GitHub PR #12441 review request → ONE item "Review PR #12441" with both links
+- Calendar "Team Sync at 7PM" but it's now 12:28AM the next day → SKIP (already happened)
 
 Return a JSON object with THREE arrays:
 {
   "actionable": [... items needing immediate action ...],
-  "follow_up": [... items Kieran already handled but should recheck later (waiting for reply, monitoring, etc.) ...],
-  "skipped": [... items reviewed and not relevant ...]
+  "follow_up": [... items to recheck later ...],
+  "skipped": [... reviewed and not relevant ...]
 }
 
 Each actionable/follow_up item:
@@ -459,7 +464,8 @@ Rules:
 - Unread thread where Kieran was tagged = confidence 8+
 - Include ALL related links per item
 - Sort by confidence (highest first)
-- Include EVERYTHING in one of the three arrays. Nothing silently dropped.`;
+- EVERY raw item must appear in exactly ONE of the three arrays. Nothing silently dropped.
+- When in doubt about dedup, MERGE into one item with all links rather than showing duplicates.`;
 
     const response = await askBridge(triagePrompt, 180000); // 3 min — single combined request
     logPoll(`Poll complete: ${response.length} chars`);
