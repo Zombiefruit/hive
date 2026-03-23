@@ -1,4 +1,4 @@
-import { Badge, Group, ScrollArea, Stack, Text, UnstyledButton } from "@mantine/core";
+import { Badge, Code, Group, Loader, ScrollArea, Stack, Text, UnstyledButton } from "@mantine/core";
 import {
   IconInbox, IconSparkles, IconClock, IconPlayerPlay, IconGitPullRequest, IconCircleCheck,
   IconBrandGithub, IconHash, IconMail, IconFileText, IconChevronRight,
@@ -290,72 +290,183 @@ export function Notifications() {
 
       {/* Detail pane */}
       {selected && (
-        <div
-          style={{
-            position: "fixed",
-            top: 52,
-            right: 0,
-            bottom: 0,
-            width: "40%",
-            backgroundColor: "var(--mantine-color-dark-8)",
-            borderLeft: "1px solid var(--mantine-color-default-border)",
-            padding: 24,
-            overflowY: "auto",
-            zIndex: 100,
-          }}
-        >
-          <Group justify="space-between" mb="md">
-            <Badge color={STAGES.find(s => s.key === selected.stage)?.color ?? "gray"} size="sm">
-              {STAGES.find(s => s.key === selected.stage)?.label}
-            </Badge>
-            <UnstyledButton onClick={() => setSelectedId(null)}>
-              <Text size="xs" c="dimmed">Close</Text>
-            </UnstyledButton>
-          </Group>
-          <Text size="lg" fw={600} mb="sm">{selected.title}</Text>
-          <Text size="sm" c="dimmed" mb="md">{selected.summary}</Text>
+        <DetailPane
+          notification={selected}
+          onClose={() => setSelectedId(null)}
+          onAdvance={() => advanceStage(selected.id)}
+          onDismiss={() => dismiss(selected.id)}
+        />
+      )}
+    </div>
+  );
+}
 
-          {selected.url && (
+function DetailPane({ notification: n, onClose, onAdvance, onDismiss }: {
+  notification: NotificationItem;
+  onClose: () => void;
+  onAdvance: () => void;
+  onDismiss: () => void;
+}) {
+  const [plan, setPlan] = useState<{ title: string; context: string; plan: string; estimatedModel: string; estimatedCost: string } | null>(null);
+  const [preparing, setPreparing] = useState(false);
+  const [starting, setStarting] = useState(false);
+
+  const handlePrepare = async () => {
+    setPreparing(true);
+    try {
+      const result = await window.deck.prepareWorkPlan({
+        id: n.id, source: n.source, title: n.title, summary: n.summary, url: n.url,
+      });
+      setPlan(result as typeof plan);
+    } catch {}
+    setPreparing(false);
+  };
+
+  const handleStart = async () => {
+    if (!plan) return;
+    setStarting(true);
+    try {
+      await window.deck.startWorkAgent(plan);
+      onAdvance(); // Move to "in_progress" stage
+    } catch {}
+    setStarting(false);
+  };
+
+  const stage = STAGES.find(s => s.key === (n.stage ?? "new"));
+  const Icon = sourceIcons[n.source] ?? IconFileText;
+  const color = sourceColors[n.source] ?? "#6b7280";
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 52,
+        right: 0,
+        bottom: 0,
+        width: "40%",
+        backgroundColor: "var(--mantine-color-dark-8)",
+        borderLeft: "1px solid var(--mantine-color-default-border)",
+        overflowY: "auto",
+        zIndex: 100,
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* Header */}
+      <div style={{ padding: "16px 24px", borderBottom: "1px solid var(--mantine-color-default-border)" }}>
+        <Group justify="space-between" mb={8}>
+          <Group gap="xs">
+            <Icon size={16} color={color} />
+            <Badge color={stage?.color ?? "gray"} size="sm">{stage?.label ?? n.stage}</Badge>
+          </Group>
+          <UnstyledButton onClick={onClose}>
+            <Text size="xs" c="dimmed">Close</Text>
+          </UnstyledButton>
+        </Group>
+        <Text size="lg" fw={600}>{n.title}</Text>
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, padding: 24, overflowY: "auto" }}>
+        <Text size="sm" c="dimmed" mb="md">{n.summary}</Text>
+
+        {n.url && (
+          <UnstyledButton
+            onClick={() => window.deck.openExternal(n.url!)}
+            style={{ color: "var(--mantine-color-blue-4)", fontSize: "0.8rem", marginBottom: 16, display: "block" }}
+          >
+            Open in browser →
+          </UnstyledButton>
+        )}
+
+        {/* Work plan section */}
+        {plan && (
+          <div style={{
+            padding: 16,
+            borderRadius: 8,
+            backgroundColor: "var(--mantine-color-dark-7)",
+            border: "1px solid color-mix(in srgb, var(--mantine-color-blue-5) 30%, transparent)",
+            marginBottom: 16,
+          }}>
+            <Text size="xs" fw={600} c="blue" mb={8} tt="uppercase" style={{ letterSpacing: "0.05em" }}>
+              Work Plan
+            </Text>
+            <Text size="sm" style={{ whiteSpace: "pre-wrap" }} mb={8}>{plan.plan}</Text>
+            <Group gap="md">
+              <Text size="xs" c="dimmed">Model: {plan.estimatedModel.replace("claude-", "").replace("-4-6", " 4")}</Text>
+              <Text size="xs" c="dimmed">Est. cost: {plan.estimatedCost}</Text>
+            </Group>
+
+            {plan.context && (
+              <>
+                <Text size="xs" fw={600} c="dimmed" mt="md" mb={4}>Context fetched:</Text>
+                <Code block style={{ fontSize: "0.7rem", maxHeight: 200, overflow: "auto" }}>
+                  {plan.context.slice(0, 2000)}
+                </Code>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div style={{ padding: "12px 24px", borderTop: "1px solid var(--mantine-color-default-border)" }}>
+        <Group gap="xs">
+          {!plan && n.stage === "new" && (
             <UnstyledButton
-              onClick={() => window.deck.openExternal(selected.url!)}
-              style={{ color: "var(--mantine-color-blue-4)", fontSize: "0.8rem", marginBottom: 16 }}
+              onClick={handlePrepare}
+              style={{
+                padding: "8px 16px",
+                borderRadius: 6,
+                fontSize: "0.8rem",
+                fontWeight: 600,
+                backgroundColor: "var(--mantine-color-blue-5)",
+                color: "white",
+                opacity: preparing ? 0.7 : 1,
+              }}
             >
-              Open in browser →
+              {preparing ? <Group gap={6}><Loader size={12} color="white" /> Fetching context...</Group> : "Prepare work plan"}
             </UnstyledButton>
           )}
 
-          <Group gap="xs" mt="md">
-            {selected.stage !== "done" && (
-              <UnstyledButton
-                onClick={() => advanceStage(selected.id)}
-                style={{
-                  padding: "6px 14px",
-                  borderRadius: 6,
-                  fontSize: "0.75rem",
-                  fontWeight: 600,
-                  backgroundColor: "var(--mantine-color-blue-5)",
-                  color: "white",
-                }}
-              >
-                Advance stage
-              </UnstyledButton>
-            )}
+          {plan && !starting && (
             <UnstyledButton
-              onClick={() => dismiss(selected.id)}
+              onClick={handleStart}
               style={{
-                padding: "6px 14px",
+                padding: "8px 16px",
                 borderRadius: 6,
-                fontSize: "0.75rem",
-                fontWeight: 500,
-                backgroundColor: "var(--mantine-color-dark-6)",
-                color: "var(--mantine-color-dimmed)",
+                fontSize: "0.8rem",
+                fontWeight: 600,
+                backgroundColor: "#22c55e",
+                color: "white",
               }}
             >
-              Dismiss
+              Approve & start agent
             </UnstyledButton>
-          </Group>
-        </div>
-      )}
+          )}
+
+          {starting && (
+            <Group gap={6}>
+              <Loader size={14} />
+              <Text size="sm">Starting agent...</Text>
+            </Group>
+          )}
+
+          <UnstyledButton
+            onClick={onDismiss}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 6,
+              fontSize: "0.8rem",
+              fontWeight: 500,
+              backgroundColor: "var(--mantine-color-dark-6)",
+              color: "var(--mantine-color-dimmed)",
+            }}
+          >
+            Dismiss
+          </UnstyledButton>
+        </Group>
+      </div>
     </div>
   );
 }

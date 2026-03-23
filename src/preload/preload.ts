@@ -18,6 +18,12 @@ const api = {
   respondToApproval: (approvalId: string, approved: boolean) =>
     ipcRenderer.invoke("agent:approval-response", { approvalId, approved }),
 
+  // Work dispatcher
+  prepareWorkPlan: (notification: { id: string; source: string; title: string; summary: string; url?: string }) =>
+    ipcRenderer.invoke("work:prepare-plan", notification),
+  startWorkAgent: (plan: unknown) =>
+    ipcRenderer.invoke("work:start-agent", plan),
+
   // Session history
   listAllSessions: () => ipcRenderer.invoke("sessions:list-all"),
 

@@ -12,6 +12,7 @@ import { addContextFromUrl } from "./agents/context-tracker";
 import { listAllSessions } from "./agents/session-history";
 import { startPolling, stopPolling, getNotifications, dismissNotification, startWorkOnNotification } from "./notifications/poll-service";
 import { startBridge, stopBridge, getBridgeDebugLog } from "./mcp-bridge";
+import { prepareWorkPlan, startWorkAgent } from "./notifications/work-dispatcher";
 import {
   initManager,
   setManagerStreamCallback,
@@ -138,6 +139,15 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("notifications:start-work", (_event, id: string) => {
     startWorkOnNotification(id);
+  });
+
+  // Work dispatcher
+  ipcMain.handle("work:prepare-plan", async (_event, notification: { id: string; source: string; title: string; summary: string; url?: string }) => {
+    return await prepareWorkPlan(notification);
+  });
+
+  ipcMain.handle("work:start-agent", (_event, plan: { notificationId: string; title: string; context: string; plan: string; estimatedModel: string; estimatedCost: string }) => {
+    return startWorkAgent(plan);
   });
 
   // Start MCP Bridge (persistent Claude Code process for Slack/Linear/etc.)
