@@ -210,6 +210,7 @@ export function Notifications() {
   // Native HTML5 drag-and-drop state
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
+  const wasDragging = useRef(false);
 
   const dismiss = (id: string) => {
     // Don't delete — move to done
@@ -413,9 +414,9 @@ export function Notifications() {
                             <div
                               key={n.id}
                               draggable
-                              onDragStart={(e) => { e.dataTransfer.setData("text/plain", n.id); setDraggingId(n.id); }}
-                              onDragEnd={() => { setDraggingId(null); setDragOverStage(null); }}
-                              onClick={() => setSelectedId(n.id === selectedId ? null : n.id)}
+                              onDragStart={(e) => { e.dataTransfer.setData("text/plain", n.id); setDraggingId(n.id); wasDragging.current = true; }}
+                              onDragEnd={() => { setDraggingId(null); setDragOverStage(null); setTimeout(() => { wasDragging.current = false; }, 50); }}
+                              onClick={() => { if (wasDragging.current) return; setSelectedId(n.id === selectedId ? null : n.id); }}
                               className="notif-card"
                               style={{
                                 padding: "10px 12px", borderRadius: 6, cursor: "grab", userSelect: "none",
@@ -588,17 +589,27 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss }: {
   const [hasApproved, setHasApproved] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Load existing plan on mount
+  // Load existing plan on mount, and poll while in planning stage
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+    const loadPlan = async () => {
       try {
-        const existing = await window.deck.getPlan(n.id);
+        const existing = await window.deck?.getPlan?.(n.id);
+        if (cancelled) return;
         if (existing && (existing as { conversationHistory: typeof conversation }).conversationHistory?.length > 0) {
           setConversation((existing as { conversationHistory: typeof conversation }).conversationHistory);
+          setLoading(false);
+        } else if (n.stage === "planning") {
+          // Plan is being prepared — show loading and keep polling
+          setLoading(true);
         }
       } catch {}
-    })();
-  }, [n.id]);
+    };
+    loadPlan();
+    // Poll every 3s while in planning stage to pick up plan updates
+    const interval = n.stage === "planning" ? setInterval(loadPlan, 3000) : undefined;
+    return () => { cancelled = true; if (interval) clearInterval(interval); };
+  }, [n.id, n.stage]);
 
   // Auto-scroll on new messages
   useEffect(() => {

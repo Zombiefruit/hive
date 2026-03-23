@@ -179,31 +179,32 @@ export async function prepareWorkPlan(notification: {
     ? `## MANDATORY: Fetch Context First\nYou MUST execute these MCP calls before creating a plan. Do NOT skip any.\n${fetchSteps.map((s, i) => `${i + 1}. ${s}`).join("\n")}\n`
     : "";
 
-  const prompt = `I need you to analyze this work item and create a detailed plan.
+  // Build the prompt — fetch ALL context first, then plan
+  const prompt = `You are planning work for Kieran Williams, a Senior Frontend Engineer at Monte Carlo Data (Vector team). The main codebase is at ~/Documents/GitHub/frontend (React + TypeScript + Mantine).
 
-${fetchInstructions}
-## Task Type: ${taskType}
-${skillPrompt ? `\n## Skill Instructions\n${skillPrompt}\n` : ""}
+## STEP 1: FETCH ALL CONTEXT (do this FIRST, before writing anything)
 
-## Notification
-- **Source**: ${notification.source}
+${fetchSteps.length > 0 ? fetchSteps.map((s, i) => `${i + 1}. ${s}`).join("\n") : "No specific links to fetch — use the summary below."}
+${notification.source === "linear" ? `\nAlso: Search Linear for any related issues or parent epics.` : ""}
+${notification.source === "slack" ? `\nAlso: Read the full Slack thread to understand the complete context.` : ""}
+
+## STEP 2: CREATE A CONCISE PLAN (after fetching context)
+
+## Work Item
+- **Type**: ${taskType}
 - **Title**: ${notification.title}
 - **Summary**: ${notification.summary}
 ${notification.url ? `- **URL**: ${notification.url}` : ""}
-${linksText ? `\n## Related Links\n${linksText}` : ""}
-${ghContext ? `\n## GitHub Context (pre-fetched)\n${ghContext}` : ""}
+${linksText ? `\n**Links:**\n${linksText}` : ""}
+${ghContext ? `\n**GitHub (pre-fetched):**\n${ghContext}` : ""}
 
-## CRITICAL: You MUST fetch full context using MCP tools BEFORE creating a plan.
-Do NOT just use the summary above. The summary is a triage overview — you need the ACTUAL data.
+Based on the context you fetched, write a SHORT plan (max 10 lines):
+1. What needs to be done (1-2 sentences, reference specifics from the context)
+2. Key files/components to modify
+3. Estimated complexity (simple/moderate/complex)
+4. Any blockers or dependencies
 
-After fetching context, create a plan that includes:
-- What exactly needs to be done (be specific, reference actual content you fetched)
-- Recommended approach
-- Which files/areas of the codebase are likely involved
-- Best model (Haiku for simple, Sonnet for moderate, Opus for complex)
-- Risks or things to watch out for
-
-Be specific and actionable — reference the actual ticket description, Slack messages, or PR details you fetched.`;
+Do NOT ask questions. Do NOT say "I need more info". Use what you have and what you can fetch via MCP tools. If you can't access something, note it and plan around it.`;
 
   const response = await askBridge(prompt, 90000);
   log(`Plan response: ${response.length} chars`);
