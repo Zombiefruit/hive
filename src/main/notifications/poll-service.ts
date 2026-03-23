@@ -237,7 +237,10 @@ Rules:
 
     logPoll(`Parsed ${items.length} notifications`);
 
-    // Dedup by extracting a stable resource key from each notification
+    // Clear existing notifications — each poll is a fresh, complete picture
+    notifications.length = 0;
+
+    // Dedup within this batch by extracting a stable resource key
     function extractKey(n: { source: string; title: string; url?: string }): string {
       // Extract IDs from URLs
       if (n.url) {
