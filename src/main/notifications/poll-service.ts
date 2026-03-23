@@ -1,6 +1,7 @@
 import { BrowserWindow } from "electron";
 import { execFile } from "node:child_process";
 import { getClaudeCodePath } from "../claude-path";
+import { getAllAgents, getAllContextRefs } from "../db/database";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -95,10 +96,55 @@ function broadcastNotifications(): void {
   }
 }
 
+function seedFromContextRefs(): void {
+  try {
+    const agents = getAllAgents();
+    const allRefs = getAllContextRefs();
+    const agentMap = new Map(agents.map(a => [a.id, a]));
+
+    for (const ref of allRefs) {
+      const agent = agentMap.get(ref.agentId);
+      if (!agent) continue;
+
+      const sourceMap: Record<string, PollNotification["source"]> = {
+        linear: "linear", slack: "slack", notion: "notion", github: "github",
+      };
+      const source = sourceMap[ref.type];
+      if (!source) continue;
+
+      if (notifications.some(n => n.title === ref.title)) continue;
+
+      notifications.push({
+        id: `seed-${ref.id}`,
+        source,
+        priority: ref.type === "linear" || ref.type === "github" ? "actionable" : "fyi",
+        status: "new",
+        title: ref.title,
+        summary: `Detected from agent: ${agent.task.slice(0, 60)}`,
+        url: ref.url ?? undefined,
+        createdAt: ref.detectedAt,
+      });
+    }
+
+    if (notifications.length > 0) {
+      logPoll(`Seeded ${notifications.length} notifications from context refs`);
+      saveCacheToFile();
+      broadcastNotifications();
+    }
+  } catch (err) {
+    logPoll(`Seed error: ${String(err)}`);
+  }
+}
+
 async function poll(): Promise<void> {
   if (isPolling) return;
   isPolling = true;
   logPoll("poll starting");
+
+  // Seed from agent context refs if inbox is empty
+  if (notifications.length === 0) {
+    seedFromContextRefs();
+  }
 
   try {
     const result = await runTriageViaCli();
@@ -135,7 +181,7 @@ Return ONLY a JSON array of notifications, no other text:
 
 If nothing found, return: []`;
 
-    logPoll("spawning claude CLI for triage");
+    logPoll("spawning claude CLI for triage (note: claude.ai MCP servers not available in -p mode, agent will use what tools it has)");
 
     const child = execFile(claudePath, [
       "-p", prompt,
