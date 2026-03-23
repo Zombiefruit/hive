@@ -10,7 +10,7 @@ import { enrichExternalAgents } from "./agents/session-enricher";
 import { startSessionTailing, stopSessionTailing } from "./agents/session-tailer";
 import { addContextFromUrl } from "./agents/context-tracker";
 import { listAllSessions } from "./agents/session-history";
-import { startPolling, stopPolling, getNotifications, dismissNotification, startWorkOnNotification, clearAllNotifications, forcePoll, hasPolledOnce, getSkippedItems } from "./notifications/poll-service";
+import { startPolling, stopPolling, getNotifications, dismissNotification, startWorkOnNotification, clearAllNotifications, forcePoll, hasPolledOnce, getSkippedItems, updateNotificationByTitle } from "./notifications/poll-service";
 import { startBridge, stopBridge, getBridgeDebugLog } from "./mcp-bridge";
 import { prepareWorkPlan, iteratePlan, startWorkAgent, getPlan, getAllPlans, getActiveWorkAgents } from "./notifications/work-dispatcher";
 import { startMonitoring, stopMonitoring } from "./notifications/agent-monitor";
@@ -146,6 +146,9 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("notifications:refresh", (_event, lookbackHours?: number) => {
     forcePoll(lookbackHours);
+  });
+  ipcMain.handle("notifications:update-by-title", (_event, data: { titleSubstring: string; changes: Record<string, unknown> }) => {
+    return updateNotificationByTitle(data.titleSubstring, data.changes);
   });
 
   // Work dispatcher

@@ -1,4 +1,5 @@
 import { app } from "electron";
+import { updateNotificationByTitle } from "../notifications/poll-service";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
@@ -155,10 +156,20 @@ function buildSystemPrompt(): string {
 You manage a fleet of Claude Code agents for Kieran Williams (Senior Engineer at Monte Carlo Data, Vector team).
 
 ## Capabilities
-You have fleet management tools (via MCP). Use them to:
-- Spawn agents, monitor progress, send messages, approve commands
-- Choose models wisely: Haiku (simple), Sonnet (features), Opus (complex)
-- Auto-approve safe operations, escalate destructive ones to the user
+You manage Kieran's notification inbox and agent fleet. You can:
+- Discuss tasks and help prioritize
+- Update task state by including action blocks in your response
+- Spawn agents when work is approved
+
+## Updating tasks
+When Kieran asks you to change a task's priority, mark it done, or change its stage,
+include a JSON action block in your response (on its own line):
+{"action": "update_task", "task_title": "partial title match", "changes": {"priority": "low", "stage": "done", "confidence": 3}}
+
+Valid changes: priority (urgent/today/low), stage (new/planning/awaiting_approval/in_progress/pr_ready/done), confidence (1-10), status (done/dismissed)
+
+Example: User says "downgrade the sync meeting" → you respond with text AND:
+{"action": "update_task", "task_title": "sync meeting", "changes": {"confidence": 3, "stage": "done"}}
 
 ## Current Fleet State
 ${fleetSummary}
@@ -243,7 +254,37 @@ export function setManagerStreamCallback(cb: (event: ManagerStreamEvent) => void
 }
 
 /**
- * Send a message to the Manager AI using the Agent SDK (inherits Claude Code SSO auth).
+ * Parse Manager response for action blocks and execute them.
+ * The Manager can include JSON action blocks like:
+ * {"action": "update_task", "task_title": "...", "changes": {...}}
+ */
+function parseAndExecuteActions(content: string): void {
+  const actionPattern = /\{[^}]*"action"\s*:\s*"update_task"[^}]*\}/g;
+  const matches = content.match(actionPattern);
+  if (!matches) return;
+
+  for (const match of matches) {
+    try {
+      const action = JSON.parse(match);
+      if (action.action === "update_task" && action.task_title) {
+        const changes: Record<string, unknown> = {};
+        if (action.changes) Object.assign(changes, action.changes);
+        if (action.priority) changes.priority = action.priority;
+        if (action.status) changes.status = action.status;
+        if (action.stage) changes.stage = action.stage;
+        if (action.confidence) changes.confidence = action.confidence;
+
+        const updated = updateNotificationByTitle(action.task_title, changes);
+        if (updated) {
+          console.log(`[Manager] Updated task "${action.task_title}":`, changes);
+        }
+      }
+    } catch {}
+  }
+}
+
+/**
+ * Send a message to the Manager AI.
  */
 export async function sendManagerMessage(userMessage: string): Promise<ManagerMessage> {
   const conversation = getActiveConversation();
@@ -300,6 +341,9 @@ export async function sendManagerMessage(userMessage: string): Promise<ManagerMe
     });
 
     emit({ type: "text_delta", text: assistantContent });
+
+    // Parse and execute any action blocks in the response
+    parseAndExecuteActions(assistantContent);
 
     const assistantMsg: ManagerMessage = {
       id: crypto.randomUUID(),

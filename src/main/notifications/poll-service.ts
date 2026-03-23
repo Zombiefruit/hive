@@ -85,6 +85,16 @@ export function forcePoll(lookbackHours?: number): void {
   poll();
 }
 
+export function updateNotificationByTitle(titleSubstring: string, changes: Record<string, unknown>): boolean {
+  const n = notifications.find(n => n.title.toLowerCase().includes(titleSubstring.toLowerCase()));
+  if (!n) return false;
+  Object.assign(n, changes);
+  saveCacheToFile();
+  broadcastNotifications();
+  logPoll(`Updated "${n.title.slice(0, 40)}" with: ${JSON.stringify(changes)}`);
+  return true;
+}
+
 export function dismissNotification(id: string): void {
   const n = notifications.find(n => n.id === id);
   if (n) n.status = "dismissed";
@@ -158,7 +168,7 @@ async function poll(): Promise<void> {
 
 ## Step 1: Gather data
 Use your MCP tools to fetch from ALL these sources for ${timeDesc}:
-- **Slack**: @mentions of <@U02PKBZSB9Q>, DMs, thread replies
+- **Slack**: @mentions of <@U02PKBZSB9Q>, DMs, thread replies in threads where Kieran was mentioned, AND mentions of @frontend (team handle). Also check channels #team-vector (C0AMSV2SK4Z) and #team-vector-standup (C0AMT1AGN7K) for recent messages directed at Kieran or the frontend team
 - **Linear**: Issues assigned to kwilliams (all statuses)
 - **GitHub**: Open PRs where Kieran is reviewer or author (VERIFY actual state — don't include merged/closed)
 - **Gmail**: Unread emails
