@@ -13,6 +13,7 @@ import { listAllSessions } from "./agents/session-history";
 import { startPolling, stopPolling, getNotifications, dismissNotification, startWorkOnNotification, clearAllNotifications, forcePoll } from "./notifications/poll-service";
 import { startBridge, stopBridge, getBridgeDebugLog } from "./mcp-bridge";
 import { prepareWorkPlan, iteratePlan, startWorkAgent, getPlan, getAllPlans } from "./notifications/work-dispatcher";
+import { startMonitoring, stopMonitoring } from "./notifications/agent-monitor";
 import {
   initManager,
   setManagerStreamCallback,
@@ -174,6 +175,9 @@ app.whenReady().then(() => {
   // Start notification polling (uses bridge for MCP access)
   startPolling();
 
+  // Start agent monitoring loop
+  startMonitoring();
+
   // Initialize Manager AI
   initManager();
   setManagerStreamCallback((event) => {
@@ -265,6 +269,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  stopMonitoring();
   stopBridge();
   stopPolling();
   stopSessionTailing();

@@ -12,6 +12,7 @@ import { askBridge, isBridgeReady } from "../mcp-bridge";
 import { spawn, ChildProcess } from "node:child_process";
 import { getClaudeCodePath } from "../claude-path";
 import { BrowserWindow } from "electron";
+import { registerAgent, recordAgentEvent, unregisterAgent } from "./agent-monitor";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -239,6 +240,7 @@ Write the prompt as if you're giving instructions to a skilled developer. Be tho
     session_id: "",
   });
   proc.stdin?.write(message + "\n");
+  registerAgent(agentId, plan.title);
 
   // Parse agent output and broadcast events to the UI
   let outputBuffer = "";
@@ -253,6 +255,7 @@ Write the prompt as if you're giving instructions to a skilled developer. Be tho
         const msg = JSON.parse(line);
         const event = parseAgentEvent(msg);
         if (event) {
+          recordAgentEvent(agentId);
           broadcastTaskEvent(agentId, event);
         }
       } catch {}
@@ -270,6 +273,7 @@ Write the prompt as if you're giving instructions to a skilled developer. Be tho
   proc.on("exit", (code) => {
     log(`Work agent ${agentId} exited: ${code}`);
     activeWorkAgents.delete(agentId);
+    unregisterAgent(agentId);
     broadcastTaskEvent(agentId, {
       timestamp: new Date().toISOString(),
       type: "completed",
