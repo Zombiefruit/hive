@@ -143,8 +143,8 @@ app.whenReady().then(() => {
   ipcMain.handle("notifications:clear", () => {
     clearAllNotifications();
   });
-  ipcMain.handle("notifications:refresh", () => {
-    forcePoll();
+  ipcMain.handle("notifications:refresh", (_event, lookbackHours?: number) => {
+    forcePoll(lookbackHours);
   });
 
   // Work dispatcher

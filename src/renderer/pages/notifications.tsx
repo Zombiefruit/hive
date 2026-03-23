@@ -112,6 +112,7 @@ export function Notifications() {
   };
 
   const [showDebug, setShowDebug] = useState(false);
+  const [lookbackHours, setLookbackHours] = useState(6);
   const [debugEntries, setDebugEntries] = useState<Array<{ timestamp: string; direction: string; content: string }>>([]);
 
   useEffect(() => {
@@ -175,8 +176,25 @@ export function Notifications() {
               <Text size="xs" c="dimmed">{notifications.length} items</Text>
             </>
           )}
+          <select
+            value={lookbackHours}
+            onChange={(e) => setLookbackHours(Number(e.target.value))}
+            style={{
+              padding: "2px 6px", borderRadius: 4, fontSize: "0.65rem",
+              backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-dimmed)",
+              border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
+              outline: "none", cursor: "pointer",
+            }}
+          >
+            <option value={2}>Last 2h</option>
+            <option value={6}>Last 6h</option>
+            <option value={12}>Last 12h</option>
+            <option value={24}>Last 24h</option>
+            <option value={48}>Last 2 days</option>
+            <option value={168}>Last week</option>
+          </select>
           <UnstyledButton
-            onClick={() => { setFetching(true); window.deck.refreshNotifications(); }}
+            onClick={() => { setFetching(true); window.deck.refreshNotifications(lookbackHours); }}
             style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-dimmed)" }}
           >
             Refresh

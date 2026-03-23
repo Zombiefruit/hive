@@ -61,7 +61,10 @@ export function clearAllNotifications(): void {
   broadcastNotifications();
 }
 
-export function forcePoll(): void {
+let nextLookbackHours = 6;
+
+export function forcePoll(lookbackHours?: number): void {
+  if (lookbackHours) nextLookbackHours = lookbackHours;
   poll();
 }
 
@@ -124,18 +127,21 @@ async function poll(): Promise<void> {
 
   try {
     // PASS 1: Gather all raw data from all sources
-    logPoll("Pass 1: Gathering raw data from all sources");
+    const hours = nextLookbackHours;
+    nextLookbackHours = 6; // Reset to default after use
+    logPoll(`Pass 1: Gathering raw data (lookback: ${hours}h)`);
+    const timeDesc = hours <= 6 ? `the last ${hours} hours` : hours <= 24 ? `the last ${hours} hours` : hours <= 48 ? "the last 2 days" : "the last week";
     const gatherPrompt = `You are gathering data for Kieran Williams (kwilliams, Slack ID U02PKBZSB9Q, Linear user kwilliams, team Vector at Monte Carlo Data).
 
-Fetch ALL of the following — don't filter anything yet, just gather:
+Fetch ALL of the following from ${timeDesc} — don't filter anything yet, just gather:
 
-1. **Slack**: All @mentions of <@U02PKBZSB9Q> in the last 6 hours. Also check DMs. For each message, get: who sent it, what they said (exact quote), which channel/thread, and when.
+1. **Slack**: All @mentions of <@U02PKBZSB9Q> in ${timeDesc}. Also check DMs. For each message, get: who sent it, what they said (exact quote), which channel/thread, and when.
 
 2. **Linear**: ALL issues assigned to kwilliams. For each: title, status, description summary, any recent comments, priority.
 
-3. **GitHub**: Any open PRs where I'm a reviewer or author. Get: title, status, who requested review.
+3. **GitHub**: Any open PRs where I'm a reviewer or author. Get: title, actual current status (open/merged/closed), who requested review.
 
-4. **Gmail**: Recent unread emails from the last 6 hours. Subject, sender, preview.
+4. **Gmail**: Recent unread emails from ${timeDesc}. Subject, sender, preview.
 
 5. **Notion**: Any pages where I was recently mentioned.
 
