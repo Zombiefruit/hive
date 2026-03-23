@@ -113,7 +113,7 @@ export function Notifications() {
   };
 
   const [showDebug, setShowDebug] = useState(false);
-  const [lookbackHours, setLookbackHours] = useState(6);
+  const [lookbackHours, setLookbackHours] = useState(168);
   const [debugEntries, setDebugEntries] = useState<Array<{ timestamp: string; direction: string; content: string }>>([]);
 
   useEffect(() => {

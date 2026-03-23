@@ -62,7 +62,7 @@ export function clearAllNotifications(): void {
   broadcastNotifications();
 }
 
-let nextLookbackHours = 6;
+let nextLookbackHours = 168;
 
 export function forcePoll(lookbackHours?: number): void {
   if (lookbackHours) nextLookbackHours = lookbackHours;
@@ -129,7 +129,7 @@ async function poll(): Promise<void> {
   try {
     // PASS 1: Gather all raw data from all sources
     const hours = nextLookbackHours;
-    nextLookbackHours = 6; // Reset to default after use
+    nextLookbackHours = 168; // Reset to default after use
     logPoll(`Pass 1: Gathering raw data (lookback: ${hours}h)`);
     const timeDesc = hours <= 6 ? `the last ${hours} hours` : hours <= 24 ? `the last ${hours} hours` : hours <= 48 ? "the last 2 days" : "the last week";
     const gatherPrompt = `You are gathering data for Kieran Williams (kwilliams, Slack ID U02PKBZSB9Q, Linear user kwilliams, team Vector at Monte Carlo Data).

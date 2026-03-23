@@ -63,24 +63,35 @@ async function checkAgents(): Promise<void> {
     const idleMs = now - agent.lastEventAt;
     const elapsedMs = now - agent.startedAt;
 
-    // Check if agent has been idle for > 3 minutes
+    // Quick checks (no AI needed)
     if (idleMs > 180000) {
-      log(`Agent ${agentId} idle for ${Math.round(idleMs / 60000)}m — escalating`);
+      log(`Agent ${agentId} idle for ${Math.round(idleMs / 60000)}m`);
       broadcastEscalation(agentId, {
         timestamp: new Date().toISOString(),
         type: "escalation",
-        content: `Agent has been idle for ${Math.round(idleMs / 60000)} minutes. It may be stuck or waiting for approval. Check its status.`,
+        content: `Agent "${agent.title}" has been idle for ${Math.round(idleMs / 60000)} minutes. It may be stuck or waiting for input.`,
       });
     }
 
-    // Check if agent has been running too long (> 15 minutes)
-    if (elapsedMs > 900000 && agent.eventCount < 5) {
-      log(`Agent ${agentId} running ${Math.round(elapsedMs / 60000)}m with only ${agent.eventCount} events — may be stuck`);
-      broadcastEscalation(agentId, {
-        timestamp: new Date().toISOString(),
-        type: "escalation",
-        content: `Agent has been running for ${Math.round(elapsedMs / 60000)} minutes with minimal activity (${agent.eventCount} events). Consider checking its progress.`,
-      });
+    // Periodic progress summary every 5 minutes via bridge
+    const timeSinceLastCheck = now - agent.lastCheckAt;
+    if (timeSinceLastCheck > 300000 && agent.eventCount > 3) {
+      log(`Agent ${agentId}: periodic check-in (${agent.eventCount} events, ${Math.round(elapsedMs / 60000)}m elapsed)`);
+
+      // Ask the bridge to summarize the agent's progress
+      try {
+        const summary = await askBridge(
+          `An agent working on "${agent.title}" has been running for ${Math.round(elapsedMs / 60000)} minutes with ${agent.eventCount} events. Based on this, generate a brief 1-sentence progress update for the user.`,
+          15000
+        );
+        if (summary && summary.length > 10) {
+          broadcastEscalation(agentId, {
+            timestamp: new Date().toISOString(),
+            type: "progress",
+            content: summary.slice(0, 200),
+          });
+        }
+      } catch {}
     }
 
     agent.lastCheckAt = now;
