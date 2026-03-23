@@ -34,8 +34,72 @@ const debugLog: Array<{ timestamp: string; direction: "in" | "out"; content: str
 const MAX_DEBUG_LOG = 200;
 
 function addDebugEntry(direction: "in" | "out", content: string): void {
-  debugLog.push({ timestamp: new Date().toISOString(), direction, content: content.slice(0, 2000) });
+  // Parse JSON to create human-readable entries
+  if (direction === "out") {
+    for (const line of content.split("\n")) {
+      if (!line.trim()) continue;
+      try {
+        const msg = JSON.parse(line);
+        const readable = formatBridgeMessage(msg);
+        if (readable) {
+          debugLog.push({ timestamp: new Date().toISOString(), direction, content: readable });
+          if (debugLog.length > MAX_DEBUG_LOG) debugLog.shift();
+        }
+      } catch {
+        // Not JSON — skip
+      }
+    }
+    return;
+  }
+
+  // For prompts (input), extract the readable part
+  try {
+    const msg = JSON.parse(content);
+    const text = msg.message?.content ?? content;
+    debugLog.push({ timestamp: new Date().toISOString(), direction, content: typeof text === "string" ? text.slice(0, 1000) : JSON.stringify(text).slice(0, 1000) });
+  } catch {
+    debugLog.push({ timestamp: new Date().toISOString(), direction, content: content.slice(0, 1000) });
+  }
   if (debugLog.length > MAX_DEBUG_LOG) debugLog.shift();
+}
+
+function formatBridgeMessage(msg: { type?: string; subtype?: string; message?: { content?: unknown }; result?: string; tools?: string[] }): string | null {
+  if (msg.type === "system" && msg.subtype === "init") {
+    const toolCount = msg.tools?.length ?? 0;
+    const mcpCount = (msg.tools ?? []).filter((t: string) => t.includes("mcp__claude_ai")).length;
+    return `🔧 Bridge initialized: ${toolCount} tools (${mcpCount} MCP connectors)`;
+  }
+  if (msg.type === "system" && msg.subtype === "hook_started") return null; // Skip hooks
+  if (msg.type === "system" && msg.subtype === "hook_response") return null;
+  if (msg.type === "system") return `⚙️ System: ${msg.subtype ?? "unknown"}`;
+
+  if (msg.type === "assistant" && Array.isArray(msg.message?.content)) {
+    const parts: string[] = [];
+    for (const block of msg.message!.content as Array<{ type: string; text?: string; name?: string; input?: Record<string, unknown> }>) {
+      if (block.type === "text" && block.text) {
+        parts.push(`💬 ${block.text.slice(0, 300)}`);
+      }
+      if (block.type === "tool_use" && block.name) {
+        const input = block.input ?? {};
+        if (block.name.includes("Slack")) parts.push(`📱 Slack: ${block.name.split("__").pop()} ${JSON.stringify(input).slice(0, 100)}`);
+        else if (block.name.includes("Linear")) parts.push(`📋 Linear: ${block.name.split("__").pop()} ${JSON.stringify(input).slice(0, 100)}`);
+        else if (block.name.includes("Gmail")) parts.push(`📧 Gmail: ${block.name.split("__").pop()}`);
+        else if (block.name.includes("Notion")) parts.push(`📝 Notion: ${block.name.split("__").pop()}`);
+        else if (block.name === "ToolSearch") parts.push(`🔍 Loading tools: ${input.query ?? ""}`);
+        else parts.push(`🔧 Tool: ${block.name}`);
+      }
+      if (block.type === "thinking") {
+        // Skip thinking blocks
+      }
+    }
+    return parts.join("\n") || null;
+  }
+
+  if (msg.type === "result") {
+    return `✅ Result: ${String(msg.result ?? "").slice(0, 200)}`;
+  }
+
+  return null; // Skip unknown types
 }
 
 /** Get the debug log for the UI. */
