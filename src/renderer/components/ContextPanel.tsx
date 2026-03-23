@@ -1,26 +1,14 @@
-import {
-  Accordion,
-  Anchor,
-  Badge,
-  Group,
-  Stack,
-  Text,
-} from "@mantine/core";
+import { Group, Stack, Text } from "@mantine/core";
+import { IconBrandSlack, IconBrandGithub } from "@tabler/icons-react";
+import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
 import { useAgentContextRefs } from "../stores/agent-store";
 import type { ContextRefType } from "../../shared/types";
 
-const typeLabels: Record<ContextRefType, string> = {
-  linear: "Linear",
-  slack: "Slack",
-  notion: "Notion",
-  github: "GitHub",
-};
-
-const typeColors: Record<ContextRefType, string> = {
-  linear: "violet",
-  slack: "green",
-  notion: "gray",
-  github: "dark",
+const typeConfig: Record<ContextRefType, { label: string; Icon: React.FC<{ size?: number; color?: string }>; color: string }> = {
+  linear: { label: "Linear", Icon: SiLinear as React.FC<{ size?: number; color?: string }>, color: "#5E6AD2" },
+  slack: { label: "Slack", Icon: IconBrandSlack as React.FC<{ size?: number; color?: string }>, color: "#E01E5A" },
+  notion: { label: "Notion", Icon: SiNotion as React.FC<{ size?: number; color?: string }>, color: "#FFFFFF" },
+  github: { label: "GitHub", Icon: IconBrandGithub as React.FC<{ size?: number; color?: string }>, color: "#FFFFFF" },
 };
 
 interface ContextPanelProps {
@@ -30,7 +18,6 @@ interface ContextPanelProps {
 export function ContextPanel({ agentId }: ContextPanelProps) {
   const contextRefs = useAgentContextRefs(agentId);
 
-  // Group by type
   const grouped = contextRefs.reduce(
     (acc, ref) => {
       if (!acc[ref.type]) acc[ref.type] = [];
@@ -48,7 +35,6 @@ export function ContextPanel({ agentId }: ContextPanelProps) {
         <Text size="sm" fw={600}>Context</Text>
         <Text size="xs" c="dimmed" ta="center" py="md">
           No linked resources detected yet.
-          {"\n"}Resources will appear as the agent accesses them.
         </Text>
       </Stack>
     );
@@ -57,44 +43,35 @@ export function ContextPanel({ agentId }: ContextPanelProps) {
   return (
     <Stack gap="sm" p="xs">
       <Text size="sm" fw={600}>Context</Text>
-      <Accordion variant="separated" radius="sm">
-        {types.map((type) => (
-          <Accordion.Item key={type} value={type}>
-            <Accordion.Control>
-              <Group gap="xs">
-                <Badge variant="light" color={typeColors[type]} size="xs">
-                  {typeLabels[type]}
-                </Badge>
-                <Text size="sm">{grouped[type].length} items</Text>
-              </Group>
-            </Accordion.Control>
-            <Accordion.Panel>
-              <Stack gap="xs">
-                {grouped[type].map((ref) => (
-                  <Group
-                    key={ref.id}
-                    gap="xs"
-                    wrap="nowrap"
-                    style={{ cursor: ref.url ? "pointer" : undefined }}
-                    onClick={() => { if (ref.url) window.deck.openExternal(ref.url); }}
-                  >
-                    <Text
-                      size="xs"
-                      truncate
-                      style={{ minWidth: 0, color: ref.url ? "var(--mantine-color-blue-4)" : undefined }}
-                    >
-                      {ref.title || ref.resourceId}
-                    </Text>
-                    <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
-                      {new Date(ref.detectedAt).toLocaleTimeString()}
-                    </Text>
-                  </Group>
-                ))}
-              </Stack>
-            </Accordion.Panel>
-          </Accordion.Item>
-        ))}
-      </Accordion>
+      {types.map((type) => {
+        const cfg = typeConfig[type];
+        const Icon = cfg?.Icon;
+        return (
+          <Stack key={type} gap={4}>
+            <Group gap={6}>
+              {Icon && <Icon size={14} color={cfg.color} />}
+              <Text size="xs" fw={600}>{cfg?.label ?? type}</Text>
+              <Text size="xs" c="dimmed">{grouped[type].length}</Text>
+            </Group>
+            <Stack gap={2} pl={20}>
+              {grouped[type].map((ref) => (
+                <Text
+                  key={ref.id}
+                  size="xs"
+                  truncate
+                  style={{
+                    cursor: ref.url ? "pointer" : undefined,
+                    color: ref.url ? "var(--mantine-color-blue-4)" : undefined,
+                  }}
+                  onClick={() => { if (ref.url) window.deck.openExternal(ref.url); }}
+                >
+                  {ref.title || ref.resourceId}
+                </Text>
+              ))}
+            </Stack>
+          </Stack>
+        );
+      })}
     </Stack>
   );
 }
