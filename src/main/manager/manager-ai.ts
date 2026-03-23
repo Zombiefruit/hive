@@ -1,4 +1,3 @@
-import { query as sdkQuery } from "@anthropic-ai/claude-agent-sdk";
 import { app } from "electron";
 import path from "node:path";
 import fs from "node:fs";
@@ -273,54 +272,39 @@ export async function sendManagerMessage(userMessage: string): Promise<ManagerMe
     ? `Previous conversation:\n${historyContext}\n\nUser: ${userMessage}`
     : userMessage;
 
-  const mcpServerScript = ensureMcpServerScript();
-
   try {
-    let assistantContent = "";
-    const toolCalls: ManagerMessage["toolCalls"] = [];
+    const systemPrompt = buildSystemPrompt();
+    const claudePath = getClaudeCodePath();
+    const { execFile } = require("node:child_process") as typeof import("node:child_process");
 
-    const q = sdkQuery({
-      prompt: fullPrompt,
-      options: {
-        pathToClaudeCodeExecutable: getClaudeCodePath(),
-        model: MODEL,
-        systemPrompt: buildSystemPrompt(),
-        permissionMode: "bypassPermissions",
-        allowDangerouslySkipPermissions: true,
-        maxTurns: 20,
-        // No budget limit for the Manager — it orchestrates, not codes
-        disallowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Agent", "NotebookEdit"],
-        mcpServers: {
-          "claude-deck-fleet": {
-            type: "stdio",
-            command: "node",
-            args: [mcpServerScript],
-          },
-        },
-      },
+    const assistantContent = await new Promise<string>((resolve, reject) => {
+      execFile(claudePath, [
+        "-p", `${systemPrompt}\n\n---\n\nUser: ${fullPrompt}`,
+        "--output-format", "json",
+        "--model", MODEL,
+        "--max-turns", "10",
+      ], {
+        timeout: 120000,
+        maxBuffer: 2 * 1024 * 1024,
+        env: { ...process.env },
+        cwd: os.homedir(),
+      }, (error: Error | null, stdout: string) => {
+        if (error) { reject(error); return; }
+        try {
+          const result = JSON.parse(stdout);
+          resolve(String(result.result ?? ""));
+        } catch {
+          resolve(stdout.slice(0, 5000));
+        }
+      });
     });
 
-    for await (const message of q) {
-      if (message.type === "assistant") {
-        const content = extractTextContent(message.message);
-        if (content) {
-          assistantContent += content;
-          emit({ type: "text_delta", text: content });
-        }
-      } else if (message.type === "result") {
-        const result = message as { subtype?: string; result?: string };
-        if (result.result && !assistantContent) {
-          assistantContent = String(result.result);
-          emit({ type: "text_delta", text: assistantContent });
-        }
-      }
-    }
+    emit({ type: "text_delta", text: assistantContent });
 
     const assistantMsg: ManagerMessage = {
       id: crypto.randomUUID(),
       role: "assistant",
       content: assistantContent || "(No response)",
-      toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
       timestamp: new Date().toISOString(),
     };
     conversation.messages.push(assistantMsg);

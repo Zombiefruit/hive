@@ -1,5 +1,14 @@
-import { query as sdkQuery } from "@anthropic-ai/claude-agent-sdk";
 import { getClaudeCodePath } from "../claude-path";
+
+// Dynamic import to avoid Vite bundling issues with import.meta.url
+let sdkQuery: typeof import("@anthropic-ai/claude-agent-sdk").query | null = null;
+async function getSdkQuery() {
+  if (!sdkQuery) {
+    const sdk = await import("@anthropic-ai/claude-agent-sdk");
+    sdkQuery = sdk.query;
+  }
+  return sdkQuery;
+}
 import type { SpawnAgentConfig } from "../../shared/types";
 import {
   createAgent,
@@ -13,7 +22,7 @@ import { trackContextFromMessage } from "./context-tracker";
 
 interface ActiveAgent {
   id: string;
-  query: ReturnType<typeof sdkQuery>;
+  query: any;
   abortController: AbortController;
   messageQueue: Array<{ role: "user"; content: string }>;
   resolveNextMessage: (() => void) | null;
@@ -85,7 +94,8 @@ export async function spawnAgent(config: SpawnAgentConfig): Promise<string> {
   // Create the SDK query with streaming input
   const messageStream = createMessageStream(config.task, activeAgent);
 
-  const q = sdkQuery({
+  const query = await getSdkQuery();
+  const q = query({
     prompt: messageStream(),
     options: {
       pathToClaudeCodeExecutable: getClaudeCodePath(),
@@ -119,7 +129,7 @@ export async function spawnAgent(config: SpawnAgentConfig): Promise<string> {
  */
 async function processAgentStream(
   agentId: string,
-  q: ReturnType<typeof sdkQuery>
+  q: any
 ): Promise<void> {
   try {
     for await (const message of q) {
@@ -286,7 +296,8 @@ export async function resumeSession(agentId: string, sessionId: string, cwd: str
   };
 
   // Use the Agent SDK's resume option to continue an existing session
-  const q = sdkQuery({
+  const query = await getSdkQuery();
+  const q = query({
     prompt: "Continue where you left off. What's the current status?",
     options: {
       pathToClaudeCodeExecutable: getClaudeCodePath(),
