@@ -124,7 +124,7 @@ If nothing found, return: []`;
         return;
       }
 
-      logPoll(`CLI stdout length: ${stdout.length}`);
+      logPoll(`CLI stdout length: ${stdout.length}, first 500: ${stdout.slice(0, 500)}`);
 
       try {
         // The output-format json gives us a result object
@@ -147,7 +147,8 @@ If nothing found, return: []`;
           url?: string;
         }>;
 
-        logPoll(`Parsed ${items.length} notifications`);
+        logPoll(`Parsed ${items.length} notifications: ${JSON.stringify(items.map(i => ({ source: i.source, title: i.title?.slice(0, 40) })))}`);
+
 
         resolve(items.map(item => ({
           id: `poll-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,

@@ -64,12 +64,27 @@ export function enrichExternalAgents(): void {
 
       logEnricher(`Agent ${agent.id.slice(0, 8)}: parsed ${displayMessages.length} display messages`);
 
-      // Extract title from first user message
-      const firstUser = displayMessages.find(m => m.role === "user");
-      if (firstUser) {
-        const title = firstUser.content.replace(/\s+/g, " ").trim().slice(0, 120);
-        if (title) updateAgentTask(agent.id, title);
+      // Extract a clean title from the first meaningful user message
+      const userMessages = displayMessages.filter(m => m.role === "user");
+      let title = "";
+      for (const msg of userMessages) {
+        let candidate = msg.content
+          .replace(/Used skill:\s*\S+\s*/g, "")  // Remove skill prefixes
+          .replace(/https?:\/\/\S+/g, (url) => {  // Shorten URLs
+            const match = url.match(/github\.com\/[^/]+\/[^/]+\/pull\/(\d+)/);
+            if (match) return `PR #${match[1]}`;
+            const linearMatch = url.match(/\/issue\/([A-Z]+-\d+)/);
+            if (linearMatch) return linearMatch[1];
+            return url.split("/").pop() ?? url;
+          })
+          .replace(/\s+/g, " ")
+          .trim();
+        if (candidate.length > 10) {
+          title = candidate.slice(0, 80);
+          break;
+        }
       }
+      if (title) updateAgentTask(agent.id, title);
 
       // Store messages — tool_group/skill/agent_group get stored as special roles
       for (const msg of displayMessages) {

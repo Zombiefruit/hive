@@ -129,7 +129,7 @@ app.whenReady().then(() => {
 
   // Notifications
   ipcMain.handle("notifications:get", () => {
-    return getNotifications().filter(n => n.status !== "dismissed" && n.status !== "done");
+    return getNotifications();
   });
   ipcMain.handle("notifications:dismiss", (_event, id: string) => {
     dismissNotification(id);
