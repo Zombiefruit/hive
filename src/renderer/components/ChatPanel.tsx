@@ -65,7 +65,7 @@ function ChatMessage({ message }: { message: Message }) {
     ? "color-mix(in srgb, var(--mantine-color-violet-5) 15%, transparent)"
     : isUser
       ? "color-mix(in srgb, var(--mantine-color-blue-5) 15%, transparent)"
-      : "var(--mantine-color-dark-7)";
+      : "var(--mantine-color-dark-6)";
 
   return (
     <Paper
@@ -75,6 +75,7 @@ function ChatMessage({ message }: { message: Message }) {
         backgroundColor: bgColor,
         alignSelf: isUser ? "flex-end" : "flex-start",
         maxWidth: "85%",
+        border: isUser ? undefined : "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
       }}
     >
       {isManager && (
