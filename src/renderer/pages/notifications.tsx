@@ -122,6 +122,19 @@ export function Notifications() {
 
           // Convert skipped items to cards (only if they don't already exist in server items)
           const serverIds = new Set(serverItems.map(n => n.id));
+          // Infer task type from source for skipped items so they land in the right section
+          const inferTaskType = (source?: string, title?: string): string => {
+            const t = (title ?? "").toLowerCase();
+            const s = (source ?? "").toLowerCase();
+            if (s === "calendar" || t.includes("meeting") || t.includes("sync") || t.includes("standup")) return "meeting_prep";
+            if (t.includes("replied") || t.includes("response") || t.includes("dm") || t.includes("thread") || t.includes("asked")) return "response";
+            if (s === "slack" && (t.includes("mention") || t.includes("tagged"))) return "response";
+            if (s === "linear" || t.includes("ticket") || t.includes("issue") || t.includes("pr ") || t.includes("pull request")) return "implementation";
+            if (s === "gmail" || s === "email") return "response";
+            if (s === "slack") return "response"; // slack items are generally things people said to you
+            return "investigation"; // default to actionable
+          };
+
           const skippedCards: NotificationItem[] = skipped.map((s: { source?: string; title?: string; reason?: string; url?: string }, i: number) => ({
             id: `skipped-${i}-${(s.title ?? "").slice(0, 20).replace(/\s/g, "")}`,
             source: s.source ?? "unknown",
@@ -131,6 +144,7 @@ export function Notifications() {
             summary: s.reason ?? "",
             actionNeeded: s.reason,
             url: s.url,
+            taskType: inferTaskType(s.source, s.title),
             createdAt: new Date().toISOString(),
             stage: "skipped",
           })).filter(s => !serverIds.has(s.id));
@@ -213,8 +227,7 @@ export function Notifications() {
     }
 
     if (newStage === "planning" || newStage === "prepared") {
-      setSelectedId(id);
-      // Both planning and prepared use prepareWorkPlan — the prompt adapts based on taskType
+      // Start preparing plan in background — user can click the card to see progress
       window.deck.prepareWorkPlan?.({
         id: n.id, source: n.source, title: n.title, summary: n.summary, url: n.url,
         taskType: n.taskType, links: n.links,
