@@ -33,8 +33,37 @@ let isPolling = false;
 export function startPolling(): void {
   if (pollInterval) return;
   logPoll("startPolling called");
-  setTimeout(() => { logPoll("first poll firing"); poll(); }, 10000);
+
+  // Load cached notifications from disk immediately
+  loadCachedNotifications();
+  broadcastNotifications();
+
+  // First real poll after 2 seconds (let app settle)
+  setTimeout(() => { logPoll("first poll firing"); poll(); }, 2000);
   pollInterval = setInterval(() => poll(), 120000);
+}
+
+function getCachePath(): string {
+  return path.join(os.homedir(), "Library", "Application Support", "claude-deck", "notifications-cache.json");
+}
+
+function loadCachedNotifications(): void {
+  try {
+    const raw = fs.readFileSync(getCachePath(), "utf-8");
+    const cached = JSON.parse(raw) as PollNotification[];
+    for (const n of cached) {
+      if (!notifications.some(e => e.id === n.id)) {
+        notifications.push(n);
+      }
+    }
+    logPoll(`Loaded ${cached.length} cached notifications`);
+  } catch {}
+}
+
+function saveCacheToFile(): void {
+  try {
+    fs.writeFileSync(getCachePath(), JSON.stringify(notifications.filter(n => n.status !== "dismissed")));
+  } catch {}
 }
 
 export function stopPolling(): void {
@@ -80,6 +109,7 @@ async function poll(): Promise<void> {
           notifications.unshift(n);
         }
       }
+      saveCacheToFile();
       broadcastNotifications();
     }
   } catch (err) {
