@@ -146,7 +146,7 @@ export function stopPolling(): void {
   if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
 }
 
-let lastSkippedItems: Array<{ source?: string; title?: string; reason?: string }> = [];
+let lastSkippedItems: Array<{ source?: string; title?: string; reason?: string; url?: string }> = [];
 
 function getSkippedCachePath(): string {
   return path.join(os.homedir(), "Library", "Application Support", "claude-deck", "skipped-cache.json");
@@ -168,7 +168,7 @@ export function getNotifications(): PollNotification[] {
   return notifications;
 }
 
-export function getSkippedItems(): Array<{ source?: string; title?: string; reason?: string }> {
+export function getSkippedItems(): Array<{ source?: string; title?: string; reason?: string; url?: string }> {
   return lastSkippedItems;
 }
 
@@ -358,33 +358,32 @@ Only include pages updated after ${cutoffStr}. Return page titles, who edited th
       },
     ];
 
-    // Fetch sources sequentially via the shared bridge (which has MCP already loaded)
-    const rawResults: string[] = [];
-
-    for (let i = 0; i < sources.length; i++) {
-      const source = sources[i];
-      logPoll(`  Fetching: ${source.name} (${i + 1}/${sources.length})`);
-
-      for (const win of BrowserWindow.getAllWindows()) {
-        try {
-          if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", {
-            source: source.name,
-            current: i + 1,
-            total: sources.length + 1,
-          });
-        } catch {}
-      }
-
+    // Fetch ALL sources in PARALLEL — each spawns its own Claude Code process
+    // spawn works from Electron's Node.js (bridge proves it); processes init in parallel
+    logPoll(`  Launching ${sources.length} parallel fetchers...`);
+    for (const win of BrowserWindow.getAllWindows()) {
       try {
-        const result = await askBridge(source.prompt, source.timeoutMs);
-        rawResults.push(`## ${source.name}\n${result}\n`);
-        logPoll(`  ${source.name}: ${result.length} chars`);
-      } catch (err) {
-        rawResults.push(`## ${source.name}\nError: ${String(err).slice(0, 100)}\n`);
-        logPoll(`  ${source.name}: ERROR ${String(err).slice(0, 60)}`);
-      }
+        if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", {
+          source: "Fetching all sources",
+          current: 1,
+          total: 2,
+        });
+      } catch {}
     }
 
+    const fetchPromises = sources.map(async (source) => {
+      logPoll(`  [parallel] Starting: ${source.name}`);
+      try {
+        const result = await askOneShot(source.prompt, source.timeoutMs);
+        logPoll(`  [parallel] ${source.name}: ${result.length} chars`);
+        return `## ${source.name}\n${result}\n`;
+      } catch (err) {
+        logPoll(`  [parallel] ${source.name}: ERROR ${String(err).slice(0, 60)}`);
+        return `## ${source.name}\nError: ${String(err).slice(0, 100)}\n`;
+      }
+    });
+
+    const rawResults = await Promise.all(fetchPromises);
     const rawData = rawResults.join("\n---\n\n");
     logPoll(`Pass 1 complete: ${rawData.length} total chars from ${rawResults.length} sources`);
 
@@ -453,7 +452,7 @@ Each actionable/follow_up item:
 {"source": "slack", "priority": "urgent|today|low", "confidence": 1-10, "task_type": "...", "title": "...", "summary": "...", "links": [{"type": "...", "label": "...", "url": "..."}], "author": "...", "action_needed": "..."}
 
 Each skipped item:
-{"source": "slack", "title": "Short description", "reason": "Why skipped"}
+{"source": "slack", "title": "Short description", "reason": "Why skipped", "url": "https://..."}
 
 Rules:
 - Manager/lead asks = confidence 10, PM (Mor Ofir) = confidence 9
@@ -474,7 +473,7 @@ Rules:
     // Try to parse as {actionable, skipped} object first, then fall back to array
     let actionableItems: unknown[] = [];
     let followUpItems: unknown[] = [];
-    let skippedItems: Array<{ source?: string; title?: string; reason?: string }> = [];
+    let skippedItems: Array<{ source?: string; title?: string; reason?: string; url?: string }> = [];
 
     const objMatch = cleanResponse.match(/\{[\s\S]*"actionable"[\s\S]*\}/);
     if (objMatch) {

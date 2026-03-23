@@ -101,7 +101,7 @@ export function Notifications() {
 
           // Convert skipped items to cards (only if they don't already exist in server items)
           const serverIds = new Set(serverItems.map(n => n.id));
-          const skippedCards: NotificationItem[] = skipped.map((s, i) => ({
+          const skippedCards: NotificationItem[] = skipped.map((s: { source?: string; title?: string; reason?: string; url?: string }, i: number) => ({
             id: `skipped-${i}-${(s.title ?? "").slice(0, 20).replace(/\s/g, "")}`,
             source: s.source ?? "unknown",
             priority: "low",
@@ -109,6 +109,7 @@ export function Notifications() {
             title: s.title ?? "Unknown item",
             summary: s.reason ?? "",
             actionNeeded: s.reason,
+            url: s.url,
             createdAt: new Date().toISOString(),
             stage: "skipped",
           })).filter(s => !serverIds.has(s.id));
