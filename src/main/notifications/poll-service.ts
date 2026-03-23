@@ -159,24 +159,69 @@ async function poll(): Promise<void> {
 
   try {
     const hours = nextLookbackHours;
-    nextLookbackHours = 168; // Reset to default after use
+    nextLookbackHours = 168;
     logPoll(`Polling (lookback: ${hours}h)`);
     const timeDesc = hours <= 6 ? `the last ${hours} hours` : hours <= 24 ? `the last ${hours} hours` : hours <= 48 ? "the last 2 days" : "the last week";
 
-    // Single combined prompt: gather data AND triage in one request
-    const triagePrompt = `You are Kieran Williams's personal assistant (kwilliams, Slack U02PKBZSB9Q, Linear kwilliams, team Vector at Monte Carlo Data).
+    // PASS 1: Gather raw data (dedicated prompt, nothing else)
+    logPoll("Pass 1: Gathering raw data");
+    const gatherPrompt = `Gather ALL of the following data for Kieran Williams (kwilliams, Slack U02PKBZSB9Q, team Vector at Monte Carlo Data) from ${timeDesc}.
 
-## Step 1: Gather data
-Use your MCP tools to fetch from ALL these sources for ${timeDesc}:
-- **Slack**: @mentions of <@U02PKBZSB9Q>, DMs, thread replies in threads where Kieran was mentioned, AND mentions of @frontend (team handle). Also check channels #team-vector (C0AMSV2SK4Z) and #team-vector-standup (C0AMT1AGN7K) for recent messages directed at Kieran or the frontend team
-- **Linear**: Issues assigned to kwilliams (all statuses)
-- **GitHub**: Open PRs where Kieran is reviewer or author (VERIFY actual state — don't include merged/closed)
-- **Gmail**: Unread emails
-- **Notion**: Recent mentions or spec updates
-- **Google Calendar**: Events in the next 24 hours
+You MUST check EVERY source listed below. Do not skip any.
 
-## Step 2: Triage
-After gathering all data, process it like Kieran would going through his inbox.
+1. **Slack** — Use slack_search_public_and_private:
+   - Search: "<@U02PKBZSB9Q>" (personal mentions)
+   - Search: "@frontend" (team mentions)
+   - Check DMs
+   - Read channels: #team-vector (C0AMSV2SK4Z), #team-vector-standup (C0AMT1AGN7K)
+   - For EACH mention: who said it, exact quote, channel, timestamp, and whether Kieran replied
+
+2. **Linear** — Use list_issues:
+   - ALL issues assigned to kwilliams
+   - For each: title, status, priority, recent comments
+
+3. **GitHub** — Use Bash with gh CLI:
+   - Open PRs where Kieran is reviewer: gh pr list --search "review-requested:@me"
+   - Kieran's open PRs: gh pr list --author @me
+   - VERIFY each PR is actually open (not merged/closed)
+
+4. **Gmail** — Use gmail_search_messages:
+   - Unread emails from ${timeDesc}
+   - Subject, sender, preview for each
+
+5. **Google Calendar** — Use gcal_list_events:
+   - Events in the next 24 hours
+   - Title, time, attendees for each
+
+6. **Notion** — Use notion-search:
+   - Recent mentions of Kieran
+   - Recently updated specs/docs
+
+Return a COMPLETE structured report. If a source returns no results, explicitly say "No results from [source]" so I know you checked.`;
+
+    const rawData = await askBridge(gatherPrompt, 180000);
+    logPoll(`Pass 1 complete: ${rawData.length} chars`);
+
+    if (rawData.length < 100) {
+      logPoll("Pass 1 returned too little data");
+      isPolling = false;
+      return;
+    }
+
+    // Restart bridge to clear context before Pass 2
+    restartBridge();
+    // Wait for bridge to reinitialize
+    await new Promise(resolve => setTimeout(resolve, 20000));
+
+    // PASS 2: Triage the raw data (fresh bridge, no accumulated context)
+    logPoll("Pass 2: Triaging raw data");
+    const triagePrompt = `You are Kieran Williams's personal assistant. Here is everything from his Slack, Linear, GitHub, Gmail, Calendar, and Notion:
+
+---
+${rawData}
+---
+
+Process this like Kieran would going through his inbox.
 
 ## CRITICAL RULES — read carefully
 
