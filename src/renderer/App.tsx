@@ -4,15 +4,22 @@ import { Routes } from "./routes";
 import { theme } from "./theme";
 import { useIpcSync } from "./hooks/useIpcSync";
 import { FloatingTrigger, FloatingPanel } from "./components/ManagerChat";
+import { useManagerStore } from "./stores/manager-store";
+
+const DOCKED_WIDTH = 480;
 
 function AppInner() {
   useIpcSync();
+  const isPinned = useManagerStore((s) => s.isPinned);
+
   return (
-    <>
-      <Routes />
+    <div style={{ display: "flex", minHeight: "100vh" }}>
+      <div style={{ flex: 1, minWidth: 0, transition: "margin-right 0.2s ease", marginRight: isPinned ? DOCKED_WIDTH : 0 }}>
+        <Routes />
+      </div>
       <FloatingTrigger />
-      <FloatingPanel />
-    </>
+      <FloatingPanel dockedWidth={DOCKED_WIDTH} />
+    </div>
   );
 }
 

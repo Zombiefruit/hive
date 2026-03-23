@@ -8,7 +8,7 @@ import { ManagerMessages } from "./ManagerMessages";
 import { ManagerInput } from "./ManagerInput";
 import type { ManagerMessage } from "../../stores/manager-store";
 
-export function FloatingPanel() {
+export function FloatingPanel({ dockedWidth = 480 }: { dockedWidth?: number }) {
   const isOpen = useManagerStore((s) => s.isOpen);
   const isPinned = useManagerStore((s) => s.isPinned);
   const setOpen = useManagerStore((s) => s.setOpen);
@@ -127,7 +127,7 @@ export function FloatingPanel() {
           top: 0,
           right: 0,
           bottom: 0,
-          width: 440,
+          width: dockedWidth,
           zIndex: 200,
           backgroundColor: "var(--mantine-color-dark-8)",
           borderLeft: "1px solid var(--mantine-color-default-border)",

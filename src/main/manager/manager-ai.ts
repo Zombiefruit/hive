@@ -288,7 +288,7 @@ export async function sendManagerMessage(userMessage: string): Promise<ManagerMe
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
         maxTurns: 20,
-        maxBudgetUsd: 2,
+        // No budget limit for the Manager — it orchestrates, not codes
         disallowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Agent", "NotebookEdit"],
         mcpServers: {
           "claude-deck-fleet": {
