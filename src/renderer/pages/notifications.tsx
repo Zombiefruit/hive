@@ -27,20 +27,42 @@ interface NotificationItem {
   stage?: string;
 }
 
-const STAGES = [
-  { key: "new", label: "Inbox", Icon: IconInbox, color: "#3b82f6", tip: "New items. Drag to Planning for agent tasks, or to Prepared for meetings/responses." },
-  { key: "follow_up", label: "Follow Up", Icon: IconClock, color: "#f59e0b", tip: "Items to recheck later — waiting for reply, monitoring progress." },
-  { key: "planning", label: "Planning", Icon: IconSparkles, color: "#a855f7", tip: "AI fetches context and creates a work plan. For code tasks only." },
-  { key: "working", label: "Working", Icon: IconPlayerPlay, color: "#22c55e", tip: "Agent is executing the plan. For code tasks only." },
-  { key: "prepared", label: "Prepared", Icon: IconFileText, color: "#06b6d4", tip: "AI gathered context for you. For meetings, responses — things only you can do." },
-  { key: "done", label: "Done", Icon: IconCircleCheck, color: "#6b7280", tip: "Completed items." },
-  { key: "skipped", label: "Reviewed", Icon: IconEyeOff, color: "#525252", tip: "AI reviewed and skipped. Drag to Inbox if you disagree." },
-];
-
 // Agent-actionable: an agent can do the actual work
 const AGENT_ACTIONABLE_TYPES = new Set(["implementation", "investigation", "review", "planning"]);
 // Human-only: agent can prepare context but you handle it
 const HUMAN_ONLY_TYPES = new Set(["meeting_prep", "response", "follow_up"]);
+
+type StageConfig = { key: string; label: string; Icon: React.FC<{ size?: number; color?: string; stroke?: number }>; color: string; tip: string };
+
+const SHARED_STAGES: StageConfig[] = [
+  { key: "new", label: "Inbox", Icon: IconInbox, color: "#3b82f6", tip: "New items from all sources." },
+  { key: "follow_up", label: "Follow Up", Icon: IconClock, color: "#f59e0b", tip: "Recheck later — waiting for reply." },
+];
+
+const AGENT_STAGES: StageConfig[] = [
+  { key: "planning", label: "Planning", Icon: IconSparkles, color: "#a855f7", tip: "AI creates a work plan." },
+  { key: "working", label: "Working", Icon: IconPlayerPlay, color: "#22c55e", tip: "Agent executing the plan." },
+];
+
+const HUMAN_STAGES: StageConfig[] = [
+  { key: "prepared", label: "Prepared", Icon: IconFileText, color: "#06b6d4", tip: "AI gathered context. You handle it." },
+];
+
+const END_STAGES: StageConfig[] = [
+  { key: "done", label: "Done", Icon: IconCircleCheck, color: "#6b7280", tip: "Completed." },
+  { key: "skipped", label: "Reviewed", Icon: IconEyeOff, color: "#525252", tip: "AI skipped. Drag to Inbox if wrong." },
+];
+
+// All stages flat (for lookups)
+const STAGES = [...SHARED_STAGES, ...AGENT_STAGES, ...HUMAN_STAGES, ...END_STAGES];
+
+// Two-row layout
+const ACTIONABLE_ROW: StageConfig[] = [...SHARED_STAGES, ...AGENT_STAGES, ...END_STAGES];
+const HUMAN_ROW: StageConfig[] = [
+  { key: "new", label: "Needs Response", Icon: IconInbox, color: "#f97316", tip: "Meetings and messages only you can handle." },
+  ...HUMAN_STAGES,
+  { key: "done", label: "Done", Icon: IconCircleCheck, color: "#6b7280", tip: "Handled." },
+];
 
 const sourceIcons: Record<string, React.FC<{ size?: number; color?: string }>> = {
   linear: SiLinear as React.FC<{ size?: number; color?: string }>,
@@ -327,7 +349,7 @@ export function Notifications() {
             <option value={168}>Last week</option>
           </select>
           <UnstyledButton
-            onClick={() => { setFetching(true); setPollProgress(null); setNotifications([]); setSkippedItems([]); window.deck.refreshNotifications(lookbackHours); }}
+            onClick={() => { setFetching(true); setPollProgress(null); window.deck.refreshNotifications?.(lookbackHours); }}
             style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-dimmed)" }}
           >
             Refresh
@@ -349,7 +371,7 @@ export function Notifications() {
         </Group>
       </div>
 
-      {/* Kanban board */}
+      {/* Two-section kanban board */}
         <div style={{ flex: 1, overflowX: "auto", overflowY: "auto" }}>
           {notifications.length === 0 && !fetching ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 300 }}>
@@ -359,11 +381,17 @@ export function Notifications() {
               </Stack>
             </div>
           ) : (
-          <div style={{ display: "flex", gap: 8, padding: 16, minWidth: "fit-content", height: "100%" }}>
-            {STAGES.map((stage, si) => {
-              const items = notifications
-                .filter(n => (n.stage ?? "new") === stage.key)
-                .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
+          <div style={{ padding: 16 }}>
+            {/* Section 1: Actionable tasks (agent can do the work) */}
+            <Text size="xs" fw={700} c="dimmed" mb={8} tt="uppercase" style={{ letterSpacing: 1 }}>Actionable — Agent Can Work</Text>
+            <div style={{ display: "flex", gap: 8, minWidth: "fit-content", marginBottom: 24 }}>
+            {ACTIONABLE_ROW.map((stage) => {
+              const filterFn = stage.key === "new"
+                ? (n: NotificationItem) => (n.stage ?? "new") === "new" && !HUMAN_ONLY_TYPES.has(n.taskType ?? "")
+                : stage.key === "done"
+                ? (n: NotificationItem) => n.stage === "done" && !HUMAN_ONLY_TYPES.has(n.taskType ?? "")
+                : (n: NotificationItem) => (n.stage ?? "new") === stage.key;
+              const items = notifications.filter(filterFn).sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
               const isOver = dragOverStage === stage.key;
               return (
                 <div key={stage.key} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
@@ -513,14 +541,110 @@ export function Notifications() {
                     </div>
                   </div>
 
-                  {si < STAGES.length - 1 && (
-                    <div style={{ display: "flex", alignItems: "center", paddingTop: 40, color: "var(--mantine-color-dimmed)", opacity: 0.3 }}>
-                      <IconChevronRight size={14} />
-                    </div>
-                  )}
                 </div>
               );
             })}
+            </div>
+
+            {/* Section 2: Human-only tasks (meetings, responses) */}
+            <Text size="xs" fw={700} c="dimmed" mb={8} tt="uppercase" style={{ letterSpacing: 1 }}>Needs Your Attention — Meetings & Responses</Text>
+            <div style={{ display: "flex", gap: 8, minWidth: "fit-content" }}>
+            {HUMAN_ROW.map((stage) => {
+              const filterFn = stage.key === "new"
+                ? (n: NotificationItem) => (n.stage ?? "new") === "new" && HUMAN_ONLY_TYPES.has(n.taskType ?? "")
+                : stage.key === "done"
+                ? (n: NotificationItem) => n.stage === "done" && HUMAN_ONLY_TYPES.has(n.taskType ?? "")
+                : (n: NotificationItem) => (n.stage ?? "new") === stage.key;
+              const items = notifications.filter(filterFn).sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
+              const isOver = dragOverStage === `human-${stage.key}`;
+              return (
+                <div key={`human-${stage.key}`} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  <div
+                    style={{ width: 240, minWidth: 200, flexShrink: 0 }}
+                    onDragOver={(e) => { e.preventDefault(); setDragOverStage(`human-${stage.key}`); }}
+                    onDragLeave={() => setDragOverStage(null)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOverStage(null);
+                      setDraggingId(null);
+                      const id = e.dataTransfer.getData("text/plain");
+                      if (id) {
+                        const targetStage = stage.key === "new" ? "new" : stage.key;
+                        moveCardToStage(id, targetStage);
+                        triggerStageAction(id, targetStage);
+                      }
+                    }}
+                  >
+                    <Tooltip label={stage.tip} position="bottom" withArrow multiline w={220} fz="xs">
+                      <Group gap={6} mb={8} px={4} style={{ cursor: "help" }}>
+                        <stage.Icon size={14} color={items.length > 0 || isOver ? stage.color : "var(--mantine-color-dimmed)"} />
+                        <Text size="xs" fw={600} c={items.length > 0 || isOver ? undefined : "dimmed"}>{stage.label}</Text>
+                        {items.length > 0 && <Badge size="xs" variant="light" color="gray" circle>{items.length}</Badge>}
+                      </Group>
+                    </Tooltip>
+                    <div style={{
+                      minHeight: 50, padding: 4, borderRadius: 8,
+                      transition: "all 0.15s ease",
+                      backgroundColor: isOver ? `color-mix(in srgb, ${stage.color} 10%, transparent)` : "transparent",
+                      border: isOver ? `1px dashed ${stage.color}` : "1px dashed transparent",
+                    }}>
+                      <Stack gap={6}>
+                        {items.length === 0 && (
+                          <div style={{ padding: 12, borderRadius: 6, textAlign: "center", border: "1px dashed color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)" }}>
+                            <Text size="xs" c="dimmed">{isOver ? "Drop here" : "Empty"}</Text>
+                          </div>
+                        )}
+                        {items.map(n => {
+                          const SrcIcon = sourceIcons[n.source] ?? IconFileText;
+                          const srcColor = sourceColors[n.source] ?? "#6b7280";
+                          return (
+                            <div
+                              key={n.id}
+                              draggable
+                              onDragStart={(e) => { e.dataTransfer.setData("text/plain", n.id); setDraggingId(n.id); wasDragging.current = true; }}
+                              onDragEnd={() => { setDraggingId(null); setDragOverStage(null); setTimeout(() => { wasDragging.current = false; }, 50); }}
+                              onClick={() => { if (wasDragging.current) return; setSelectedId(n.id === selectedId ? null : n.id); }}
+                              className="notif-card"
+                              style={{
+                                padding: "10px 12px", borderRadius: 6, cursor: "grab", userSelect: "none",
+                                border: `1px solid ${n.id === selectedId ? "var(--mantine-color-blue-5)" : "color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)"}`,
+                                backgroundColor: "var(--mantine-color-dark-7)",
+                                opacity: draggingId === n.id ? 0.4 : 1,
+                              }}
+                            >
+                              <Group gap={6} mb={4} justify="space-between">
+                                <Group gap={4}>
+                                  <SrcIcon size={12} color={srcColor} />
+                                  {n.author && <Text size="xs" c="dimmed" truncate style={{ maxWidth: 70 }}>{n.author}</Text>}
+                                </Group>
+                                <Badge size="xs" variant="light" color="gray" radius="sm" style={{ fontSize: "0.55rem" }}>{n.taskType ?? n.source}</Badge>
+                              </Group>
+                              <Text size="xs" fw={500} lineClamp={2} mb={4}>{n.title}</Text>
+                              {n.actionNeeded && <Text size="xs" c="blue.4" lineClamp={1} mb={4} style={{ fontSize: "0.65rem" }}>→ {n.actionNeeded}</Text>}
+                              <Group gap={4}>
+                                {stage.key === "new" && (
+                                  <UnstyledButton className="notif-action-btn" onClick={(e) => { e.stopPropagation(); handleStageButton(n.id, "prepared"); }}
+                                    style={{ padding: "3px 10px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 600, backgroundColor: "#06b6d4", color: "white", lineHeight: 1.4 }}>
+                                    Prepare
+                                  </UnstyledButton>
+                                )}
+                                {stage.key !== "done" && (
+                                  <UnstyledButton onClick={(e) => { e.stopPropagation(); moveCardToStage(n.id, "done"); }}
+                                    style={{ padding: "2px 4px", borderRadius: 4, color: "var(--mantine-color-dimmed)", opacity: 0.5 }}>
+                                    <IconCircleCheck size={12} />
+                                  </UnstyledButton>
+                                )}
+                              </Group>
+                            </div>
+                          );
+                        })}
+                      </Stack>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            </div>
           </div>
           )}
         </div>

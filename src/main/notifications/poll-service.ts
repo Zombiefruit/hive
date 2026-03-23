@@ -58,6 +58,10 @@ function askOneShot(prompt: string, timeoutMs: number): Promise<string> {
           if (msg.type === "system" && msg.subtype === "init" && !promptSent) {
             const mcpCount = ((msg.tools ?? []) as string[]).filter((t: string) => t.includes("mcp__claude_ai")).length;
             logPoll(`    [oneshot] init: ${(msg.tools ?? []).length} tools, ${mcpCount} MCP`);
+            // Broadcast to UI so user sees activity
+            for (const win of BrowserWindow.getAllWindows()) {
+              try { if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", { source: `Initialized (${mcpCount} MCP tools)`, current: 1, total: 2 }); } catch {}
+            }
 
             promptSent = true;
             proc.stdin?.write(JSON.stringify({
