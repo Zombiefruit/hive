@@ -228,7 +228,9 @@ export function Notifications() {
           }}
         >
           {STAGES.map((stage, si) => {
-            const items = notifications.filter(n => (n.stage ?? "new") === stage.key);
+            const items = notifications
+              .filter(n => (n.stage ?? "new") === stage.key)
+              .sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
             return (
               <div key={stage.key} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                 <div
