@@ -10,6 +10,13 @@ export interface DisplayMessage {
   items?: string[];
 }
 
+export interface DetectedContext {
+  type: "linear" | "slack" | "notion" | "github";
+  resourceId: string;
+  title: string;
+  url?: string;
+}
+
 interface RawLine {
   type: string;
   message?: { content?: unknown };
@@ -148,4 +155,101 @@ export function parseSessionToDisplayMessages(lines: string[], limit = 150): Dis
 
   flushPending();
   return messages;
+}
+
+/**
+ * Detect context references (Linear/Slack/Notion/GitHub) from JSONL lines.
+ * Scans MCP tool calls for service-specific patterns.
+ */
+export function detectContextFromLines(lines: string[]): DetectedContext[] {
+  const contexts: DetectedContext[] = [];
+  const seen = new Set<string>();
+
+  for (const line of lines) {
+    let data: { type?: string; message?: { content?: unknown } };
+    try { data = JSON.parse(line); } catch { continue; }
+    if (data.type !== "assistant" || !Array.isArray(data.message?.content)) continue;
+
+    for (const block of data.message!.content as Array<{ type: string; name?: string; input?: Record<string, unknown> }>) {
+      if (block.type !== "tool_use" || !block.name) continue;
+      const name = block.name;
+      const input = block.input ?? {};
+
+      // Linear
+      if (name.includes("Linear") && name.includes("get_issue")) {
+        const id = String(input.issueId ?? input.id ?? input.identifier ?? "");
+        if (id && !seen.has(`linear:${id}`)) {
+          seen.add(`linear:${id}`);
+          contexts.push({ type: "linear", resourceId: id, title: String(input.title ?? id), url: `https://linear.app/issue/${id}` });
+        }
+      }
+
+      // Slack
+      if (name.includes("Slack") && (name.includes("read_channel") || name.includes("read_thread") || name.includes("search"))) {
+        const channel = String(input.channel_id ?? input.channel ?? "");
+        if (channel && !seen.has(`slack:${channel}`)) {
+          seen.add(`slack:${channel}`);
+          contexts.push({ type: "slack", resourceId: channel, title: String(input.channel_name ?? channel), url: `https://slack.com/archives/${channel}` });
+        }
+      }
+
+      // Notion
+      if (name.includes("Notion") && (name.includes("fetch") || name.includes("search"))) {
+        const pageId = String(input.page_id ?? input.pageId ?? input.id ?? "");
+        if (pageId && !seen.has(`notion:${pageId}`)) {
+          seen.add(`notion:${pageId}`);
+          contexts.push({ type: "notion", resourceId: pageId, title: String(input.title ?? pageId.slice(0, 12)), url: `https://notion.so/${pageId.replace(/-/g, "")}` });
+        }
+      }
+
+      // GitHub (via Bash git commands or MCP)
+      if (name === "Bash") {
+        const cmd = String(input.command ?? "");
+        const prMatch = cmd.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
+        if (prMatch && !seen.has(`github:${prMatch[1]}#${prMatch[2]}`)) {
+          seen.add(`github:${prMatch[1]}#${prMatch[2]}`);
+          contexts.push({ type: "github", resourceId: `${prMatch[1]}#${prMatch[2]}`, title: `PR #${prMatch[2]}`, url: `https://github.com/${prMatch[1]}/pull/${prMatch[2]}` });
+        }
+      }
+
+      // Also check Skill inputs for GitHub URLs
+      if (name === "Skill" || name === "WebFetch") {
+        const url = String(input.url ?? input.args ?? "");
+        const ghMatch = url.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
+        if (ghMatch && !seen.has(`github:${ghMatch[1]}#${ghMatch[2]}`)) {
+          seen.add(`github:${ghMatch[1]}#${ghMatch[2]}`);
+          contexts.push({ type: "github", resourceId: `${ghMatch[1]}#${ghMatch[2]}`, title: `PR #${ghMatch[2]}`, url: `https://github.com/${ghMatch[1]}/pull/${ghMatch[2]}` });
+        }
+      }
+    }
+  }
+
+  // Also scan user messages for URLs
+  for (const line of lines) {
+    let data: { type?: string; message?: { content?: unknown } };
+    try { data = JSON.parse(line); } catch { continue; }
+    if (data.type !== "user") continue;
+    const content = typeof data.message?.content === "string" ? data.message.content : "";
+
+    // GitHub PR URLs in user messages
+    const ghMatches = content.matchAll(/github\.com\/([^/\s]+\/[^/\s]+)\/pull\/(\d+)/g);
+    for (const m of ghMatches) {
+      const key = `github:${m[1]}#${m[2]}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        contexts.push({ type: "github", resourceId: `${m[1]}#${m[2]}`, title: `PR #${m[2]} on ${m[1]}`, url: `https://github.com/${m[1]}/pull/${m[2]}` });
+      }
+    }
+
+    // Linear ticket IDs
+    const linMatches = content.matchAll(/\b([A-Z]+-\d+)\b/g);
+    for (const m of linMatches) {
+      if (!seen.has(`linear:${m[1]}`)) {
+        seen.add(`linear:${m[1]}`);
+        contexts.push({ type: "linear", resourceId: m[1], title: m[1] });
+      }
+    }
+  }
+
+  return contexts;
 }

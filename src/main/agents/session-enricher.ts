@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { getAllAgents, getMessages, addMessage, addEvent, updateAgentTask } from "../db/database";
+import { getAllAgents, getMessages, addMessage, addEvent, updateAgentTask, addContextRef } from "../db/database";
 import { broadcastStoreUpdate } from "../ipc/bridge";
-import { parseSessionToDisplayMessages } from "./message-parser";
+import { parseSessionToDisplayMessages, detectContextFromLines } from "./message-parser";
 
 const enrichedSessionIds = new Set<string>();
 const CLAUDE_DIR = path.join(os.homedir(), ".claude");
@@ -87,8 +87,31 @@ export function enrichExternalAgents(): void {
         });
       }
 
+      // Detect context references (Linear tickets, Slack channels, GitHub PRs, etc.)
+      const contexts = detectContextFromLines(lines);
+      for (const ctx of contexts) {
+        addContextRef(agent.id, ctx.type, ctx.resourceId, ctx.title, ctx.url);
+      }
+      logEnricher(`Agent ${agent.id.slice(0, 8)}: detected ${contexts.length} context refs`);
+
+      // Create meaningful timeline events
+      const userCount = displayMessages.filter(m => m.role === "user").length;
+      const assistantCount = displayMessages.filter(m => m.role === "assistant").length;
+      const skillCount = displayMessages.filter(m => m.role === "skill").length;
+      const agentCount = displayMessages.filter(m => m.role === "agent_group").length;
+
       if (displayMessages.length > 0) {
-        addEvent(agent.id, "task_start", `Loaded ${displayMessages.length} messages`);
+        addEvent(agent.id, "task_start", `Session with ${userCount} exchanges, ${assistantCount} responses`);
+      }
+      if (skillCount > 0) {
+        const skills = displayMessages.filter(m => m.role === "skill").map(m => m.content);
+        addEvent(agent.id, "tool_use", `Used skills: ${skills.join(", ")}`);
+      }
+      if (agentCount > 0) {
+        addEvent(agent.id, "tool_use", `Spawned sub-agents for parallel work`);
+      }
+      if (contexts.length > 0) {
+        addEvent(agent.id, "context_detected", `Linked ${contexts.length} resources: ${contexts.map(c => c.title).join(", ").slice(0, 80)}`);
       }
     } catch (err) {
       logEnricher(`Agent ${agent.id.slice(0, 8)}: ERROR ${String(err)}`);
