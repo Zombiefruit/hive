@@ -145,12 +145,31 @@ If nothing found, return: []`;
 
     logPoll(`Parsed ${items.length} notifications`);
 
-    // Dedup by source + URL (most reliable), then source + title
-    const existingKeys = new Set(notifications.map(n => `${n.source}:${n.url ?? n.title}`));
+    // Dedup by extracting a stable resource key from each notification
+    function extractKey(n: { source: string; title: string; url?: string }): string {
+      // Extract IDs from URLs
+      if (n.url) {
+        const prMatch = n.url.match(/\/pull\/(\d+)/);
+        if (prMatch) return `github:pr:${prMatch[1]}`;
+        const linearMatch = n.url.match(/\/issue\/([A-Z]+-\d+)/);
+        if (linearMatch) return `linear:${linearMatch[1]}`;
+        const slackMatch = n.url.match(/archives\/([A-Z0-9]+)/);
+        if (slackMatch) return `slack:${slackMatch[1]}`;
+      }
+      // Extract IDs from titles
+      const ticketMatch = n.title.match(/([A-Z]+-\d+)/);
+      if (ticketMatch) return `${n.source}:${ticketMatch[1]}`;
+      const prTitleMatch = n.title.match(/PR\s*#?(\d+)/i);
+      if (prTitleMatch) return `github:pr:${prTitleMatch[1]}`;
+      // Fallback to source + normalized title
+      return `${n.source}:${n.title.toLowerCase().replace(/\s+/g, " ").trim()}`;
+    }
+
+    const existingKeys = new Set(notifications.map(n => extractKey(n)));
 
     let added = 0;
     for (const item of items) {
-      const key = `${item.source}:${item.url ?? item.title}`;
+      const key = extractKey(item);
       if (existingKeys.has(key)) continue;
       existingKeys.add(key);
       notifications.unshift({

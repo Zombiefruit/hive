@@ -139,6 +139,17 @@ export function Notifications() {
             Inbox
           </UnstyledButton>
         </Group>
+        <div style={{ WebkitAppRegion: "no-drag", display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{
+            width: 6, height: 6, borderRadius: "50%",
+            backgroundColor: notifications.length > 0 ? "#22c55e" : "#eab308",
+            animation: "pulse-dot 2s ease-in-out infinite",
+          }} />
+          <Text size="xs" c="dimmed">
+            {notifications.length} items · Polling every 2m
+          </Text>
+          <style>{`@keyframes pulse-dot { 0%,100% { opacity:1; } 50% { opacity:0.4; } }`}</style>
+        </div>
       </div>
 
       {/* Kanban board */}
