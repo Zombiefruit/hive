@@ -139,45 +139,25 @@ async function poll(): Promise<void> {
   // Don't seed from context refs — only use real triage results
 
   try {
-    // PASS 1: Gather all raw data from all sources
     const hours = nextLookbackHours;
     nextLookbackHours = 168; // Reset to default after use
-    logPoll(`Pass 1: Gathering raw data (lookback: ${hours}h)`);
+    logPoll(`Polling (lookback: ${hours}h)`);
     const timeDesc = hours <= 6 ? `the last ${hours} hours` : hours <= 24 ? `the last ${hours} hours` : hours <= 48 ? "the last 2 days" : "the last week";
-    const gatherPrompt = `You are gathering data for Kieran Williams (kwilliams, Slack ID U02PKBZSB9Q, Linear user kwilliams, team Vector at Monte Carlo Data).
 
-Fetch ALL of the following from ${timeDesc} — don't filter anything yet, just gather:
+    // Single combined prompt: gather data AND triage in one request
+    const triagePrompt = `You are Kieran Williams's personal assistant (kwilliams, Slack U02PKBZSB9Q, Linear kwilliams, team Vector at Monte Carlo Data).
 
-1. **Slack**: All @mentions of <@U02PKBZSB9Q> in ${timeDesc}. Also check DMs. For each message, get: who sent it, what they said (exact quote), which channel/thread, and when.
+## Step 1: Gather data
+Use your MCP tools to fetch from ALL these sources for ${timeDesc}:
+- **Slack**: @mentions of <@U02PKBZSB9Q>, DMs, thread replies
+- **Linear**: Issues assigned to kwilliams (all statuses)
+- **GitHub**: Open PRs where Kieran is reviewer or author (VERIFY actual state — don't include merged/closed)
+- **Gmail**: Unread emails
+- **Notion**: Recent mentions or spec updates
+- **Google Calendar**: Events in the next 24 hours
 
-2. **Linear**: ALL issues assigned to kwilliams. For each: title, status, description summary, any recent comments, priority.
-
-3. **GitHub**: Any open PRs where I'm a reviewer or author. Get: title, actual current status (open/merged/closed), who requested review.
-
-4. **Gmail**: Recent unread emails from ${timeDesc}. Subject, sender, preview.
-
-5. **Notion**: Any pages where I was recently mentioned.
-
-Return ALL of this as a structured text report. Don't skip anything — I need the complete picture. Format it clearly with sections.`;
-
-    const rawData = await askBridge(gatherPrompt, 120000);
-    logPoll(`Pass 1 complete: ${rawData.length} chars of raw data`);
-
-    if (rawData.length < 50) {
-      logPoll("Pass 1 returned too little data, skipping Pass 2");
-      isPolling = false;
-      return;
-    }
-
-    // PASS 2: AI consolidation — think like Kieran going through his inbox
-    logPoll("Pass 2: AI consolidation and prioritization");
-    const triagePrompt = `You are Kieran's personal assistant. Here is everything from his Slack, Linear, GitHub, Gmail, and Notion from the last few hours:
-
----
-${rawData}
----
-
-Now process this like Kieran would going through his inbox.
+## Step 2: Triage
+After gathering all data, process it like Kieran would going through his inbox.
 
 ## CRITICAL RULES — read carefully
 
@@ -197,6 +177,7 @@ Now process this like Kieran would going through his inbox.
    - "response" — someone messaged Kieran and expects a reply
    - "investigation" — "look into this" type request
    - "planning" — needs a plan/RFC before any work
+   - "meeting_prep" — upcoming meeting that needs preparation
 
 Return ONLY a JSON array, nothing else:
 [{
@@ -224,8 +205,8 @@ Rules:
 - Sort by confidence (highest first)
 - If nothing genuinely needs action, return []`;
 
-    const response = await askBridge(triagePrompt, 90000);
-    logPoll(`Pass 2 complete: ${response.length} chars`);
+    const response = await askBridge(triagePrompt, 180000); // 3 min — single combined request
+    logPoll(`Poll complete: ${response.length} chars`);
     logPoll(`Response (first 300): ${response.slice(0, 300)}`);
 
     // Strip markdown code blocks if present

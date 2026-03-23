@@ -6,6 +6,7 @@ import {
 import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
 import { useState, useEffect, useRef } from "react";
 import { Markdown } from "../components/Markdown";
+import { AddToManagerButton } from "../components/AddToManagerButton";
 import { useNavigate } from "react-router-dom";
 
 interface NotificationItem {
@@ -293,6 +294,7 @@ export function Notifications() {
                                 {n.author && <Text size="xs" c="dimmed" truncate style={{ maxWidth: 80 }}>{n.author}</Text>}
                               </Group>
                               <Group gap={4}>
+                                <AddToManagerButton id={n.id} label={n.title} type="notification" data={{ source: n.source, summary: n.summary }} />
                                 {n.confidence && (
                                   <div style={{
                                     width: 16, height: 16, borderRadius: "50%", fontSize: "0.55rem", fontWeight: 700,

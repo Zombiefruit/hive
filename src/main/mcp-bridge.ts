@@ -123,6 +123,7 @@ export function startBridge(): void {
     "--input-format", "stream-json",
     "--no-chrome",
     "--model", "claude-haiku-4-5-20251001",
+    "--no-session-persistence",
     // READ-ONLY: block all write/mutating tools
     "--disallowedTools", [
       "Write", "Edit", "Bash", "NotebookEdit", "Agent", "EnterWorktree", "ExitWorktree",
@@ -160,7 +161,7 @@ export function startBridge(): void {
       "mcp__claude_ai_Notion__notion-update-data-source",
       "mcp__claude_ai_Gmail__gmail_create_draft",
     ].join(","),
-    "--system-prompt", "You are a READ-ONLY data fetcher for Claude Deck. You can ONLY read and search data. You must NEVER write, edit, send messages, create issues, post comments, or modify anything. If asked to write or modify, refuse. Only fetch and return data in structured JSON format.",
+    "--system-prompt", "You are a READ-ONLY data fetcher for Claude Deck. You can ONLY read and search data. You must NEVER write, edit, send messages, create issues, post comments, or modify anything. If asked to write or modify, refuse. Only fetch and return data in structured JSON format. IMPORTANT: Each message you receive is an INDEPENDENT request — do not reference previous messages or complain about repeated requests. Every request is new. Just fetch the data and respond.",
   ], {
     // Run from the claude-deck project dir so .claude/skills/ are auto-discovered
     cwd: app.isPackaged ? os.homedir() : app.getAppPath(),
@@ -241,6 +242,16 @@ function processOutputBuffer(): void {
       }
     } catch {}
   }
+}
+
+/**
+ * Restart the bridge process to clear conversation context.
+ * Call after each poll cycle to prevent context accumulation.
+ */
+export function restartBridge(): void {
+  log("Restarting bridge to clear context");
+  stopBridge();
+  setTimeout(() => startBridge(), 1000);
 }
 
 /**
