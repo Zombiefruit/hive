@@ -384,6 +384,21 @@ export function Notifications() {
                                   <IconChevronRight size={12} />
                                 </UnstyledButton>
                               )}
+                              {/* Mark as done — available on all stages except done */}
+                              {stage.key !== "done" && (
+                                <UnstyledButton
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setNotifications(prev => prev.map(item =>
+                                      item.id === n.id ? { ...item, stage: "done" } : item
+                                    ));
+                                    window.deck.dismissNotification(n.id);
+                                  }}
+                                  style={{ padding: "2px 4px", borderRadius: 4, color: "var(--mantine-color-dimmed)", opacity: 0.5 }}
+                                >
+                                  <IconCircleCheck size={12} />
+                                </UnstyledButton>
+                              )}
                             </Group>
                           </div>
                         );
