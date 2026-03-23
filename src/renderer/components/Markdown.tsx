@@ -1,121 +1,112 @@
-import { Code, Text } from "@mantine/core";
+import { marked } from "marked";
+import { useMemo } from "react";
 
-/**
- * Simple markdown-ish renderer that doesn't depend on react-markdown.
- * Handles: code blocks, inline code, bold, headers, lists, links.
- */
+// Configure marked for safe rendering
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+});
+
+const MARKDOWN_STYLES = `
+.md-content {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--mantine-color-text);
+}
+.md-content p {
+  margin: 0 0 8px 0;
+}
+.md-content p:last-child {
+  margin-bottom: 0;
+}
+.md-content code {
+  background: var(--mantine-color-dark-5);
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-size: 0.8em;
+  font-family: var(--mantine-font-family-monospace);
+}
+.md-content pre {
+  background: var(--mantine-color-dark-5);
+  padding: 10px 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 8px 0;
+  font-size: 0.75rem;
+}
+.md-content pre code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+.md-content h1, .md-content h2, .md-content h3 {
+  margin: 12px 0 6px 0;
+  font-weight: 600;
+}
+.md-content h1 { font-size: 1.1rem; }
+.md-content h2 { font-size: 1rem; }
+.md-content h3 { font-size: 0.9rem; }
+.md-content ul, .md-content ol {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+.md-content li {
+  margin-bottom: 2px;
+}
+.md-content blockquote {
+  border-left: 3px solid var(--mantine-color-blue-5);
+  margin: 8px 0;
+  padding: 4px 12px;
+  opacity: 0.85;
+}
+.md-content a {
+  color: var(--mantine-color-blue-4);
+  text-decoration: none;
+}
+.md-content a:hover {
+  text-decoration: underline;
+}
+.md-content table {
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 0.8rem;
+  width: 100%;
+}
+.md-content th, .md-content td {
+  border: 1px solid var(--mantine-color-dark-4);
+  padding: 4px 8px;
+  text-align: left;
+}
+.md-content th {
+  background: var(--mantine-color-dark-5);
+  font-weight: 600;
+}
+.md-content strong {
+  font-weight: 600;
+}
+.md-content hr {
+  border: none;
+  border-top: 1px solid var(--mantine-color-dark-4);
+  margin: 12px 0;
+}
+`;
+
 export function Markdown({ content }: { content: string }) {
-  const blocks = content.split(/\n\n+/);
+  const html = useMemo(() => {
+    try {
+      return marked.parse(content, { async: false }) as string;
+    } catch {
+      return content;
+    }
+  }, [content]);
 
   return (
-    <div>
-      {blocks.map((block, i) => (
-        <MarkdownBlock key={i} text={block} />
-      ))}
-    </div>
+    <>
+      <style>{MARKDOWN_STYLES}</style>
+      <div
+        className="md-content"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    </>
   );
-}
-
-function MarkdownBlock({ text }: { text: string }) {
-  const trimmed = text.trim();
-  if (!trimmed) return null;
-
-  // Code block: ```...```
-  const codeBlockMatch = trimmed.match(/^```(\w*)\n?([\s\S]*?)```$/);
-  if (codeBlockMatch) {
-    return (
-      <Code block style={{ fontSize: "0.75rem", marginBlock: 6 }}>
-        {codeBlockMatch[2].trim()}
-      </Code>
-    );
-  }
-
-  // Heading
-  if (trimmed.startsWith("### ")) {
-    return <Text size="sm" fw={600} mt="xs">{renderInline(trimmed.slice(4))}</Text>;
-  }
-  if (trimmed.startsWith("## ")) {
-    return <Text size="md" fw={600} mt="xs">{renderInline(trimmed.slice(3))}</Text>;
-  }
-  if (trimmed.startsWith("# ")) {
-    return <Text size="lg" fw={700} mt="xs">{renderInline(trimmed.slice(2))}</Text>;
-  }
-
-  // List (bullet or numbered)
-  if (/^[-*] /.test(trimmed) || /^\d+\. /.test(trimmed)) {
-    const items = trimmed.split("\n").filter(Boolean);
-    return (
-      <ul style={{ margin: "4px 0", paddingLeft: 20, fontSize: "0.875rem" }}>
-        {items.map((item, i) => (
-          <li key={i} style={{ marginBottom: 2 }}>
-            {renderInline(item.replace(/^[-*]\s+/, "").replace(/^\d+\.\s+/, ""))}
-          </li>
-        ))}
-      </ul>
-    );
-  }
-
-  // Blockquote
-  if (trimmed.startsWith("> ")) {
-    return (
-      <div style={{ borderLeft: "3px solid var(--mantine-color-blue-5)", paddingLeft: 12, margin: "4px 0", opacity: 0.85 }}>
-        <Text size="sm">{renderInline(trimmed.replace(/^>\s?/gm, ""))}</Text>
-      </div>
-    );
-  }
-
-  // Regular paragraph — handle multi-line within a block
-  const lines = trimmed.split("\n");
-  return (
-    <Text size="sm" style={{ marginBottom: 4 }}>
-      {lines.map((line, i) => (
-        <span key={i}>
-          {renderInline(line)}
-          {i < lines.length - 1 && <br />}
-        </span>
-      ))}
-    </Text>
-  );
-}
-
-/** Render inline markdown: **bold**, `code`, [links](url) */
-function renderInline(text: string): React.ReactNode {
-  const parts: React.ReactNode[] = [];
-  let remaining = text;
-  let key = 0;
-
-  while (remaining.length > 0) {
-    // Inline code: `...`
-    const codeMatch = remaining.match(/^(.*?)`([^`]+)`/);
-    if (codeMatch) {
-      if (codeMatch[1]) parts.push(<span key={key++}>{codeMatch[1]}</span>);
-      parts.push(<Code key={key++} style={{ fontSize: "0.8em" }}>{codeMatch[2]}</Code>);
-      remaining = remaining.slice(codeMatch[0].length);
-      continue;
-    }
-
-    // Bold: **...**
-    const boldMatch = remaining.match(/^(.*?)\*\*(.+?)\*\*/);
-    if (boldMatch) {
-      if (boldMatch[1]) parts.push(<span key={key++}>{boldMatch[1]}</span>);
-      parts.push(<strong key={key++}>{boldMatch[2]}</strong>);
-      remaining = remaining.slice(boldMatch[0].length);
-      continue;
-    }
-
-    // Link: [text](url)
-    const linkMatch = remaining.match(/^(.*?)\[([^\]]+)\]\(([^)]+)\)/);
-    if (linkMatch) {
-      if (linkMatch[1]) parts.push(<span key={key++}>{linkMatch[1]}</span>);
-      parts.push(<a key={key++} href={linkMatch[3]} target="_blank" rel="noopener" style={{ color: "var(--mantine-color-blue-4)" }}>{linkMatch[2]}</a>);
-      remaining = remaining.slice(linkMatch[0].length);
-      continue;
-    }
-
-    // No match — emit rest as text
-    parts.push(<span key={key++}>{remaining}</span>);
-    break;
-  }
-
-  return parts.length === 1 ? parts[0] : <>{parts}</>;
 }

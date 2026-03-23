@@ -137,9 +137,16 @@ export function ChatPanel({ agentId, agentStatus, isReadOnly }: ChatPanelProps) 
       <ScrollArea ref={scrollRef} style={{ flex: 1 }} offsetScrollbars>
         <Stack gap="sm" p="md" style={{ display: "flex", flexDirection: "column" }}>
           {messages.length === 0 ? (
-            <Text c="dimmed" ta="center" py="xl">
-              Conversation will appear here...
-            </Text>
+            <div style={{ textAlign: "center", padding: "48px 24px" }}>
+              <Text size="sm" c="dimmed" mb="xs">
+                No messages loaded yet
+              </Text>
+              <Text size="xs" c="dimmed">
+                {isReadOnly
+                  ? "This session's conversation file wasn't found. Close the Claude Code session and reopen this app to load its history."
+                  : "Start typing below to begin the conversation."}
+              </Text>
+            </div>
           ) : (
             messages.map((msg) => (
               <ChatMessage key={msg.id} message={msg} />
