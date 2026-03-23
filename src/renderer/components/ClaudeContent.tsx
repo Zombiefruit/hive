@@ -39,11 +39,8 @@ export function ClaudeContent({ content, role }: ClaudeContentProps) {
     return <Text size="xs" c="dimmed" fs="italic">{'(internal operation)'}</Text>;
   }
 
-  if (role === "user") {
-    return <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>{cleaned}</Text>;
-  }
-
-  return <Markdown content={cleaned} />;
+  // Use plain text rendering for now — Markdown component may have rendering issues
+  return <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>{cleaned}</Text>;
 }
 
 function cleanClaudeOutput(raw: string): string {
