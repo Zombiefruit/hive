@@ -188,7 +188,7 @@ export function AgentDetail() {
           >
             <IconExternalLink size={14} color="var(--mantine-color-dimmed)" />
             <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-              External session — read-only view
+              {agent.status === "active" ? "Live session — watching for new messages" : "External session — read-only view"}
             </Text>
             {agent.sessionId && (
               <Button

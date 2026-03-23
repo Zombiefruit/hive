@@ -146,16 +146,23 @@ export function upsertExternalAgent(
   isAlive: boolean,
 ): void {
   const existing = db
-    .prepare("SELECT id FROM agents WHERE sessionId = ? AND source = 'external'")
-    .get(sessionId) as { id: string } | undefined;
+    .prepare("SELECT id, source FROM agents WHERE sessionId = ?")
+    .get(sessionId) as { id: string; source: string } | undefined;
 
   const status = isAlive ? "active" : "completed";
   const now = new Date().toISOString();
   const startedAtIso = new Date(startedAt).toISOString();
 
   if (existing) {
-    db.prepare("UPDATE agents SET pid = ?, status = ?, updatedAt = ? WHERE id = ?")
-      .run(pid, status, now, existing.id);
+    // Don't downgrade deck-managed agents back to external
+    if (existing.source === "deck") {
+      db.prepare("UPDATE agents SET pid = ?, status = ?, updatedAt = ? WHERE id = ?")
+        .run(pid, status, now, existing.id);
+    } else {
+      db.prepare("UPDATE agents SET pid = ?, status = ?, updatedAt = ? WHERE id = ?")
+        .run(pid, status, now, existing.id);
+    }
+    return;
   } else {
     const id = randomUUID();
     db.prepare(`
