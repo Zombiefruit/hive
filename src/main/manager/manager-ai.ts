@@ -259,24 +259,28 @@ export function setManagerStreamCallback(cb: (event: ManagerStreamEvent) => void
  * {"action": "update_task", "task_title": "...", "changes": {...}}
  */
 function parseAndExecuteActions(content: string): void {
-  const actionPattern = /\{[^}]*"action"\s*:\s*"update_task"[^}]*\}/g;
-  const matches = content.match(actionPattern);
-  if (!matches) return;
+  // Find JSON objects that contain "update_task" by counting braces
+  const lines = content.split("\n");
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("{") || !trimmed.includes("update_task")) continue;
 
-  for (const match of matches) {
     try {
-      const action = JSON.parse(match);
+      const action = JSON.parse(trimmed);
       if (action.action === "update_task" && action.task_title) {
         const changes: Record<string, unknown> = {};
         if (action.changes) Object.assign(changes, action.changes);
-        if (action.priority) changes.priority = action.priority;
-        if (action.status) changes.status = action.status;
-        if (action.stage) changes.stage = action.stage;
-        if (action.confidence) changes.confidence = action.confidence;
+        // Also support flat fields
+        if (action.priority && !changes.priority) changes.priority = action.priority;
+        if (action.status && !changes.status) changes.status = action.status;
+        if (action.stage && !changes.stage) changes.stage = action.stage;
+        if (action.confidence && !changes.confidence) changes.confidence = action.confidence;
 
-        const updated = updateNotificationByTitle(action.task_title, changes);
+        const updated = updateNotificationByTitle(String(action.task_title), changes);
         if (updated) {
-          console.log(`[Manager] Updated task "${action.task_title}":`, changes);
+          emit({ type: "text_delta", text: `\n\n✅ Task "${action.task_title}" updated.` });
+        } else {
+          emit({ type: "text_delta", text: `\n\n⚠️ Could not find task matching "${action.task_title}".` });
         }
       }
     } catch {}
