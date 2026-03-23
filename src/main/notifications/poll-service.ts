@@ -140,14 +140,19 @@ If nothing found, return: []`;
     }
 
     const items = JSON.parse(jsonMatch[0]) as Array<{
-      source: string; priority: string; title: string; summary: string; url?: string;
+      source: string; priority: string; title: string; summary: string; url?: string; author?: string;
     }>;
 
     logPoll(`Parsed ${items.length} notifications`);
 
+    // Dedup by source + URL (most reliable), then source + title
+    const existingKeys = new Set(notifications.map(n => `${n.source}:${n.url ?? n.title}`));
+
     let added = 0;
     for (const item of items) {
-      if (notifications.some(n => n.title === item.title)) continue;
+      const key = `${item.source}:${item.url ?? item.title}`;
+      if (existingKeys.has(key)) continue;
+      existingKeys.add(key);
       notifications.unshift({
         id: `poll-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         source: item.source as PollNotification["source"],
