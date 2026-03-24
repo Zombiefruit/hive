@@ -431,36 +431,37 @@ Only include pages updated after ${cutoffStr}. Return page titles, who edited th
       },
     ];
 
-    // Fetch ALL sources in PARALLEL — each spawns its own Claude Code process
-    // Uses identical spawn pattern to the working bridge
-    logPoll(`  Launching ${sources.length} parallel fetchers...`);
-    addDebugEntry("in", `🚀 Launching ${sources.length} parallel source fetchers`);
-    for (const win of BrowserWindow.getAllWindows()) {
+    // Fetch sources via the shared bridge (reliable MCP access)
+    // Sequential but each source shows progress in the UI
+    const rawResults: string[] = [];
+
+    for (let i = 0; i < sources.length; i++) {
+      const source = sources[i];
+      logPoll(`  Fetching: ${source.name} (${i + 1}/${sources.length})`);
+      addDebugEntry("in", `📤 Fetching ${source.name} (${i + 1}/${sources.length})...`);
+
+      for (const win of BrowserWindow.getAllWindows()) {
+        try {
+          if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", {
+            source: source.name,
+            current: i + 1,
+            total: sources.length + 1,
+          });
+        } catch {}
+      }
+
       try {
-        if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", {
-          source: "Fetching all sources in parallel",
-          current: 1,
-          total: 2,
-        });
-      } catch {}
+        const result = await askBridge(source.prompt, source.timeoutMs);
+        rawResults.push(`## ${source.name}\n${result}\n`);
+        logPoll(`  ${source.name}: ${result.length} chars`);
+        addDebugEntry("out", `✅ ${source.name}: ${result.length} chars`);
+      } catch (err) {
+        rawResults.push(`## ${source.name}\nError: ${String(err).slice(0, 100)}\n`);
+        logPoll(`  ${source.name}: ERROR ${String(err).slice(0, 60)}`);
+        addDebugEntry("out", `❌ ${source.name}: ERROR`);
+      }
     }
 
-    const fetchPromises = sources.map(async (source) => {
-      logPoll(`  [parallel] Starting: ${source.name}`);
-      addDebugEntry("in", `📤 ${source.name}: starting...`);
-      try {
-        const result = await askOneShot(source.prompt, source.timeoutMs);
-        logPoll(`  [parallel] ${source.name}: ${result.length} chars`);
-        addDebugEntry("out", `✅ ${source.name}: ${result.length} chars`);
-        return `## ${source.name}\n${result}\n`;
-      } catch (err) {
-        logPoll(`  [parallel] ${source.name}: ERROR ${String(err).slice(0, 60)}`);
-        addDebugEntry("out", `❌ ${source.name}: ${String(err).slice(0, 60)}`);
-        return `## ${source.name}\nError: ${String(err).slice(0, 100)}\n`;
-      }
-    });
-
-    const rawResults = await Promise.all(fetchPromises);
     const rawData = rawResults.join("\n---\n\n");
     logPoll(`Pass 1 complete: ${rawData.length} total chars from ${rawResults.length} sources`);
 
