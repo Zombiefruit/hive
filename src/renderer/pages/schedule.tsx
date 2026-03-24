@@ -4,7 +4,6 @@ import {
   IconChevronDown, IconGripVertical, IconFocus2,
 } from "@tabler/icons-react";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import { AppHeader } from "../components/AppHeader";
 
 interface ScheduleItem {
@@ -74,7 +73,6 @@ function recalcTimes(items: ScheduleItem[], dayStartMinutes: number): ScheduleIt
 }
 
 export function Schedule() {
-  const navigate = useNavigate();
   const [items, setItems] = useState<ScheduleItem[]>([]);
   const [generating, setGenerating] = useState(false);
   const [workingHours] = useState({ start: "09:00", end: "18:00" });
@@ -236,84 +234,36 @@ export function Schedule() {
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--mantine-color-body)" }}>
-      {/* Header — matches notifications.tsx */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          padding: "8px 24px",
-          paddingLeft: 90,
-          gap: 12,
-          borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-          backgroundColor: "color-mix(in srgb, var(--mantine-color-dark-8) 80%, transparent)",
-          backdropFilter: "blur(8px)",
-          WebkitAppRegion: "drag",
-          flexShrink: 0,
-        }}
-      >
-        <Group gap={6} style={{ WebkitAppRegion: "no-drag", minWidth: 120 }} wrap="nowrap">
-          <Text size="md" fw={700}>Claude Deck</Text>
-        </Group>
-        {/* Centered tabs */}
-        <Group gap={4} style={{ WebkitAppRegion: "no-drag", position: "absolute", left: "50%", transform: "translateX(-50%)" }}>
-          <UnstyledButton
-            onClick={() => navigate("/")}
-            style={{ padding: "4px 14px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500, color: "var(--mantine-color-dimmed)" }}
-          >
-            Agents
-          </UnstyledButton>
-          <UnstyledButton
-            onClick={() => navigate("/notifications")}
-            style={{ padding: "4px 14px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500, color: "var(--mantine-color-dimmed)" }}
-          >
-            Inbox
-          </UnstyledButton>
-          <UnstyledButton
-            style={{ padding: "4px 14px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500, backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-text)" }}
-          >
-            Schedule
-          </UnstyledButton>
-        </Group>
-        <Group gap={8} style={{ WebkitAppRegion: "no-drag", marginLeft: "auto" }}>
-          <Text size="xs" c="dimmed">
-            {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
-          </Text>
-          <Tooltip label={focusMode ? "Exit focus mode" : "Focus mode — hide sidebar"} position="bottom" withArrow>
-            <UnstyledButton
-              onClick={() => setFocusMode(f => !f)}
-              style={{
-                padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500,
-                backgroundColor: focusMode ? "var(--mantine-color-blue-9)" : "var(--mantine-color-dark-6)",
-                color: focusMode ? "var(--mantine-color-blue-4)" : "var(--mantine-color-dimmed)",
-                display: "flex", alignItems: "center", gap: 4,
-                transition: "background-color 0.15s ease, color 0.15s ease",
-              }}
-            >
-              <IconFocus2 size={12} />
-              Focus
+      {/* Header */}
+      <AppHeader
+        rightContent={
+          <>
+            <Text size="xs" c="dimmed">
+              {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+            </Text>
+            <Tooltip label={focusMode ? "Exit focus mode" : "Focus mode — hide sidebar"} position="bottom" withArrow>
+              <UnstyledButton
+                onClick={() => setFocusMode(f => !f)}
+                style={{
+                  padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500,
+                  backgroundColor: focusMode ? "var(--mantine-color-blue-9)" : "var(--mantine-color-dark-6)",
+                  color: focusMode ? "var(--mantine-color-blue-4)" : "var(--mantine-color-dimmed)",
+                  display: "flex", alignItems: "center", gap: 4,
+                  transition: "background-color 0.15s ease, color 0.15s ease",
+                }}
+              >
+                <IconFocus2 size={12} />
+                Focus
+              </UnstyledButton>
+            </Tooltip>
+            <UnstyledButton onClick={generateSchedule} disabled={generating}
+              style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-dimmed)", display: "flex", alignItems: "center", gap: 4 }}>
+              {generating ? <Loader size={10} /> : <IconRefresh size={12} />}
+              {generating ? "Generating..." : "Regenerate"}
             </UnstyledButton>
-          </Tooltip>
-          <UnstyledButton onClick={generateSchedule} disabled={generating}
-            style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-dimmed)", display: "flex", alignItems: "center", gap: 4 }}>
-            {generating ? <Loader size={10} /> : <IconRefresh size={12} />}
-            {generating ? "Generating..." : "Regenerate"}
-          </UnstyledButton>
-          <Tooltip label="Settings" position="bottom" withArrow>
-            <UnstyledButton
-              onClick={() => navigate("/settings")}
-              style={{
-                padding: "4px",
-                borderRadius: 4,
-                color: "var(--mantine-color-dimmed)",
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              <IconSettings size={16} />
-            </UnstyledButton>
-          </Tooltip>
-        </Group>
-      </div>
+          </>
+        }
+      />
 
       {/* Schedule body */}
       <div style={{ flex: 1, overflow: "auto", display: "flex" }}>

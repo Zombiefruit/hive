@@ -120,19 +120,20 @@ function askOneShot(prompt: string, timeoutMs: number): Promise<string> {
 
 export interface PollNotification {
   id: string;
-  source: "slack" | "linear" | "github" | "notion" | "email";
-  priority: "actionable" | "fyi" | "noise" | "urgent" | "today" | "low";
+  source: "slack" | "linear" | "github" | "notion" | "email" | "manual";
+  priority: "actionable" | "fyi" | "noise" | "urgent" | "today" | "low" | "medium";
   status: "new" | "in_progress" | "done" | "dismissed";
   title: string;
   summary: string;
   url?: string;
   links?: Array<{ type: string; label: string; url: string }>;
-  taskType?: "implementation" | "review" | "response" | "investigation" | "planning";
+  taskType?: "implementation" | "review" | "response" | "investigation" | "planning" | "meeting_prep";
   author?: string;
   confidence?: number;
   actionNeeded?: string;
   createdAt: string;
   stage?: string;
+  estimatedMinutes?: number;
 }
 
 const POLL_LOG = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "poll.log");
@@ -246,6 +247,32 @@ export function upsertNotification(data: Record<string, unknown>): boolean {
   broadcastNotifications();
   logPoll(`Upserted [${id.slice(0, 20)}] stage=${data.stage}`);
   return true;
+}
+
+export function createManualNotification(data: {
+  title: string;
+  summary: string;
+  taskType: string;
+  priority: string;
+  estimatedMinutes?: number;
+}): PollNotification {
+  const notification: PollNotification = {
+    id: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    source: "manual",
+    priority: data.priority as PollNotification["priority"],
+    status: "new",
+    title: data.title,
+    summary: data.summary,
+    taskType: data.taskType as PollNotification["taskType"],
+    createdAt: new Date().toISOString(),
+    stage: "new",
+    estimatedMinutes: data.estimatedMinutes,
+  };
+  notifications.unshift(notification);
+  saveCacheToFile();
+  broadcastNotifications();
+  logPoll(`Manual notification created: "${data.title.slice(0, 40)}"`);
+  return notification;
 }
 
 export function updateNotificationById(id: string, changes: Record<string, unknown>): boolean {

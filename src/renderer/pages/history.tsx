@@ -1,7 +1,8 @@
-import { Group, ScrollArea, Stack, Text, Title, UnstyledButton } from "@mantine/core";
-import { IconArrowLeft, IconClock, IconFileText, IconTerminal2 } from "@tabler/icons-react";
+import { Group, Stack, Text, UnstyledButton } from "@mantine/core";
+import { IconClock, IconFileText, IconTerminal2 } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AppHeader } from "../components/AppHeader";
 
 interface HistoricalSession {
   sessionId: string;
@@ -44,27 +45,12 @@ export function History() {
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "var(--mantine-color-body)" }}>
-      <div
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 10,
-          display: "flex",
-          alignItems: "center",
-          padding: "8px 24px",
-          paddingLeft: 80,
-          gap: 12,
-          borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-          backgroundColor: "color-mix(in srgb, var(--mantine-color-dark-8) 80%, transparent)",
-          backdropFilter: "blur(8px)",
-          WebkitAppRegion: "drag",
-        }}
-      >
-        <UnstyledButton onClick={() => navigate("/")} style={{ WebkitAppRegion: "no-drag", padding: 4 }}>
-          <IconArrowLeft size={16} />
-        </UnstyledButton>
-        <Title order={4}>Session History</Title>
-        <Text size="xs" c="dimmed">{sessions.length} sessions</Text>
+      <div style={{ position: "sticky", top: 0, zIndex: 10 }}>
+        <AppHeader
+          rightContent={
+            <Text size="xs" c="dimmed">{sessions.length} sessions</Text>
+          }
+        />
       </div>
 
       <div style={{ maxWidth: 900, margin: "0 auto", padding: 24 }}>

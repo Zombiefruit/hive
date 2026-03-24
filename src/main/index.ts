@@ -10,7 +10,7 @@ import { enrichExternalAgents } from "./agents/session-enricher";
 import { startSessionTailing, stopSessionTailing } from "./agents/session-tailer";
 import { addContextFromUrl } from "./agents/context-tracker";
 import { listAllSessions } from "./agents/session-history";
-import { startPolling, stopPolling, getNotifications, dismissNotification, startWorkOnNotification, clearAllNotifications, forcePoll, hasPolledOnce, getSkippedItems, updateNotificationByTitle, updateNotificationById, upsertNotification } from "./notifications/poll-service";
+import { startPolling, stopPolling, getNotifications, dismissNotification, startWorkOnNotification, clearAllNotifications, forcePoll, hasPolledOnce, getSkippedItems, updateNotificationByTitle, updateNotificationById, upsertNotification, createManualNotification } from "./notifications/poll-service";
 import { startBridge, stopBridge, getBridgeDebugLog } from "./mcp-bridge";
 import { prepareWorkPlan, iteratePlan, startWorkAgent, getPlan, clearPlan, getAllPlans, getActiveWorkAgents } from "./notifications/work-dispatcher";
 import { startMonitoring, stopMonitoring } from "./notifications/agent-monitor";
@@ -178,6 +178,9 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("notifications:upsert", (_event, data: Record<string, unknown>) => {
     return upsertNotification(data);
+  });
+  ipcMain.handle("notifications:create-manual", (_event, data: { title: string; summary: string; taskType: string; priority: string; estimatedMinutes?: number }) => {
+    return createManualNotification(data);
   });
 
   // Work dispatcher

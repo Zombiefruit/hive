@@ -2,12 +2,13 @@ import { Badge, Group, Loader, Stack, Text, Tooltip, UnstyledButton } from "@man
 import {
   IconInbox, IconSparkles, IconClock, IconPlayerPlay, IconGitPullRequest, IconCircleCheck,
   IconBrandGithub, IconHash, IconMail, IconFileText, IconChevronRight, IconChevronDown,
-  IconGripVertical, IconEyeOff,
+  IconGripVertical, IconEyeOff, IconPlus, IconPencil,
 } from "@tabler/icons-react";
 import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Markdown } from "../components/Markdown";
 import { AddToManagerButton } from "../components/AddToManagerButton";
+import { AddTaskModal } from "../components/AddTaskModal";
 import { AppHeader } from "../components/AppHeader";
 import { useNavigate } from "react-router-dom";
 

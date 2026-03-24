@@ -13,7 +13,6 @@ import {
   UnstyledButton,
 } from "@mantine/core";
 import {
-  IconArrowLeft,
   IconBrandSlack,
   IconBriefcase,
   IconCheck,
@@ -22,10 +21,10 @@ import {
   IconSettings,
   IconTrash,
   IconUser,
-  IconUsers,
 } from "@tabler/icons-react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { AppHeader } from "../components/AppHeader";
 import type {
   DeckConfig,
   UserRole,
@@ -238,47 +237,7 @@ export function Settings() {
       }}
     >
       {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          padding: "8px 24px",
-          paddingLeft: 90,
-          gap: 12,
-          borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-          backgroundColor: "color-mix(in srgb, var(--mantine-color-dark-8) 80%, transparent)",
-          backdropFilter: "blur(8px)",
-          WebkitAppRegion: "drag",
-          flexShrink: 0,
-        }}
-      >
-        <Group gap={6} style={{ WebkitAppRegion: "no-drag", minWidth: 120 }} wrap="nowrap">
-          <Text size="md" fw={700}>Claude Deck</Text>
-        </Group>
-        <Group gap={8} style={{ WebkitAppRegion: "no-drag", position: "absolute", left: "50%", transform: "translateX(-50%)" }}>
-          <IconSettings size={14} color="var(--mantine-color-dimmed)" />
-          <Text size="sm" c="dimmed" fw={500}>Settings</Text>
-        </Group>
-        <Group gap={8} style={{ WebkitAppRegion: "no-drag", marginLeft: "auto" }}>
-          <UnstyledButton
-            onClick={() => navigate(-1)}
-            style={{
-              padding: "2px 10px",
-              borderRadius: 4,
-              fontSize: "0.7rem",
-              fontWeight: 500,
-              backgroundColor: "var(--mantine-color-dark-6)",
-              color: "var(--mantine-color-dimmed)",
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-            }}
-          >
-            <IconArrowLeft size={12} />
-            Back
-          </UnstyledButton>
-        </Group>
-      </div>
+      <AppHeader />
 
       {/* Scrollable content */}
       <div
