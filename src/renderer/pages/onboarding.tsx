@@ -37,11 +37,9 @@ import type {
 
 const TOTAL_STEPS = 6;
 
+// Only suggest truly universal channels — users add their own team channels
 const DEFAULT_CHANNELS: SlackChannel[] = [
-  { id: "C0AMSV2SK4Z", name: "#team-vector" },
-  { id: "C0AMT1AGN7K", name: "#team-vector-standup" },
-  { id: "C01GENERAL01", name: "#general" },
-  { id: "C01ENGINEE01", name: "#engineering" },
+  { id: "", name: "#general" },
 ];
 
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
@@ -196,14 +194,15 @@ export function Onboarding() {
 
   const addCustomChannel = () => {
     const trimmedName = newChannelName.trim();
-    const trimmedId = newChannelId.trim();
-    if (!trimmedName || !trimmedId) return;
-    if (channels.some((c) => c.id === trimmedId)) return;
-    const newChannel: SlackChannel = { id: trimmedId, name: trimmedName.startsWith("#") ? trimmedName : `#${trimmedName}` };
+    if (!trimmedName) return;
+    const name = trimmedName.startsWith("#") ? trimmedName : `#${trimmedName}`;
+    if (channels.some((c) => c.name === name)) return;
+    // Generate a placeholder ID — will be resolved via Slack search at runtime
+    const placeholderId = `pending-${name.replace(/[^a-z0-9]/gi, "")}`;
+    const newChannel: SlackChannel = { id: placeholderId, name };
     setChannels((prev) => [...prev, newChannel]);
-    setSelectedChannelIds((prev) => new Set([...prev, trimmedId]));
+    setSelectedChannelIds((prev) => new Set([...prev, placeholderId]));
     setNewChannelName("");
-    setNewChannelId("");
   };
 
   const removeChannel = (id: string) => {
@@ -453,13 +452,11 @@ export function Onboarding() {
                           <Text size="sm" fw={500} truncate>
                             {ch.name}
                           </Text>
-                          <Text
-                            size="xs"
-                            c="dimmed"
-                            style={{ fontFamily: "var(--mantine-font-family-monospace)", fontSize: "0.65rem" }}
-                          >
-                            {ch.id}
-                          </Text>
+                          {ch.id && (
+                            <Text size="xs" c="dimmed" style={{ fontSize: "0.6rem" }}>
+                              Slack channel
+                            </Text>
+                          )}
                         </div>
                         {!DEFAULT_CHANNELS.some((d) => d.id === ch.id) && (
                           <ActionIcon
@@ -491,15 +488,7 @@ export function Onboarding() {
                       onChange={(e) =>
                         setNewChannelName(e.currentTarget.value)
                       }
-                      size="xs"
-                      style={{ flex: 1 }}
-                    />
-                    <TextInput
-                      placeholder="Channel ID"
-                      value={newChannelId}
-                      onChange={(e) =>
-                        setNewChannelId(e.currentTarget.value)
-                      }
+                      onKeyDown={(e) => { if (e.key === "Enter") addCustomChannel(); }}
                       size="xs"
                       style={{ flex: 1 }}
                     />
@@ -508,9 +497,7 @@ export function Onboarding() {
                       variant="light"
                       color="blue"
                       onClick={addCustomChannel}
-                      disabled={
-                        !newChannelName.trim() || !newChannelId.trim()
-                      }
+                      disabled={!newChannelName.trim()}
                     >
                       <IconPlus size={14} />
                     </ActionIcon>
