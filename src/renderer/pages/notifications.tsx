@@ -2,12 +2,13 @@ import { Badge, Group, Loader, Stack, Text, Tooltip, UnstyledButton } from "@man
 import {
   IconInbox, IconSparkles, IconClock, IconPlayerPlay, IconGitPullRequest, IconCircleCheck,
   IconBrandGithub, IconHash, IconMail, IconFileText, IconChevronRight, IconChevronDown,
-  IconGripVertical, IconEyeOff, IconSettings,
+  IconGripVertical, IconEyeOff,
 } from "@tabler/icons-react";
 import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Markdown } from "../components/Markdown";
 import { AddToManagerButton } from "../components/AddToManagerButton";
+import { AppHeader } from "../components/AppHeader";
 import { useNavigate } from "react-router-dom";
 
 interface NotificationItem {
@@ -290,119 +291,59 @@ export function Notifications() {
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
       `}</style>
       {/* Header with tabs */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          padding: "8px 24px",
-          paddingLeft: 90,
-          gap: 12,
-          borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-          backgroundColor: "color-mix(in srgb, var(--mantine-color-dark-8) 80%, transparent)",
-          backdropFilter: "blur(8px)",
-          WebkitAppRegion: "drag",
-          flexShrink: 0,
-        }}
-      >
-        <Group gap={6} style={{ WebkitAppRegion: "no-drag", minWidth: 120 }} wrap="nowrap">
-          <Text size="md" fw={700}>Claude Deck</Text>
-          {authStatus && (
-            <div
-              title={authStatus.authenticated ? `Authenticated (${authStatus.version ?? "unknown version"})` : authStatus.installed ? "Not authenticated" : "CLI not found"}
+      <AppHeader
+        rightContent={
+          <>
+            {fetching ? (
+              <>
+                <div style={{ width: 14, height: 14, border: "2px solid var(--mantine-color-blue-5)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                <Text size="xs" c="blue">
+                  {pollProgress
+                    ? `Fetching ${pollProgress.source} (${pollProgress.current}/${pollProgress.total})...`
+                    : "Fetching notifications..."}
+                </Text>
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+              </>
+            ) : (
+              <>
+                <div style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#22c55e" }} />
+                <Text size="xs" c="dimmed">
+                  {notifications.length} items{lastRefreshed ? ` · Updated ${formatTimeSince(lastRefreshed)}` : ""}
+                </Text>
+              </>
+            )}
+            <select
+              value={lookbackHours}
+              onChange={(e) => setLookbackHours(Number(e.target.value))}
               style={{
-                width: 7,
-                height: 7,
-                borderRadius: "50%",
-                backgroundColor: authStatus.authenticated ? "#22c55e" : "#ef4444",
-                flexShrink: 0,
-              }}
-            />
-          )}
-        </Group>
-        {/* Centered tabs */}
-        <Group gap={4} style={{ WebkitAppRegion: "no-drag", position: "absolute", left: "50%", transform: "translateX(-50%)" }}>
-          <UnstyledButton
-            onClick={() => navigate("/")}
-            style={{ padding: "4px 14px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500, color: "var(--mantine-color-dimmed)" }}
-          >
-            Agents
-          </UnstyledButton>
-          <UnstyledButton
-            style={{ padding: "4px 14px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500, backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-text)" }}
-          >
-            Inbox
-          </UnstyledButton>
-          <UnstyledButton
-            onClick={() => navigate("/schedule")}
-            style={{ padding: "4px 14px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500, color: "var(--mantine-color-dimmed)" }}
-          >
-            Schedule
-          </UnstyledButton>
-        </Group>
-        <Group gap={8} style={{ WebkitAppRegion: "no-drag", marginLeft: "auto" }}>
-          {fetching ? (
-            <>
-              <div style={{ width: 14, height: 14, border: "2px solid var(--mantine-color-blue-5)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-              <Text size="xs" c="blue">
-                {pollProgress
-                  ? `Fetching ${pollProgress.source} (${pollProgress.current}/${pollProgress.total})...`
-                  : "Fetching notifications..."}
-              </Text>
-              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            </>
-          ) : (
-            <>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#22c55e" }} />
-              <Text size="xs" c="dimmed">
-                {notifications.length} items{lastRefreshed ? ` · Updated ${formatTimeSince(lastRefreshed)}` : ""}
-              </Text>
-            </>
-          )}
-          <select
-            value={lookbackHours}
-            onChange={(e) => setLookbackHours(Number(e.target.value))}
-            style={{
-              padding: "2px 6px", borderRadius: 4, fontSize: "0.65rem",
-              backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-dimmed)",
-              border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
-              outline: "none", cursor: "pointer",
-            }}
-          >
-            <option value={2}>Last 2h</option>
-            <option value={6}>Last 6h</option>
-            <option value={12}>Last 12h</option>
-            <option value={24}>Last 24h</option>
-            <option value={48}>Last 2 days</option>
-            <option value={168}>Last week</option>
-          </select>
-          <UnstyledButton
-            onClick={() => { setFetching(true); setPollProgress(null); window.deck.refreshNotifications?.(lookbackHours); }}
-            style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-dimmed)" }}
-          >
-            Refresh
-          </UnstyledButton>
-          <UnstyledButton
-            onClick={() => setShowDebug(!showDebug)}
-            style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, color: showDebug ? "var(--mantine-color-blue-4)" : "var(--mantine-color-dimmed)" }}
-          >
-            {showDebug ? "Hide logs" : "Logs"}
-          </UnstyledButton>
-          <Tooltip label="Settings" position="bottom" withArrow>
-            <UnstyledButton
-              onClick={() => navigate("/settings")}
-              style={{
-                padding: "4px",
-                borderRadius: 4,
-                color: "var(--mantine-color-dimmed)",
-                display: "flex",
-                alignItems: "center",
+                padding: "2px 6px", borderRadius: 4, fontSize: "0.65rem",
+                backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-dimmed)",
+                border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
+                outline: "none", cursor: "pointer",
               }}
             >
-              <IconSettings size={16} />
+              <option value={2}>Last 2h</option>
+              <option value={6}>Last 6h</option>
+              <option value={12}>Last 12h</option>
+              <option value={24}>Last 24h</option>
+              <option value={48}>Last 2 days</option>
+              <option value={168}>Last week</option>
+            </select>
+            <UnstyledButton
+              onClick={() => { setFetching(true); setPollProgress(null); window.deck.refreshNotifications?.(lookbackHours); }}
+              style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-dimmed)" }}
+            >
+              Refresh
             </UnstyledButton>
-          </Tooltip>
-        </Group>
-      </div>
+            <UnstyledButton
+              onClick={() => setShowDebug(!showDebug)}
+              style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, color: showDebug ? "var(--mantine-color-blue-4)" : "var(--mantine-color-dimmed)" }}
+            >
+              {showDebug ? "Hide logs" : "Logs"}
+            </UnstyledButton>
+          </>
+        }
+      />
 
       {/* Two-section kanban board */}
         <div style={{ flex: 1, overflowX: "auto", overflowY: "auto" }}>

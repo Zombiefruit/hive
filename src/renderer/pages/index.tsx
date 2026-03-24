@@ -1,7 +1,6 @@
 import {
   Badge,
   Group,
-  ScrollArea,
   SimpleGrid,
   Stack,
   Text,
@@ -12,15 +11,13 @@ import {
 import { useDisclosure } from "@mantine/hooks";
 import {
   IconPlus,
-  IconSettings,
-  IconBell,
-  IconHistory,
   IconRobotOff,
   IconShieldCheck,
   IconActivity,
 } from "@tabler/icons-react";
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { AppHeader } from "../components/AppHeader";
 import { MetricsBar } from "../components/MetricsBar";
 import { AgentCard } from "../components/AgentCard";
 import { AgentFilterBar } from "../components/AgentFilterBar";
@@ -124,80 +121,28 @@ export function Dashboard() {
         }}
       >
         {/* Header */}
-        <div
-          style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 10,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "8px 24px",
-            paddingLeft: 80,
-            borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-            backgroundColor: "color-mix(in srgb, var(--mantine-color-dark-8) 80%, transparent)",
-            backdropFilter: "blur(8px)",
-            WebkitAppRegion: "drag",
-          }}
-        >
-          <Group gap="sm" style={{ WebkitAppRegion: "no-drag", minWidth: 120 }}>
-            <Title order={4}>Claude Deck</Title>
-          </Group>
-          {/* Centered tabs */}
-          <Group gap={4} style={{ WebkitAppRegion: "no-drag", position: "absolute", left: "50%", transform: "translateX(-50%)" }}>
-            <UnstyledButton
-              style={{
-                padding: "4px 14px",
-                borderRadius: 6,
-                fontSize: "0.8rem",
-                fontWeight: 500,
-                backgroundColor: "var(--mantine-color-dark-6)",
-                color: "var(--mantine-color-text)",
-              }}
-            >
-              Agents
-            </UnstyledButton>
-            <UnstyledButton
-              onClick={() => navigate("/notifications")}
-              style={{
-                padding: "4px 14px",
-                borderRadius: 6,
-                fontSize: "0.8rem",
-                fontWeight: 500,
-                color: "var(--mantine-color-dimmed)",
-              }}
-            >
-              Inbox
-            </UnstyledButton>
-          </Group>
-          <Group gap="xs" style={{ WebkitAppRegion: "no-drag" }}>
-            <UnstyledButton
-              onClick={openModal}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "6px 12px",
-                borderRadius: 6,
-                fontSize: "0.8rem",
-                fontWeight: 500,
-                backgroundColor: "var(--mantine-color-blue-5)",
-                color: "white",
-              }}
-            >
-              <IconPlus size={14} stroke={2} />
-              Spawn Agent
-            </UnstyledButton>
-            <UnstyledButton onClick={() => navigate("/history")} style={{ padding: 8, borderRadius: 8 }}>
-              <IconHistory size={16} color="var(--mantine-color-dimmed)" />
-            </UnstyledButton>
-            <UnstyledButton onClick={() => navigate("/notifications")} style={{ padding: 8, borderRadius: 8 }}>
-              <IconBell size={16} color="var(--mantine-color-dimmed)" />
-            </UnstyledButton>
-            <UnstyledButton onClick={() => navigate("/debug")} style={{ padding: 8, borderRadius: 8 }}>
-              <IconSettings size={16} color="var(--mantine-color-dimmed)" />
-            </UnstyledButton>
-          </Group>
+        <div style={{ position: "sticky", top: 0, zIndex: 10 }}>
+          <AppHeader
+            rightContent={
+              <UnstyledButton
+                onClick={openModal}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "6px 12px",
+                  borderRadius: 6,
+                  fontSize: "0.8rem",
+                  fontWeight: 500,
+                  backgroundColor: "var(--mantine-color-blue-5)",
+                  color: "white",
+                }}
+              >
+                <IconPlus size={14} stroke={2} />
+                Spawn Agent
+              </UnstyledButton>
+            }
+          />
         </div>
 
         {/* Loading state */}

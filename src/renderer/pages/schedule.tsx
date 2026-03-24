@@ -1,10 +1,11 @@
 import { Badge, Group, Loader, Progress, Stack, Text, Tooltip, UnstyledButton } from "@mantine/core";
 import {
   IconCalendarEvent, IconCircleCheck, IconRefresh, IconChevronRight,
-  IconChevronDown, IconGripVertical, IconFocus2, IconSettings,
+  IconChevronDown, IconGripVertical, IconFocus2,
 } from "@tabler/icons-react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { AppHeader } from "../components/AppHeader";
 
 interface ScheduleItem {
   id: string;
