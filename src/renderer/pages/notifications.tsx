@@ -96,6 +96,7 @@ export function Notifications() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [plansReady, setPlansReady] = useState<Set<string>>(new Set());
   const [fetching, setFetching] = useState(true);
+  const fetchingRef = useRef(true); // tracks polling state without re-renders
   const [lastRefreshed, setLastRefreshed] = useState<string | null>(null);
   const [pollProgress, setPollProgress] = useState<{ source: string; current: number; total: number } | null>(null);
   const [showSkipped, setShowSkipped] = useState(false);
@@ -117,11 +118,12 @@ export function Notifications() {
           const skipped = Array.isArray(data) ? [] : (data.skipped ?? []);
           const hasPolled = Array.isArray(data) ? items.length > 0 : (data.hasPolled ?? false);
 
-          // Server is the single source of truth — skipped items are now real server notifications
+          // Server is the single source of truth
           const serverItems = items.map(n => ({ ...n, stage: n.stage ?? "new" }));
-          setNotifications(serverItems);
-          // Only clear fetching if polling has completed AND we're not currently polling
-          if (hasPolled) setFetching(false);
+          if (serverItems.length > 0) setNotifications(serverItems);
+          // Don't clear fetching from load() — only polling-finished should do that
+          // But if we have cached data on first load and no poll is active, show it
+          if (hasPolled && serverItems.length > 0 && !fetchingRef.current) setFetching(false);
         }
       } catch {}
     };
@@ -141,10 +143,12 @@ export function Notifications() {
     // Polling lifecycle events — these are the ONLY way to control the loading indicator
     const unsubStarted = window.deck.onPollingStarted?.(() => {
       setFetching(true);
+      fetchingRef.current = true;
       setPollProgress(null);
     });
     const unsubFinished = window.deck.onPollingFinished?.(() => {
       setFetching(false);
+      fetchingRef.current = false;
       setPollProgress(null);
       setLastRefreshed(new Date().toISOString());
     });
@@ -373,14 +377,6 @@ export function Notifications() {
           >
             {showDebug ? "Hide logs" : "Logs"}
           </UnstyledButton>
-          {notifications.length > 0 && (
-            <UnstyledButton
-              onClick={() => { window.deck.clearNotifications(); setNotifications([]); }}
-              style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, color: "var(--mantine-color-red-4)" }}
-            >
-              Clear
-            </UnstyledButton>
-          )}
         </Group>
       </div>
 
@@ -690,6 +686,7 @@ export function Notifications() {
             <Group justify="space-between">
               <Text size="xs" fw={600}>Bridge Activity</Text>
               <Text size="xs" c="dimmed">{debugEntries.length} entries</Text>
+              <UnstyledButton onClick={() => setDebugEntries([])} style={{ fontSize: "0.6rem", color: "var(--mantine-color-dimmed)" }}>Clear</UnstyledButton>
             </Group>
           </div>
           <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
