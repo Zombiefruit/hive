@@ -1,0 +1,54 @@
+/** Configuration types for Claude Deck onboarding and user preferences. */
+
+export interface SlackChannel {
+  id: string;
+  name: string;
+}
+
+export type UserRole =
+  | "frontend_dev"
+  | "backend_dev"
+  | "fullstack_dev"
+  | "pm"
+  | "designer"
+  | "other";
+
+export type FetchCadence = "manual" | "15min" | "30min" | "1hr";
+
+export interface IntegrationToggles {
+  slack: boolean;
+  linear: boolean;
+  gmail: boolean;
+  calendar: boolean;
+  notion: boolean;
+  github: boolean;
+}
+
+export interface DeckConfig {
+  /** Step 1 — Identity */
+  name: string;
+  email: string;
+
+  /** Step 2 — Role */
+  role: UserRole;
+
+  /** Step 3 — Team */
+  managerName: string;
+  teamName: string;
+
+  /** Step 4 — Slack Channels */
+  slackChannels: SlackChannel[];
+
+  /** Step 5 — Integrations */
+  integrations: IntegrationToggles;
+
+  /** Step 6 — Preferences */
+  fetchCadence: FetchCadence;
+  timezone: string;
+  workingHoursStart: string; // "HH:MM"
+  workingHoursEnd: string; // "HH:MM"
+
+  /** Metadata */
+  createdAt: string;
+  updatedAt: string;
+}

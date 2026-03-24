@@ -258,14 +258,18 @@ export function Notifications() {
   const [showDebug, setShowDebug] = useState(false);
   const [lookbackHours, setLookbackHours] = useState(168);
   const [debugEntries, setDebugEntries] = useState<Array<{ timestamp: string; direction: string; content: string }>>([]);
+  const debugClearedAt = useRef<string | null>(null);
 
   useEffect(() => {
     if (!showDebug) return;
     const fetchDebug = async () => {
       try {
         const res = await fetch("http://localhost:9876/api/debug");
-        const data = await res.json();
-        setDebugEntries(data);
+        const data = await res.json() as Array<{ timestamp: string; direction: string; content: string }>;
+        const filtered = debugClearedAt.current
+          ? data.filter((e: { timestamp: string }) => e.timestamp > debugClearedAt.current!)
+          : data;
+        setDebugEntries(filtered);
       } catch {}
     };
     fetchDebug();
@@ -686,7 +690,7 @@ export function Notifications() {
             <Group justify="space-between">
               <Text size="xs" fw={600}>Bridge Activity</Text>
               <Text size="xs" c="dimmed">{debugEntries.length} entries</Text>
-              <UnstyledButton onClick={() => setDebugEntries([])} style={{ fontSize: "0.6rem", color: "var(--mantine-color-dimmed)" }}>Clear</UnstyledButton>
+              <UnstyledButton onClick={() => { debugClearedAt.current = new Date().toISOString(); setDebugEntries([]); }} style={{ fontSize: "0.6rem", color: "var(--mantine-color-dimmed)" }}>Clear</UnstyledButton>
             </Group>
           </div>
           <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>

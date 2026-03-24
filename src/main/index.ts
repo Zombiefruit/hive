@@ -26,9 +26,11 @@ import {
   stopManager,
 } from "./manager/manager-ai";
 import type { StoreState, FleetMetrics, SpawnAgentConfig } from "../shared/types";
+import type { DeckConfig } from "../shared/config-types";
 import { ipcMain } from "electron";
 import { initTray, updateTrayBadge } from "./tray";
 import { checkClaudeAuth } from "./auth-check";
+import { hasConfig, getConfig, saveConfig } from "./config";
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require("electron-squirrel-startup")) {
@@ -107,6 +109,14 @@ app.whenReady().then(() => {
 
   // Auth IPC handler
   ipcMain.handle("auth:check", () => checkClaudeAuth());
+
+  // Config IPC handlers
+  ipcMain.handle("config:has", () => hasConfig());
+  ipcMain.handle("config:get", () => getConfig());
+  ipcMain.handle("config:save", (_event, config: DeckConfig) => {
+    saveConfig(config);
+    return { ok: true };
+  });
 
   // Register IPC handlers with real agent logic
   registerIpcHandlers({

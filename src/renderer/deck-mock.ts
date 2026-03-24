@@ -182,6 +182,17 @@ if (!isElectron) {
       Promise.resolve({ id: "mock", title: "Mock", messages: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }),
     deleteManagerConversation: noop,
     getManagerMessages: () => Promise.resolve([]),
+    // Config (onboarding) — mock with localStorage
+    hasConfig: () => Promise.resolve(localStorage.getItem("claude-deck-config") !== null),
+    getConfig: () => {
+      const raw = localStorage.getItem("claude-deck-config");
+      return Promise.resolve(raw ? JSON.parse(raw) : null);
+    },
+    saveConfig: (config: unknown) => {
+      localStorage.setItem("claude-deck-config", JSON.stringify(config));
+      return Promise.resolve({ ok: true });
+    },
+
     onStoreUpdate: (cb: (state: unknown) => void) => {
       storeCallback = cb;
       // Fetch real data from debug API, fall back to mock

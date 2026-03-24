@@ -134,6 +134,11 @@ const api = {
       version: string | null;
       authenticated: boolean;
     }>,
+
+  // Config (onboarding)
+  hasConfig: () => ipcRenderer.invoke("config:has") as Promise<boolean>,
+  getConfig: () => ipcRenderer.invoke("config:get"),
+  saveConfig: (config: unknown) => ipcRenderer.invoke("config:save", config),
 } as const;
 
 export type DeckAPI = typeof api;
