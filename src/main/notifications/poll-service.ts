@@ -380,9 +380,10 @@ async function poll(): Promise<void> {
 
 Step 1: Use mcp__claude_ai_Slack__slack_search_public_and_private with query "<@U02PKBZSB9Q> after:${slackAfter}"
 Step 2: Use mcp__claude_ai_Slack__slack_search_public_and_private with query "to:U02PKBZSB9Q after:${slackAfter}"
-Step 3: Use mcp__claude_ai_Slack__slack_read_channel with channel_id "C0AMSV2SK4Z"
-Step 4: Use mcp__claude_ai_Slack__slack_read_channel with channel_id "C0AMT1AGN7K"
-Step 5: Use mcp__claude_ai_Slack__slack_read_channel with channel_id "C054VQW7EGG"
+Step 3: Use mcp__claude_ai_Slack__slack_search_public_and_private with query "from:<@U043ENDKV4Y> after:${slackAfter}" to find messages from Kieran's manager Yael
+Step 4: Use mcp__claude_ai_Slack__slack_read_channel with channel_id "C0AMSV2SK4Z"
+Step 5: Use mcp__claude_ai_Slack__slack_read_channel with channel_id "C0AMT1AGN7K"
+Step 6: Use mcp__claude_ai_Slack__slack_read_channel with channel_id "C054VQW7EGG"
 
 CRITICAL RULES:
 - Only include messages from AFTER ${cutoffStr}. DISCARD anything older.

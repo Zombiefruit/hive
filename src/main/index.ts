@@ -110,6 +110,12 @@ app.whenReady().then(() => {
   // Auth IPC handler
   ipcMain.handle("auth:check", () => checkClaudeAuth());
 
+  // Diagnostic: test spawn behavior
+  ipcMain.handle("debug:test-spawn", async () => {
+    const { testSpawn } = await import("./test-spawn");
+    return testSpawn();
+  });
+
   // Config IPC handlers
   ipcMain.handle("config:has", () => hasConfig());
   ipcMain.handle("config:get", () => getConfig());
@@ -287,8 +293,15 @@ app.whenReady().then(() => {
       res.end(JSON.stringify(getActiveWorkAgents()));
     } else if (req.url === "/api/debug") {
       res.end(JSON.stringify(getBridgeDebugLog()));
+    } else if (req.url === "/api/test-spawn") {
+      import("./test-spawn").then(({ testSpawn }) => {
+        testSpawn().then(result => {
+          res.end(JSON.stringify({ result }));
+        });
+      });
+      return; // async — don't end twice
     } else {
-      res.end(JSON.stringify({ endpoints: ["/api/store", "/api/notifications", "/api/sessions", "/api/debug"] }));
+      res.end(JSON.stringify({ endpoints: ["/api/store", "/api/notifications", "/api/sessions", "/api/debug", "/api/test-spawn"] }));
     }
   });
   debugServer.on("error", (err: NodeJS.ErrnoException) => {
