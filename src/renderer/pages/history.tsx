@@ -1,7 +1,6 @@
 import { Group, Stack, Text, UnstyledButton } from "@mantine/core";
 import { IconClock, IconFileText, IconTerminal2 } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { AppHeader } from "../components/AppHeader";
 
 interface HistoricalSession {
@@ -29,7 +28,6 @@ function formatAge(ms: number): string {
 }
 
 export function History() {
-  const navigate = useNavigate();
   const [sessions, setSessions] = useState<HistoricalSession[]>([]);
   const [loading, setLoading] = useState(true);
 

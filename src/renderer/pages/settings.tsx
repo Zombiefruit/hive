@@ -23,7 +23,6 @@ import {
   IconUser,
 } from "@tabler/icons-react";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import { AppHeader } from "../components/AppHeader";
 import type {
   DeckConfig,
@@ -69,7 +68,6 @@ function detectTimezone(): string {
 type LoadStatus = "loading" | "loaded" | "error";
 
 export function Settings() {
-  const navigate = useNavigate();
   const [loadStatus, setLoadStatus] = useState<LoadStatus>("loading");
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);

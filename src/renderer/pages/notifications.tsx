@@ -10,7 +10,6 @@ import { Markdown } from "../components/Markdown";
 import { AddToManagerButton } from "../components/AddToManagerButton";
 import { AddTaskModal } from "../components/AddTaskModal";
 import { AppHeader } from "../components/AppHeader";
-import { useNavigate } from "react-router-dom";
 
 interface NotificationItem {
   id: string;
@@ -73,10 +72,11 @@ const sourceIcons: Record<string, React.FC<{ size?: number; color?: string }>> =
   github: IconBrandGithub,
   notion: SiNotion as React.FC<{ size?: number; color?: string }>,
   email: IconMail,
+  manual: IconPencil,
 };
 
 const sourceColors: Record<string, string> = {
-  linear: "#5E6AD2", slack: "#E01E5A", github: "#FFFFFF", notion: "#FFFFFF", email: "#EA4335",
+  linear: "#5E6AD2", slack: "#E01E5A", github: "#FFFFFF", notion: "#FFFFFF", email: "#EA4335", manual: "#a78bfa",
 };
 
 function formatTimeSince(iso: string): string {
@@ -93,7 +93,6 @@ function formatTimeSince(iso: string): string {
 // Context can be added from the detail pane after the card moves.
 
 export function Notifications() {
-  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [plansReady, setPlansReady] = useState<Set<string>>(new Set());
@@ -258,6 +257,7 @@ export function Notifications() {
   };
 
   const [showDebug, setShowDebug] = useState(false);
+  const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [lookbackHours, setLookbackHours] = useState(168);
   const [debugEntries, setDebugEntries] = useState<Array<{ timestamp: string; direction: string; content: string }>>([]);
   const debugClearedAt = useRef<string | null>(null);
@@ -387,13 +387,31 @@ export function Notifications() {
                       }
                     }}
                   >
-                    <Tooltip label={stage.tip} position="bottom" withArrow multiline w={220} fz="xs">
-                      <Group gap={6} mb={8} px={4} style={{ cursor: "help" }}>
-                        <stage.Icon size={14} color={items.length > 0 || isOver ? stage.color : "var(--mantine-color-dimmed)"} />
-                        <Text size="xs" fw={600} c={items.length > 0 || isOver ? undefined : "dimmed"}>{stage.label}</Text>
-                        {items.length > 0 && <Badge size="xs" variant="light" color="gray" circle>{items.length}</Badge>}
-                      </Group>
-                    </Tooltip>
+                    <Group gap={6} mb={8} px={4} justify="space-between">
+                      <Tooltip label={stage.tip} position="bottom" withArrow multiline w={220} fz="xs">
+                        <Group gap={6} style={{ cursor: "help" }}>
+                          <stage.Icon size={14} color={items.length > 0 || isOver ? stage.color : "var(--mantine-color-dimmed)"} />
+                          <Text size="xs" fw={600} c={items.length > 0 || isOver ? undefined : "dimmed"}>{stage.label}</Text>
+                          {items.length > 0 && <Badge size="xs" variant="light" color="gray" circle>{items.length}</Badge>}
+                        </Group>
+                      </Tooltip>
+                      {stage.key === "new" && (
+                        <Tooltip label="Add task manually" position="bottom" withArrow fz="xs">
+                          <UnstyledButton
+                            onClick={() => setAddTaskOpen(true)}
+                            style={{
+                              width: 20, height: 20, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center",
+                              color: "var(--mantine-color-dimmed)",
+                              backgroundColor: "transparent",
+                              transition: "all 0.15s ease",
+                            }}
+                            className="notif-action-btn"
+                          >
+                            <IconPlus size={13} />
+                          </UnstyledButton>
+                        </Tooltip>
+                      )}
+                    </Group>
 
                     <div style={{
                       minHeight: 60, padding: 4, borderRadius: 8,
@@ -452,7 +470,16 @@ export function Notifications() {
                                       {n.confidence}
                                     </div>
                                   )}
-                                  <Badge size="xs" variant="light" color="gray" radius="sm" style={{ fontSize: "0.55rem" }}>{n.source}</Badge>
+                                  <Badge
+                                    size="xs"
+                                    variant="light"
+                                    color={n.source === "manual" ? "violet" : "gray"}
+                                    radius="sm"
+                                    style={{ fontSize: "0.55rem" }}
+                                    leftSection={n.source === "manual" ? <IconPencil size={9} /> : undefined}
+                                  >
+                                    {n.source}
+                                  </Badge>
                                 </Group>
                               </Group>
                               <Text size="xs" fw={500} lineClamp={2} mb={4}>{n.title}</Text>
@@ -577,7 +604,16 @@ export function Notifications() {
                                   <SrcIcon size={12} color={srcColor} />
                                   {n.author && <Text size="xs" c="dimmed" truncate style={{ maxWidth: 70 }}>{n.author}</Text>}
                                 </Group>
-                                <Badge size="xs" variant="light" color="gray" radius="sm" style={{ fontSize: "0.55rem" }}>{n.taskType ?? n.source}</Badge>
+                                <Badge
+                                  size="xs"
+                                  variant="light"
+                                  color={n.source === "manual" ? "violet" : "gray"}
+                                  radius="sm"
+                                  style={{ fontSize: "0.55rem" }}
+                                  leftSection={n.source === "manual" ? <IconPencil size={9} /> : undefined}
+                                >
+                                  {n.source === "manual" ? "manual" : (n.taskType ?? n.source)}
+                                </Badge>
                               </Group>
                               <Text size="xs" fw={500} lineClamp={2} mb={4}>{n.title}</Text>
                               {n.actionNeeded && <Text size="xs" c="blue.4" lineClamp={1} mb={4} style={{ fontSize: "0.65rem" }}>→ {n.actionNeeded}</Text>}
@@ -682,6 +718,8 @@ export function Notifications() {
           </div>
         </div>
       )}
+
+      <AddTaskModal opened={addTaskOpen} onClose={() => setAddTaskOpen(false)} />
     </div>
   );
 }
