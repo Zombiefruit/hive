@@ -35,16 +35,21 @@ function askOneShot(prompt: string, timeoutMs: number): Promise<string> {
     let resultText = "";
     let done = false;
     let promptSent = false;
+    let bytesReceived = 0;
+
+    addDebugEntry("out", `⏳ Process spawned (PID ${proc.pid}), waiting for init...`);
 
     const timeout = setTimeout(() => {
       if (!done) {
         done = true;
+        addDebugEntry("out", `⏱️ Process timed out (PID ${proc.pid}, ${bytesReceived} bytes received, promptSent=${promptSent})`);
         proc.kill();
         resolve(resultText || "Request timed out");
       }
     }, timeoutMs);
 
     proc.stdout?.on("data", (chunk: Buffer) => {
+      bytesReceived += chunk.length;
       outputBuffer += chunk.toString("utf-8");
       const lines = outputBuffer.split("\n");
       outputBuffer = lines.pop() ?? "";
@@ -97,12 +102,16 @@ function askOneShot(prompt: string, timeoutMs: number): Promise<string> {
       }
     });
 
-    proc.stderr?.on("data", () => {}); // suppress
+    proc.stderr?.on("data", (chunk: Buffer) => {
+      const msg = chunk.toString("utf-8").trim();
+      if (msg) addDebugEntry("out", `⚠️ stderr: ${msg.slice(0, 150)}`);
+    });
 
-    proc.on("exit", () => {
+    proc.on("exit", (code) => {
       if (!done) {
         done = true;
         clearTimeout(timeout);
+        addDebugEntry("out", `🛑 Process exited (code=${code}, bytes=${bytesReceived}, promptSent=${promptSent})`);
         resolve(resultText || "Process exited without result");
       }
     });

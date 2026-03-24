@@ -2,7 +2,7 @@ import { Badge, Group, Loader, Stack, Text, Tooltip, UnstyledButton } from "@man
 import {
   IconInbox, IconSparkles, IconClock, IconPlayerPlay, IconGitPullRequest, IconCircleCheck,
   IconBrandGithub, IconHash, IconMail, IconFileText, IconChevronRight, IconChevronDown,
-  IconGripVertical, IconEyeOff,
+  IconGripVertical, IconEyeOff, IconSettings,
 } from "@tabler/icons-react";
 import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -332,6 +332,12 @@ export function Notifications() {
           >
             Inbox
           </UnstyledButton>
+          <UnstyledButton
+            onClick={() => navigate("/schedule")}
+            style={{ padding: "4px 14px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500, color: "var(--mantine-color-dimmed)" }}
+          >
+            Schedule
+          </UnstyledButton>
         </Group>
         <Group gap={8} style={{ WebkitAppRegion: "no-drag", marginLeft: "auto" }}>
           {fetching ? (
@@ -381,6 +387,20 @@ export function Notifications() {
           >
             {showDebug ? "Hide logs" : "Logs"}
           </UnstyledButton>
+          <Tooltip label="Settings" position="bottom" withArrow>
+            <UnstyledButton
+              onClick={() => navigate("/settings")}
+              style={{
+                padding: "4px",
+                borderRadius: 4,
+                color: "var(--mantine-color-dimmed)",
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <IconSettings size={16} />
+            </UnstyledButton>
+          </Tooltip>
         </Group>
       </div>
 
