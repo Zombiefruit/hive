@@ -16,15 +16,23 @@ import {
   IconBrandSlack,
   IconBriefcase,
   IconCheck,
+  IconCircleFilled,
+  IconGitBranch,
   IconPlug,
+  IconPlugConnected,
   IconPlus,
+  IconRefresh,
   IconSettings,
+  IconTerminal,
   IconTrash,
   IconUser,
+  IconUsers,
 } from "@tabler/icons-react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { AppHeader } from "../components/AppHeader";
 import type {
+  Coworker,
+  CoworkerRole,
   DeckConfig,
   UserRole,
   FetchCadence,
@@ -57,6 +65,13 @@ const INTEGRATION_LIST: { key: keyof IntegrationToggles; label: string; descript
   { key: "github", label: "GitHub", description: "PR reviews, CI failures, and mentions" },
 ];
 
+const COWORKER_ROLES: { value: CoworkerRole; label: string }[] = [
+  { value: "manager", label: "Manager" },
+  { value: "lead", label: "Lead" },
+  { value: "pm", label: "PM" },
+  { value: "peer", label: "Peer" },
+];
+
 function detectTimezone(): string {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -76,6 +91,8 @@ export function Settings() {
   // Identity
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [slackUserId, setSlackUserId] = useState("");
+  const [linearUsername, setLinearUsername] = useState("");
 
   // Role
   const [role, setRole] = useState<UserRole>("fullstack_dev");
@@ -83,6 +100,12 @@ export function Settings() {
   // Team
   const [managerName, setManagerName] = useState("");
   const [teamName, setTeamName] = useState("");
+  const [coworkers, setCoworkers] = useState<Coworker[]>([]);
+  const [newCoworkerName, setNewCoworkerName] = useState("");
+  const [newCoworkerRole, setNewCoworkerRole] = useState<CoworkerRole>("peer");
+  const [newCoworkerSlackId, setNewCoworkerSlackId] = useState("");
+  const [coworkerSearchResults, setCoworkerSearchResults] = useState<Array<{ label: string; slackId: string }>>([]);
+  const coworkerSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Slack channels
   const [channels, setChannels] = useState<SlackChannel[]>([]);
@@ -104,9 +127,45 @@ export function Settings() {
   const [timezone, setTimezone] = useState(detectTimezone);
   const [workStart, setWorkStart] = useState("09:00");
   const [workEnd, setWorkEnd] = useState("18:00");
+  const [slackHookEnabled, setSlackHookEnabled] = useState(false);
+
+  // Repo Mappings
+  const [repoMappings, setRepoMappings] = useState<Array<{ pattern: string; repoPath: string }>>([]);
+  const [newPattern, setNewPattern] = useState("");
+  const [newRepoPath, setNewRepoPath] = useState("");
+
+  // Bridge connector status
+  const [bridgeStatus, setBridgeStatus] = useState<{
+    ready: boolean;
+    mcpToolCount: number;
+    connectors: { slack: boolean; linear: boolean; gmail: boolean; calendar: boolean; notion: boolean };
+  } | null>(null);
+  const [restarting, setRestarting] = useState(false);
+
+  // Skill status
+  const [skillStatus, setSkillStatus] = useState<{ installed: boolean; missing: string[] } | null>(null);
 
   // Track original createdAt so we don't overwrite it
   const createdAtRef = useRef<string>("");
+
+  // Poll bridge status
+  useEffect(() => {
+    let cancelled = false;
+    const fetch = async () => {
+      try {
+        const status = await window.deck.getBridgeStatus();
+        if (!cancelled) setBridgeStatus(status);
+      } catch {}
+    };
+    fetch();
+    const interval = setInterval(fetch, 5000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
+
+  // Check skill status on mount
+  useEffect(() => {
+    window.deck.checkSkills?.().then(setSkillStatus).catch(() => {});
+  }, []);
 
   // Load config on mount
   useEffect(() => {
@@ -118,9 +177,12 @@ export function Settings() {
         if (config) {
           setName(config.name ?? "");
           setEmail(config.email ?? "");
+          setSlackUserId(config.slackUserId ?? "");
+          setLinearUsername(config.linearUsername ?? "");
           setRole(config.role ?? "fullstack_dev");
           setManagerName(config.managerName ?? "");
           setTeamName(config.teamName ?? "");
+          setCoworkers(config.coworkers ?? []);
           setChannels(config.slackChannels ?? []);
           setIntegrations(config.integrations ?? {
             slack: true, linear: true, gmail: false,
@@ -130,6 +192,8 @@ export function Settings() {
           setTimezone(config.timezone ?? detectTimezone());
           setWorkStart(config.workingHoursStart ?? "09:00");
           setWorkEnd(config.workingHoursEnd ?? "18:00");
+          setSlackHookEnabled(config.slackHookEnabled ?? false);
+          setRepoMappings(config.repoMappings ?? []);
           createdAtRef.current = config.createdAt ?? new Date().toISOString();
         }
         setLoadStatus("loaded");
@@ -148,15 +212,20 @@ export function Settings() {
       const config: DeckConfig = {
         name: name.trim(),
         email: email.trim(),
+        slackUserId: slackUserId.trim() || undefined,
+        linearUsername: linearUsername.trim() || undefined,
         role,
         managerName: managerName.trim(),
         teamName: teamName.trim(),
+        coworkers: coworkers.length > 0 ? coworkers : undefined,
         slackChannels: channels,
         integrations,
         fetchCadence,
         timezone,
         workingHoursStart: workStart,
         workingHoursEnd: workEnd,
+        slackHookEnabled,
+        repoMappings: repoMappings.length > 0 ? repoMappings : undefined,
         createdAt: createdAtRef.current || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -170,7 +239,7 @@ export function Settings() {
     } finally {
       setSaving(false);
     }
-  }, [name, email, role, managerName, teamName, channels, integrations, fetchCadence, timezone, workStart, workEnd]);
+  }, [name, email, slackUserId, linearUsername, role, managerName, teamName, coworkers, channels, integrations, fetchCadence, timezone, workStart, workEnd, slackHookEnabled, repoMappings]);
 
   const addCustomChannel = () => {
     const trimmedName = newChannelName.trim();
@@ -270,6 +339,23 @@ export function Settings() {
               onChange={(e) => setEmail(e.currentTarget.value)}
               size="sm"
             />
+            <Group grow>
+              <TextInput
+                label="Slack User ID"
+                placeholder="e.g. U02PKBZSB9Q"
+                description="Find in Slack profile > More > Copy member ID"
+                value={slackUserId}
+                onChange={(e) => setSlackUserId(e.currentTarget.value)}
+                size="sm"
+              />
+              <TextInput
+                label="Linear username"
+                placeholder="e.g. kwilliams"
+                value={linearUsername}
+                onChange={(e) => setLinearUsername(e.currentTarget.value)}
+                size="sm"
+              />
+            </Group>
 
             {sectionDivider}
 
@@ -311,6 +397,121 @@ export function Settings() {
                 size="sm"
               />
             </Group>
+
+            {sectionDivider}
+
+            {/* ── Coworkers ── */}
+            {sectionHeader(
+              <IconUsers size={16} color="var(--mantine-color-grape-5)" />,
+              "Coworkers",
+              "People you work with. Their role determines notification priority (manager asks = critical).",
+            )}
+            <Stack gap={6}>
+              {coworkers.length === 0 && (
+                <Text size="xs" c="dimmed" fs="italic">No coworkers configured. Your manager is auto-included from above.</Text>
+              )}
+              {coworkers.map((cw, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 50%, transparent)",
+                    backgroundColor: "color-mix(in srgb, var(--mantine-color-dark-7) 50%, transparent)",
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Group gap={8}>
+                      <Text size="sm" fw={500}>{cw.name}</Text>
+                      <Badge size="xs" variant="light" color={
+                        cw.role === "manager" ? "red" : cw.role === "lead" ? "orange" : cw.role === "pm" ? "violet" : "blue"
+                      }>{cw.role}</Badge>
+                    </Group>
+                    {cw.slackUserId && (
+                      <Text size="xs" c="dimmed" style={{ fontFamily: "var(--mantine-font-family-monospace)", fontSize: "0.65rem" }}>
+                        Slack: {cw.slackUserId}
+                      </Text>
+                    )}
+                  </div>
+                  <ActionIcon size="sm" variant="subtle" color="red" onClick={() => setCoworkers(prev => prev.filter((_, j) => j !== i))}>
+                    <IconTrash size={14} />
+                  </ActionIcon>
+                </div>
+              ))}
+            </Stack>
+            <div>
+              <Text size="xs" fw={600} mb={6}>Add coworker</Text>
+              <Group gap={8}>
+                <Select
+                  placeholder="Search Slack by name..."
+                  value={newCoworkerName || null}
+                  onChange={(val) => {
+                    if (!val) return;
+                    setNewCoworkerName(val);
+                    const match = coworkerSearchResults.find(r => r.label === val);
+                    if (match?.slackId) setNewCoworkerSlackId(match.slackId);
+                  }}
+                  data={coworkerSearchResults.map(r => ({ value: r.label, label: r.label }))}
+                  searchable
+                  onSearchChange={(query) => {
+                    if (query.length < 2) { setCoworkerSearchResults([]); return; }
+                    if (coworkerSearchTimer.current) clearTimeout(coworkerSearchTimer.current);
+                    coworkerSearchTimer.current = setTimeout(async () => {
+                      try {
+                        const result = await window.deck.searchUsers("slack", query);
+                        if (result.ok && result.data) {
+                          const users = JSON.parse(result.data) as Array<{ id: string; title: string }>;
+                          setCoworkerSearchResults(users.map(u => ({ label: u.title, slackId: u.id })));
+                        }
+                      } catch { setCoworkerSearchResults([]); }
+                    }, 300);
+                  }}
+                  size="xs"
+                  style={{ flex: 2 }}
+                  nothingFoundMessage="Type to search Slack..."
+                />
+                <Select
+                  data={COWORKER_ROLES}
+                  value={newCoworkerRole}
+                  onChange={(val) => val && setNewCoworkerRole(val as CoworkerRole)}
+                  size="xs"
+                  style={{ flex: 1 }}
+                  allowDeselect={false}
+                  styles={{
+                    input: { backgroundColor: "var(--mantine-color-dark-6)" },
+                    dropdown: { backgroundColor: "var(--mantine-color-dark-6)" },
+                  }}
+                />
+                <TextInput
+                  placeholder="Slack ID (auto-filled)"
+                  value={newCoworkerSlackId}
+                  onChange={(e) => setNewCoworkerSlackId(e.currentTarget.value)}
+                  size="xs"
+                  style={{ flex: 1, opacity: newCoworkerSlackId ? 0.7 : 1 }}
+                />
+                <ActionIcon
+                  size="md"
+                  variant="light"
+                  color="blue"
+                  disabled={!newCoworkerName.trim()}
+                  onClick={() => {
+                    if (!newCoworkerName.trim()) return;
+                    setCoworkers(prev => [...prev, {
+                      name: newCoworkerName.trim(),
+                      role: newCoworkerRole,
+                      slackUserId: newCoworkerSlackId.trim() || undefined,
+                    }]);
+                    setNewCoworkerName("");
+                    setNewCoworkerSlackId("");
+                  }}
+                >
+                  <IconPlus size={14} />
+                </ActionIcon>
+              </Group>
+            </div>
 
             {sectionDivider}
 
@@ -434,6 +635,187 @@ export function Settings() {
 
             {sectionDivider}
 
+            {/* ── MCP Connections ── */}
+            {sectionHeader(
+              <IconPlugConnected size={16} color="var(--mantine-color-cyan-5)" />,
+              "MCP Connections",
+              "Status of data connectors. If auth is broken, open a terminal to re-authenticate.",
+            )}
+
+            {bridgeStatus ? (
+              <Stack gap={8}>
+                {/* Bridge overall status */}
+                <Group gap={8}>
+                  <IconCircleFilled
+                    size={10}
+                    color={bridgeStatus.ready ? "var(--mantine-color-green-5)" : "var(--mantine-color-red-5)"}
+                  />
+                  <Text size="sm" fw={500}>
+                    Bridge {bridgeStatus.ready ? "connected" : "disconnected"}
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    {bridgeStatus.mcpToolCount} MCP tools loaded
+                  </Text>
+                </Group>
+
+                {/* Per-connector status */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+                    gap: 8,
+                  }}
+                >
+                  {(
+                    [
+                      { key: "slack", label: "Slack" },
+                      { key: "linear", label: "Linear" },
+                      { key: "gmail", label: "Gmail" },
+                      { key: "calendar", label: "Calendar" },
+                      { key: "notion", label: "Notion" },
+                    ] as const
+                  ).map(({ key, label }) => {
+                    const connected = bridgeStatus.connectors[key];
+                    return (
+                      <div
+                        key={key}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 8,
+                          border: `1px solid ${
+                            connected
+                              ? "color-mix(in srgb, var(--mantine-color-green-7) 40%, transparent)"
+                              : "color-mix(in srgb, var(--mantine-color-red-7) 40%, transparent)"
+                          }`,
+                          backgroundColor: connected
+                            ? "color-mix(in srgb, var(--mantine-color-green-9) 10%, transparent)"
+                            : "color-mix(in srgb, var(--mantine-color-red-9) 10%, transparent)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                        }}
+                      >
+                        <IconCircleFilled
+                          size={8}
+                          color={connected ? "var(--mantine-color-green-5)" : "var(--mantine-color-red-5)"}
+                        />
+                        <Text size="sm">{label}</Text>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Skill status */}
+                {skillStatus && !skillStatus.installed && (
+                  <div style={{
+                    padding: 12, borderRadius: 8, marginTop: 8,
+                    backgroundColor: "color-mix(in srgb, var(--mantine-color-yellow-9) 15%, transparent)",
+                    border: "1px solid color-mix(in srgb, var(--mantine-color-yellow-7) 40%, transparent)",
+                  }}>
+                    <Text size="sm" fw={500} c="yellow.4">MC Engineering Skills Missing</Text>
+                    <Text size="xs" c="dimmed" mt={4}>
+                      Required skills not found: <strong>{skillStatus.missing.join(", ")}</strong>.
+                      Run <code style={{ backgroundColor: "var(--mantine-color-dark-5)", padding: "1px 4px", borderRadius: 3 }}>configure-claude</code> to install them.
+                    </Text>
+                  </div>
+                )}
+                {skillStatus?.installed && (
+                  <Group gap={6} mt={8}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#22c55e" }} />
+                    <Text size="xs" c="dimmed">MC skills installed (start-work, hack, ship, code-review)</Text>
+                  </Group>
+                )}
+
+                {/* Action buttons */}
+                <Group gap={8} mt={4}>
+                  <Button
+                    size="xs"
+                    variant="light"
+                    leftSection={<IconRefresh size={14} />}
+                    loading={restarting}
+                    onClick={async () => {
+                      setRestarting(true);
+                      try {
+                        await window.deck.restartBridge();
+                        // Wait for bridge to reinitialize then refresh status
+                        setTimeout(async () => {
+                          try {
+                            const status = await window.deck.getBridgeStatus();
+                            setBridgeStatus(status);
+                          } catch {}
+                          setRestarting(false);
+                        }, 5000);
+                      } catch {
+                        setRestarting(false);
+                      }
+                    }}
+                  >
+                    Restart bridge
+                  </Button>
+                  <Button
+                    size="xs"
+                    variant="light"
+                    color="orange"
+                    leftSection={<IconTerminal size={14} />}
+                    onClick={() => window.deck.openAuthTerminal()}
+                  >
+                    Open terminal to fix auth
+                  </Button>
+                </Group>
+
+                {/* Help text */}
+                {Object.values(bridgeStatus.connectors).some((v) => !v) && (
+                  <Text size="xs" c="dimmed" mt={2}>
+                    Red connectors need re-authentication. Click "Open terminal to fix auth", then type <code>/mcp</code> to manage your MCP servers. After fixing, click "Restart bridge".
+                  </Text>
+                )}
+              </Stack>
+            ) : (
+              <Group gap={8}>
+                <Loader size="xs" />
+                <Text size="sm" c="dimmed">Checking connection status...</Text>
+              </Group>
+            )}
+
+            {sectionDivider}
+
+            {/* ── Repo Mappings ── */}
+            {sectionHeader(
+              <IconGitBranch size={16} color="var(--mantine-color-teal-5)" />,
+              "Repo Mappings",
+              "Map ticket prefixes and channel names to local repo paths for /start-work.",
+            )}
+
+            <Stack gap={6}>
+              {(repoMappings ?? []).map((m, i) => (
+                <Group key={i} gap={8} style={{ padding: "6px 10px", borderRadius: 6, backgroundColor: "var(--mantine-color-dark-7)" }}>
+                  <Badge size="xs" variant="light" color="teal">{m.pattern}</Badge>
+                  <Text size="xs" style={{ fontFamily: "var(--mantine-font-family-monospace)", fontSize: "0.7rem", flex: 1 }}>{m.repoPath}</Text>
+                  <ActionIcon size="sm" variant="subtle" color="red" onClick={() => setRepoMappings(prev => (prev ?? []).filter((_, j) => j !== i))}>
+                    <IconTrash size={14} />
+                  </ActionIcon>
+                </Group>
+              ))}
+              {(!repoMappings || repoMappings.length === 0) && (
+                <Text size="xs" c="dimmed" fs="italic">No repo mappings configured. Add patterns like "VEC-*" to /path/to/repo.</Text>
+              )}
+            </Stack>
+            <div>
+              <Text size="xs" fw={600} mb={6}>Add mapping</Text>
+              <Group gap={8}>
+                <TextInput placeholder="Pattern (e.g., VEC-*)" value={newPattern} onChange={e => setNewPattern(e.currentTarget.value)} size="xs" style={{ flex: 1 }} />
+                <TextInput placeholder="Repo path (e.g., /Users/kieran/repos/monolith)" value={newRepoPath} onChange={e => setNewRepoPath(e.currentTarget.value)} size="xs" style={{ flex: 2 }} />
+                <ActionIcon size="md" variant="light" color="teal" disabled={!newPattern.trim() || !newRepoPath.trim()} onClick={() => {
+                  setRepoMappings(prev => [...(prev ?? []), { pattern: newPattern.trim(), repoPath: newRepoPath.trim() }]);
+                  setNewPattern(""); setNewRepoPath("");
+                }}>
+                  <IconPlus size={14} />
+                </ActionIcon>
+              </Group>
+            </div>
+
+            {sectionDivider}
+
             {/* ── Preferences ── */}
             {sectionHeader(
               <IconSettings size={16} color="var(--mantine-color-orange-5)" />,
@@ -471,6 +853,14 @@ export function Settings() {
                 size="sm"
               />
             </Group>
+            <Switch
+              label="Slack real-time hook"
+              description="Check for @mentions and DMs every 60 seconds (requires Slack integration)"
+              checked={slackHookEnabled}
+              onChange={(e) => setSlackHookEnabled(e.currentTarget.checked)}
+              size="sm"
+              disabled={!integrations.slack}
+            />
           </Stack>
         </div>
       </div>

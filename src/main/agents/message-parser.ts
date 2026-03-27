@@ -1,3 +1,5 @@
+import { buildSlackArchiveUrl } from "../../shared/task-utils";
+
 /**
  * Parse raw JSONL lines into grouped, display-ready messages.
  * Collapses sequential tool calls into summary groups.
@@ -205,7 +207,7 @@ export function detectContextFromLines(lines: string[]): DetectedContext[] {
         if (channel && !seen.has(`slack:${channel}`)) {
           seen.add(`slack:${channel}`);
           const channelName = resolveSlackChannelName(channel);
-          contexts.push({ type: "slack", resourceId: channel, title: `#${channelName}`, url: `https://montecarlodata.slack.com/archives/${channel}` });
+          contexts.push({ type: "slack", resourceId: channel, title: `#${channelName}`, url: buildSlackArchiveUrl(channel) });
         }
       }
 

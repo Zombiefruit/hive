@@ -1,5 +1,5 @@
 import { marked } from "marked";
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 
 // Configure marked for safe rendering
 marked.setOptions({
@@ -100,12 +100,23 @@ export function Markdown({ content }: { content: string }) {
     }
   }, [content]);
 
+  // Intercept link clicks → open in external browser, not Electron
+  const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const anchor = target.closest("a");
+    if (anchor?.href) {
+      e.preventDefault();
+      window.deck?.openExternal(anchor.href);
+    }
+  }, []);
+
   return (
     <>
       <style>{MARKDOWN_STYLES}</style>
       <div
         className="md-content"
         dangerouslySetInnerHTML={{ __html: html }}
+        onClick={handleClick}
       />
     </>
   );

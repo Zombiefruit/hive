@@ -10,6 +10,8 @@ import { Debug } from "./pages/debug";
 import { TaskDetail } from "./pages/task/[taskId]";
 import { Settings } from "./pages/settings";
 import { Onboarding } from "./pages/onboarding";
+import StandupPage from "./pages/standup";
+import ProjectsPage from "./pages/projects";
 
 /**
  * Guard that redirects to /onboarding if no config exists.
@@ -56,7 +58,10 @@ const router = createBrowserRouter([
       { path: "/history", element: <History /> },
       { path: "/notifications", element: <Notifications /> },
       { path: "/schedule", element: <Schedule /> },
+      { path: "/projects", element: <ProjectsPage /> },
+      { path: "/projects/:projectId", element: <ProjectsPage /> },
       { path: "/task/:taskId", element: <TaskDetail /> },
+      { path: "/standup", element: <StandupPage /> },
       { path: "/debug", element: <Debug /> },
       { path: "/settings", element: <Settings /> },
     ],

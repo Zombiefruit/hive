@@ -52,40 +52,40 @@ describe("Poll Service — Notification Persistence", () => {
     // SPEC: "Refresh just fetches new ones. I should not be deleting existing tasks."
     const cachePath = path.join(TEST_DIR, "notifications-cache.json");
     const existing = [
-      { id: "poll-1", source: "linear", title: "VEC-10", stage: "planning", status: "new", priority: "urgent", summary: "test", createdAt: new Date().toISOString() },
-      { id: "poll-2", source: "slack", title: "Thread response", stage: "done", status: "new", priority: "today", summary: "test", createdAt: new Date().toISOString() },
+      { id: "poll-1", source: "linear", title: "VEC-10", stage: "start_work", status: "new", priority: "critical", summary: "test", createdAt: new Date().toISOString() },
+      { id: "poll-2", source: "slack", title: "Thread response", stage: "done", status: "new", priority: "high", summary: "test", createdAt: new Date().toISOString() },
     ];
     fs.writeFileSync(cachePath, JSON.stringify(existing));
 
     // Simulate loading cache
     const cached = JSON.parse(fs.readFileSync(cachePath, "utf-8"));
     expect(cached).toHaveLength(2);
-    expect(cached[0].stage).toBe("planning");
+    expect(cached[0].stage).toBe("start_work");
     expect(cached[1].stage).toBe("done");
 
     // After adding new items, existing should still be there
     const newItem = { id: "poll-3", source: "gmail", title: "New email", stage: "new", status: "new", priority: "low", summary: "test", createdAt: new Date().toISOString() };
     const merged = [...cached, newItem];
     expect(merged).toHaveLength(3);
-    expect(merged.find(n => n.id === "poll-1")?.stage).toBe("planning");
+    expect(merged.find(n => n.id === "poll-1")?.stage).toBe("start_work");
     expect(merged.find(n => n.id === "poll-2")?.stage).toBe("done");
   });
 
   it("should persist stage changes to cache file", () => {
     const cachePath = path.join(TEST_DIR, "notifications-cache.json");
     const notifications = [
-      { id: "poll-1", source: "linear", title: "VEC-10", stage: "new", status: "new", priority: "urgent", summary: "test", createdAt: new Date().toISOString() },
+      { id: "poll-1", source: "linear", title: "VEC-10", stage: "new", status: "new", priority: "critical", summary: "test", createdAt: new Date().toISOString() },
     ];
     fs.writeFileSync(cachePath, JSON.stringify(notifications));
 
     // Simulate stage change
     const loaded = JSON.parse(fs.readFileSync(cachePath, "utf-8"));
-    loaded[0].stage = "planning";
+    loaded[0].stage = "start_work";
     fs.writeFileSync(cachePath, JSON.stringify(loaded));
 
     // Verify persistence
     const reloaded = JSON.parse(fs.readFileSync(cachePath, "utf-8"));
-    expect(reloaded[0].stage).toBe("planning");
+    expect(reloaded[0].stage).toBe("start_work");
   });
 
   it("should persist skipped items to cache file", () => {
@@ -248,27 +248,26 @@ describe("Poll Service — Parallel Fetching", () => {
 
 describe("Poll Service — Stage Management", () => {
   it("should support all required stages", () => {
-    // SPEC: Inbox, Follow Up, Planning, Working, Done, Reviewed
-    const STAGES = ["new", "follow_up", "planning", "working", "done", "skipped"];
+    // SPEC: Inbox, Start Work, Plan Review, Hack, Ship, Code Review, PR Feedback, Done, Backlog, Skipped
+    const STAGES = ["new", "start_work", "plan_review", "hack", "ship", "code_review", "pr_feedback", "done", "backlog", "skipped", "preparing", "ready"];
     expect(STAGES).toContain("new");
-    expect(STAGES).toContain("follow_up");
-    expect(STAGES).toContain("planning");
-    expect(STAGES).toContain("working");
+    expect(STAGES).toContain("start_work");
+    expect(STAGES).toContain("hack");
     expect(STAGES).toContain("done");
     expect(STAGES).toContain("skipped");
   });
 
-  it("should trigger prepareWorkPlan when moving to planning", () => {
-    // SPEC: "If I drag it into planning, it should start planning"
-    const stage = "planning";
-    const shouldTriggerPlan = stage === "planning";
+  it("should trigger prepareWorkPlan when moving to start_work", () => {
+    // SPEC: "If I drag it into start_work, it should start planning"
+    const stage = "start_work";
+    const shouldTriggerPlan = stage === "start_work";
     expect(shouldTriggerPlan).toBe(true);
   });
 
-  it("should trigger startWorkAgent when moving to working", () => {
-    // SPEC: "Once there's a plan, drag to working should start work"
-    const stage = "working";
-    const shouldTriggerWork = stage === "working";
+  it("should trigger startWorkAgent when moving to hack", () => {
+    // SPEC: "Once there's a plan, drag to hack should start work"
+    const stage = "hack";
+    const shouldTriggerWork = stage === "hack";
     expect(shouldTriggerWork).toBe(true);
   });
 
@@ -276,14 +275,14 @@ describe("Poll Service — Stage Management", () => {
     // SPEC: "If I refresh the page, it should remember the stage"
     const notifications = [
       { id: "poll-1", stage: "new" },
-      { id: "poll-2", stage: "planning" },
+      { id: "poll-2", stage: "start_work" },
     ];
 
     // Simulate updateNotificationById
     const target = notifications.find(n => n.id === "poll-2");
     expect(target).toBeDefined();
-    Object.assign(target!, { stage: "working" });
-    expect(notifications.find(n => n.id === "poll-2")?.stage).toBe("working");
+    Object.assign(target!, { stage: "hack" });
+    expect(notifications.find(n => n.id === "poll-2")?.stage).toBe("hack");
   });
 });
 

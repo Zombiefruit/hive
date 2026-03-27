@@ -1,31 +1,26 @@
 ---
 name: fetch-slack
-description: Fetch Slack mentions, DMs, and thread replies for Kieran Williams. Use when gathering Slack notifications.
-allowed-tools: mcp__claude_ai_Slack__slack_search_public_and_private, mcp__claude_ai_Slack__slack_read_channel, mcp__claude_ai_Slack__slack_read_thread, mcp__claude_ai_Slack__slack_read_user_profile, mcp__claude_ai_Slack__slack_search_users, mcp__claude_ai_Slack__slack_search_channels, ToolSearch
+description: Instructions for fetching Slack messages, threads, and channel history during the poll cycle.
 user-invocable: false
 ---
 
-# Fetch Slack Notifications
+# Fetch Slack Data
 
-Fetch all Slack activity for Kieran Williams (User ID: U02PKBZSB9Q) from the timeframe specified in `$ARGUMENTS` (default: last 6 hours).
+For each configured Slack channel, use `mcp__claude_ai_Slack__slack_read_channel` with the channel_id and limit {{SLACK_LIMIT}}.
 
-## What to fetch
+{{CHANNEL_LIST}}
 
-1. **@mentions**: Search for `<@U02PKBZSB9Q>` in all channels
-2. **DMs**: Check direct messages to Kieran
-3. **Thread replies**: Check threads where Kieran has been tagged
+For DMs from the manager, use `mcp__claude_ai_Slack__slack_search_public_and_private`.
 
-## For each message, capture:
-- **Who** sent it (name, not just ID — use slack_read_user_profile if needed)
-- **What** they said (exact quote)
-- **Where** (channel name and thread link)
-- **When** (timestamp)
-- **Context**: If it's a thread, include the parent message for context
+## For each message/thread, capture:
+- **Who** sent it (name, not ID)
+- **What** they said (exact quote or summary)
+- **Where** — channel NAME and channel ID (e.g., #team-vector / C0AMSV2SK4Z)
+- **When** — timestamp
+- **Permalink** — full Slack archive URL: `{{SLACK_BASE_URL}}/archives/CHANNEL_ID/pTIMESTAMP`
 
-## Key channels
-- C0AMSV2SK4Z = #team-vector
-- C0AMT1AGN7K = #team-vector-standup
-- C0ALAC5N91S = #kieran-task-bot
+## Response Detection
+Flag threads where {{USER_NAME}} ({{USER_SLACK_ID}}) hasn't replied as "NEEDS RESPONSE".
 
-## Output
-Return a structured text report with all findings. Don't filter or prioritize — return everything. Another agent will triage.
+## Important: "Also send to channel" behavior
+Slack allows "Also send to channel" replies that appear in the channel but may NOT appear in thread API responses. When checking if someone replied to a thread, ALSO look at channel messages around the same time that reference the thread.

@@ -1,5 +1,6 @@
 import { app, BrowserWindow, shell } from "electron";
 import path from "node:path";
+import fs from "node:fs";
 import http from "node:http";
 import { initDatabase, closeDatabase, getAllAgents, getMessages, getPendingApprovals, getAllContextRefs, getRecentEvents, upsertExternalAgent, cleanupStaleExternalAgents } from "./db/database";
 import { registerIpcHandlers, startStoreSync, stopStoreSync } from "./ipc/bridge";
@@ -11,7 +12,8 @@ import { startSessionTailing, stopSessionTailing } from "./agents/session-tailer
 import { addContextFromUrl } from "./agents/context-tracker";
 import { listAllSessions } from "./agents/session-history";
 import { startPolling, stopPolling, getNotifications, dismissNotification, startWorkOnNotification, clearAllNotifications, forcePoll, hasPolledOnce, getSkippedItems, updateNotificationByTitle, updateNotificationById, upsertNotification, createManualNotification } from "./notifications/poll-service";
-import { startBridge, stopBridge, getBridgeDebugLog } from "./mcp-bridge";
+import { startBridge, stopBridge, restartBridge, getBridgeDebugLog, clearBridgeDebugLog, getBridgeStatus } from "./mcp-bridge";
+import { getProcessStats, startProcessSampling, stopProcessSampling } from "./process-monitor";
 import { prepareWorkPlan, iteratePlan, startWorkAgent, getPlan, clearPlan, getAllPlans, getActiveWorkAgents } from "./notifications/work-dispatcher";
 import { startMonitoring, stopMonitoring } from "./notifications/agent-monitor";
 import {
@@ -25,6 +27,10 @@ import {
   getActiveManagerMessages,
   stopManager,
 } from "./manager/manager-ai";
+import { runSkill, checkRequiredSkills, type SkillInvocation } from "./skill-runner";
+import type { PlanningEvent } from "./mcp-bridge";
+import { getAllProjects, getProject } from "../shared/project-model";
+import { startSlackHook, stopSlackHook } from "./notifications/slack-hook-service";
 import type { StoreState, FleetMetrics, SpawnAgentConfig } from "../shared/types";
 import type { DeckConfig } from "../shared/config-types";
 import { ipcMain } from "electron";
@@ -116,6 +122,36 @@ app.whenReady().then(() => {
     return testSpawn();
   });
 
+  // Bridge status & re-auth IPC handlers
+  ipcMain.handle("bridge:status", () => getBridgeStatus());
+  ipcMain.handle("bridge:restart", () => {
+    restartBridge();
+    return { ok: true };
+  });
+  // User search via MCP bridge (direct)
+  ipcMain.handle("mcp:search-users", async (_event, source: string, query: string) => {
+    try {
+      const { askBridge: bridge } = await import("./mcp-bridge");
+      const prompt = source === "slack"
+        ? `Use mcp__claude_ai_Slack__slack_search_users with query "${query}". Return each user's name, display_name, and ID. Plain text only.`
+        : `Use mcp__claude_ai_Linear__list_users. Return each user's name, email, and ID. Plain text only.`;
+      const data = await bridge(prompt, 30000);
+      return { ok: true, data };
+    } catch (err) {
+      return { ok: false, error: String(err).slice(0, 200) };
+    }
+  });
+
+  ipcMain.handle("bridge:open-auth-terminal", () => {
+    const { exec } = require("node:child_process");
+    // Open Terminal.app with claude running — user can type /mcp to fix auth
+    exec(`osascript -e 'tell application "Terminal" to do script "claude"' -e 'tell application "Terminal" to activate'`);
+    return { ok: true };
+  });
+
+  // Process monitor IPC handler
+  ipcMain.handle("process:stats", () => getProcessStats());
+
   // Config IPC handlers
   ipcMain.handle("config:has", () => hasConfig());
   ipcMain.handle("config:get", () => getConfig());
@@ -150,9 +186,23 @@ app.whenReady().then(() => {
     return addContextFromUrl(data.agentId, data.url);
   });
 
-  // Open URL in default browser
+  // Open URL in default browser — sanitize before opening
   ipcMain.handle("shell:open-external", (_event, url: string) => {
-    return shell.openExternal(url);
+    if (!url || typeof url !== "string") return;
+    // Only fix truly broken URLs. Valid Slack archive URLs (xxx.slack.com/archives/...)
+    // should be left as-is — the browser opens them and Slack redirects to the native app
+    // with full thread context. The slack:// protocol loses thread navigation.
+    let safeUrl = url;
+    const slackBroken = safeUrl.match(/^https?:\/\/slack\/\/channel\/([A-Z0-9]+)/i);
+    if (slackBroken) {
+      safeUrl = `https://app.slack.com/client/T/${slackBroken[1]}`;
+    }
+    if (!safeUrl.startsWith("http")) safeUrl = `https://${safeUrl}`;
+    // Debug log for Slack URL troubleshooting
+    if (safeUrl.includes("slack")) {
+      console.log(`[open-external] Slack URL: ${safeUrl}`);
+    }
+    return shell.openExternal(safeUrl);
   });
 
   // Session history
@@ -213,14 +263,39 @@ app.whenReady().then(() => {
     return await startWorkAgent(notificationId);
   });
 
-  // Start MCP Bridge (persistent Claude Code process for Slack/Linear/etc.)
-  try { startBridge(); } catch (err) { console.error("Bridge start failed:", err); }
+  // Start poll bridge (persistent — used by poll-service for fetch + triage)
+  // Planning agents spawn their own MCP-enabled processes on demand.
+  try { startBridge(); } catch (err) { console.error("Poll bridge start failed:", err); }
 
   // Start notification polling (uses bridge for MCP access)
   startPolling();
 
   // Start agent monitoring loop
   startMonitoring();
+
+  // Start process monitor sampling (RSS tracking for spawned processes)
+  startProcessSampling();
+
+  // Start Slack hook if configured (real-time mention/DM monitoring)
+  try {
+    const cfg = hasConfig() ? getConfig() : null;
+    if (cfg?.slackHookEnabled && cfg.slackUserId) {
+      const managerCoworker = cfg.coworkers?.find(c => c.role === "manager");
+      startSlackHook({
+        userSlackId: cfg.slackUserId,
+        channels: cfg.slackChannels.map(c => c.id),
+        slackConfig: {
+          managerSlackId: managerCoworker?.slackUserId ?? "",
+          coworkerIds: new Set((cfg.coworkers ?? []).filter(c => c.slackUserId).map(c => c.slackUserId!)),
+          workStart: cfg.workingHoursStart,
+          workEnd: cfg.workingHoursEnd,
+          timezone: cfg.timezone,
+        },
+      });
+    }
+  } catch (err) {
+    console.error("Slack hook start failed:", err);
+  }
 
   // Initialize Manager AI
   initManager();
@@ -277,11 +352,116 @@ app.whenReady().then(() => {
     return { ok: true };
   });
 
+  // Skill runner
+  ipcMain.handle("skill:run", async (_event, invocation: SkillInvocation) => {
+    const onEvent = (event: PlanningEvent) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) {
+          win.webContents.send("planning:event", { notificationId: invocation.notificationId, event });
+        }
+      }
+    };
+    return runSkill(invocation, onEvent);
+  });
+
+  ipcMain.handle("skill:check", () => checkRequiredSkills());
+
+  // Discover git repos in common locations
+  ipcMain.handle("repos:discover", async () => {
+    const os = require("node:os");
+    const fs = require("node:fs");
+    const path = require("node:path");
+    const repos: Array<{ value: string; label: string }> = [];
+    const searchDirs = [
+      path.join(os.homedir(), "Documents", "GitHub"),
+      path.join(os.homedir(), "repos"),
+      path.join(os.homedir(), "src"),
+      path.join(os.homedir(), "code"),
+      path.join(os.homedir(), "projects"),
+      path.join(os.homedir(), "dev"),
+      path.join(os.homedir(), "workspace"),
+    ];
+    for (const dir of searchDirs) {
+      try {
+        if (!fs.existsSync(dir)) continue;
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.isDirectory()) {
+            const repoPath = path.join(dir, entry.name);
+            const gitDir = path.join(repoPath, ".git");
+            if (fs.existsSync(gitDir)) {
+              repos.push({ value: repoPath, label: entry.name });
+            }
+          }
+        }
+      } catch {}
+    }
+    return repos;
+  });
+
+  // Send a Slack message via the poll bridge (for response tasks)
+  ipcMain.handle("slack:send-message", async (_event, channel: string, threadTs: string, text: string) => {
+    try {
+      const { askBridge } = require("./mcp-bridge");
+      const result = await askBridge(
+        `Use mcp__claude_ai_Slack__slack_send_message with channel_id "${channel}", thread_ts "${threadTs}", and text "${text.replace(/"/g, '\\"')}". Return "sent" on success.`,
+        60000
+      );
+      return { ok: true, data: result };
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  });
+
+  // Load persisted planning events for a notification (survives page navigation)
+  ipcMain.handle("planning:get-events", (_event, notificationId: string) => {
+    try {
+      const cachePath = path.join(app.getPath("userData"), "planning-events-cache.json");
+      const cache = JSON.parse(fs.readFileSync(cachePath, "utf-8"));
+      return cache[notificationId] ?? [];
+    } catch { return []; }
+  });
+
+  ipcMain.handle("skill:read-plan", async (_event, repoPath: string, workSlug: string) => {
+    try {
+      const planPath = path.join(repoPath, ".work", workSlug, "plan.md");
+      return fs.readFileSync(planPath, "utf-8");
+    } catch { return null; }
+  });
+
+  ipcMain.handle("skill:read-review", async (_event, repoPath: string, workSlug: string) => {
+    try {
+      const reviewDir = path.join(repoPath, ".work", workSlug, "reviews");
+      if (!fs.existsSync(reviewDir)) return [];
+      const files = fs.readdirSync(reviewDir).filter(f => f.endsWith(".md")).sort();
+      return files.map(f => ({
+        filename: f,
+        content: fs.readFileSync(path.join(reviewDir, f), "utf-8"),
+      }));
+    } catch { return []; }
+  });
+
+  // Projects
+  ipcMain.handle("projects:get-all", () => getAllProjects());
+  ipcMain.handle("projects:get", (_event, id: string) => getProject(id));
+
   // Start periodic store sync to renderer (every 100ms)
   startStoreSync(buildStoreState, 100);
 
   // Debug HTTP API — lets browser/Playwright access real data
-  const debugServer = http.createServer((req: { url?: string }, res: { writeHead: Function; end: Function }) => {
+  const debugServer = http.createServer((req: http.IncomingMessage, res: http.ServerResponse) => {
+    // Handle CORS preflight for POST requests
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      });
+      res.end();
+      return;
+    }
+
+    // GET endpoints
     res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
     if (req.url === "/api/store") {
       res.end(JSON.stringify(buildStoreState()));
@@ -291,8 +471,13 @@ app.whenReady().then(() => {
       res.end(JSON.stringify(listAllSessions()));
     } else if (req.url === "/api/tasks") {
       res.end(JSON.stringify(getActiveWorkAgents()));
+    } else if (req.url === "/api/processes") {
+      res.end(JSON.stringify(getProcessStats()));
     } else if (req.url === "/api/debug") {
       res.end(JSON.stringify(getBridgeDebugLog()));
+    } else if (req.url === "/api/debug/clear") {
+      clearBridgeDebugLog();
+      res.end(JSON.stringify({ ok: true }));
     } else if (req.url === "/api/test-spawn") {
       import("./test-spawn").then(({ testSpawn }) => {
         testSpawn().then(result => {
@@ -301,7 +486,7 @@ app.whenReady().then(() => {
       });
       return; // async — don't end twice
     } else {
-      res.end(JSON.stringify({ endpoints: ["/api/store", "/api/notifications", "/api/sessions", "/api/debug", "/api/test-spawn"] }));
+      res.end(JSON.stringify({ endpoints: ["/api/store", "/api/notifications", "/api/sessions", "/api/processes", "/api/debug", "/api/test-spawn"] }));
     }
   });
   debugServer.on("error", (err: NodeJS.ErrnoException) => {
@@ -332,6 +517,8 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  stopSlackHook();
+  stopProcessSampling();
   stopMonitoring();
   stopBridge();
   stopPolling();

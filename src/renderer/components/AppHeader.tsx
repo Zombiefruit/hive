@@ -5,7 +5,9 @@ import { useNavigate, useLocation } from "react-router-dom";
 const TABS = [
   { path: "/", label: "Agents" },
   { path: "/notifications", label: "Inbox" },
+  { path: "/projects", label: "Projects" },
   { path: "/schedule", label: "Schedule" },
+  { path: "/standup", label: "Standup" },
 ];
 
 interface AppHeaderProps {
@@ -36,8 +38,8 @@ export function AppHeader({ rightContent }: AppHeaderProps) {
         <Text size="md" fw={700}>Claude Deck</Text>
       </Group>
 
-      {/* Centered tabs */}
-      <Group gap={4} style={{ WebkitAppRegion: "no-drag", position: "absolute", left: "50%", transform: "translateX(-50%)" }}>
+      {/* Centered tabs — fixed position so they don't jump when right content changes */}
+      <Group gap={4} style={{ WebkitAppRegion: "no-drag", position: "absolute", left: "50%", transform: "translateX(-50%)", whiteSpace: "nowrap" }}>
         {TABS.map(tab => {
           const isActive = tab.path === "/" ? location.pathname === "/" : location.pathname.startsWith(tab.path);
           return (

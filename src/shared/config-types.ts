@@ -5,6 +5,14 @@ export interface SlackChannel {
   name: string;
 }
 
+export type CoworkerRole = "manager" | "lead" | "pm" | "peer";
+
+export interface Coworker {
+  name: string;
+  role: CoworkerRole;
+  slackUserId?: string;
+}
+
 export type UserRole =
   | "frontend_dev"
   | "backend_dev"
@@ -28,6 +36,9 @@ export interface DeckConfig {
   /** Step 1 — Identity */
   name: string;
   email: string;
+  slackUserId?: string;
+  slackWorkspace?: string; // e.g. "montecarloai" → montecarloai.slack.com
+  linearUsername?: string;
 
   /** Step 2 — Role */
   role: UserRole;
@@ -35,6 +46,7 @@ export interface DeckConfig {
   /** Step 3 — Team */
   managerName: string;
   teamName: string;
+  coworkers?: Coworker[];
 
   /** Step 4 — Slack Channels */
   slackChannels: SlackChannel[];
@@ -47,6 +59,11 @@ export interface DeckConfig {
   timezone: string;
   workingHoursStart: string; // "HH:MM"
   workingHoursEnd: string; // "HH:MM"
+  slackHookEnabled?: boolean; // Real-time Slack mention/DM monitoring
+  repoMappings?: Array<{
+    pattern: string;
+    repoPath: string;
+  }>;
 
   /** Metadata */
   createdAt: string;

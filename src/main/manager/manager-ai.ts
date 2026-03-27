@@ -9,7 +9,7 @@ import { getAllAgents, getPendingApprovals } from "../db/database";
 import { broadcastStoreUpdate } from "../ipc/bridge";
 import { getMonitorSummary } from "../notifications/agent-monitor";
 
-const MODEL = "claude-opus-4-6";
+const MODEL = "claude-sonnet-4-6"; // Sonnet for fast responses — bridge uses Opus for heavy MCP work
 const CALL_DIR = path.join(os.tmpdir(), "claude-deck-mcp");
 
 interface ManagerMessage {
@@ -167,10 +167,17 @@ When Kieran asks you to change a task's priority, mark it done, or change its st
 include a JSON action block in your response (on its own line):
 {"action": "update_task", "task_title": "partial title match", "changes": {"priority": "low", "stage": "done", "confidence": 3}}
 
-Valid changes: priority (urgent/today/low), stage (new/planning/awaiting_approval/in_progress/pr_ready/done), confidence (1-10), status (done/dismissed)
+Valid changes: priority (critical/high/medium/low/backlog), stage (new/follow_up/planning/working/backlog/done), confidence (1-10), status (done/dismissed)
+
+Priority levels:
+- critical = do it NOW, direct ask from manager, blocking others
+- high = do it today, tagged threads needing reply, active PRs
+- medium = do it this week, assigned tickets, planned work
+- low = when you have time, optional reviews, nice-to-haves
+- backlog = informational, no action needed
 
 Example: User says "downgrade the sync meeting" → you respond with text AND:
-{"action": "update_task", "task_title": "sync meeting", "changes": {"confidence": 3, "stage": "done"}}
+{"action": "update_task", "task_title": "sync meeting", "changes": {"priority": "backlog", "stage": "done"}}
 
 ## Current Fleet State
 ${fleetSummary}
@@ -324,21 +331,28 @@ export async function sendManagerMessage(userMessage: string): Promise<ManagerMe
   try {
     const systemPrompt = buildSystemPrompt();
     const claudePath = getClaudeCodePath();
+    const managerStart = Date.now();
+    console.log(`[manager] Sending message: "${userMessage.slice(0, 60)}"`);
     const { execFile } = require("node:child_process") as typeof import("node:child_process");
 
     const assistantContent = await new Promise<string>((resolve, reject) => {
-      execFile(claudePath, [
+      console.log(`[manager] Spawning claude process (model: ${MODEL})...`);
+      const proc = execFile(claudePath, [
         "-p", `${systemPrompt}\n\n---\n\nUser: ${fullPrompt}`,
         "--output-format", "json",
         "--model", MODEL,
         "--max-turns", "10",
       ], {
-        timeout: 120000,
+        timeout: 180000,
         maxBuffer: 2 * 1024 * 1024,
         env: { ...process.env },
         cwd: os.homedir(),
       }, (error: Error | null, stdout: string) => {
-        if (error) { reject(error); return; }
+        if (error) {
+          console.log(`[manager] ERROR: ${error.message}`);
+          reject(error);
+          return;
+        }
         try {
           const result = JSON.parse(stdout);
           resolve(String(result.result ?? ""));
@@ -346,8 +360,10 @@ export async function sendManagerMessage(userMessage: string): Promise<ManagerMe
           resolve(stdout.slice(0, 5000));
         }
       });
+      console.log(`[manager] Process spawned (PID: ${proc.pid})`);
     });
 
+    console.log(`[manager] Response received: ${assistantContent.length} chars (${Math.round((Date.now() - managerStart) / 1000)}s)`);
     emit({ type: "text_delta", text: assistantContent });
 
     // Parse and execute any action blocks in the response

@@ -6,6 +6,7 @@ import { Badge, Group, Loader, Stack, Text, UnstyledButton } from "@mantine/core
 import { IconBrandGithub, IconHash, IconSearch, IconX, IconCheck } from "@tabler/icons-react";
 import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
 import { useState, useCallback, useRef } from "react";
+import { getSlackBaseUrl } from "../../shared/task-utils";
 
 type ConnectorType = "linear" | "slack" | "notion";
 
@@ -42,7 +43,7 @@ export function ContextPicker({ onSelect, onClose }: ContextPickerProps) {
 
     const prompts: Record<ConnectorType, string> = {
       linear: `Search Linear for issues matching "${q}". Return a JSON array of results: [{"id": "VEC-10", "title": "Issue title", "url": "https://linear.app/..."}]. Only return the JSON array, nothing else.`,
-      slack: `Search Slack for channels or messages matching "${q}". Return a JSON array: [{"id": "C12345", "title": "#channel-name or message preview", "url": "https://montecarlodata.slack.com/..."}]. Only return the JSON array.`,
+      slack: `Search Slack for channels or messages matching "${q}". Return a JSON array: [{"id": "C12345", "title": "#channel-name or message preview", "url": "${getSlackBaseUrl()}/..."}]. Only return the JSON array.`,
       notion: `Search Notion for pages matching "${q}". Return a JSON array: [{"id": "page-id", "title": "Page title", "url": "https://notion.so/..."}]. Only return the JSON array.`,
     };
 

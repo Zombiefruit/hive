@@ -23,9 +23,32 @@ function AppInner() {
   );
 }
 
+// Global scrollbar styles — hide ugly native scrollbars, use thin styled ones
+const SCROLLBAR_CSS = `
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+`;
+
 export function App() {
   return (
     <MantineProvider theme={theme} defaultColorScheme="dark">
+      <style>{SCROLLBAR_CSS}</style>
       <AppInner />
     </MantineProvider>
   );

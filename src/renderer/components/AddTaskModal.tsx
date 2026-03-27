@@ -15,10 +15,11 @@ const TASK_TYPES = [
 ];
 
 const PRIORITIES = [
-  { value: "urgent", label: "Urgent" },
-  { value: "today", label: "Today" },
-  { value: "medium", label: "Medium" },
-  { value: "low", label: "Low" },
+  { value: "critical", label: "Critical — do it now" },
+  { value: "high", label: "High — today" },
+  { value: "medium", label: "Medium — this week" },
+  { value: "low", label: "Low — when free" },
+  { value: "backlog", label: "Backlog — someday" },
 ];
 
 export function AddTaskModal({ opened, onClose }: AddTaskModalProps) {

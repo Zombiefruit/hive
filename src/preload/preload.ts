@@ -37,6 +37,20 @@ const api = {
     return () => ipcRenderer.removeListener("task:event", listener);
   },
 
+  // Planning events (real-time stream from MCP planning agent)
+  onPlanningEvent: (callback: (data: { notificationId: string; event: { type: string; content: string; timestamp: string } }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: { notificationId: string; event: { type: string; content: string; timestamp: string } }) => callback(data);
+    ipcRenderer.on("planning:event", listener);
+    return () => ipcRenderer.removeListener("planning:event", listener);
+  },
+
+  // Load persisted planning events (survives page navigation)
+  getPlanningEvents: (notificationId: string) => ipcRenderer.invoke("planning:get-events", notificationId),
+
+  // Send Slack message (for response tasks)
+  sendSlackMessage: (channel: string, threadTs: string, text: string) =>
+    ipcRenderer.invoke("slack:send-message", channel, threadTs, text) as Promise<{ ok: boolean; data?: string; error?: string }>,
+
   // Session history
   listAllSessions: () => ipcRenderer.invoke("sessions:list-all"),
 
@@ -136,6 +150,36 @@ const api = {
       version: string | null;
       authenticated: boolean;
     }>,
+
+  // Bridge status & re-auth
+  getBridgeStatus: () =>
+    ipcRenderer.invoke("bridge:status") as Promise<{
+      ready: boolean;
+      mcpToolCount: number;
+      connectors: { slack: boolean; linear: boolean; gmail: boolean; calendar: boolean; notion: boolean };
+    }>,
+  restartBridge: () => ipcRenderer.invoke("bridge:restart"),
+  openAuthTerminal: () => ipcRenderer.invoke("bridge:open-auth-terminal"),
+
+  // User search via MCP proxy
+  searchUsers: (source: "slack" | "linear", query: string) =>
+    ipcRenderer.invoke("mcp:search-users", source, query) as Promise<{ ok: boolean; data?: string; error?: string }>,
+
+  // Process monitor
+  getProcessStats: () => ipcRenderer.invoke("process:stats"),
+
+  // Repo discovery
+  discoverRepos: () => ipcRenderer.invoke("repos:discover") as Promise<Array<{ value: string; label: string }>>,
+
+  // Skill runner
+  runSkill: (invocation: unknown) => ipcRenderer.invoke("skill:run", invocation),
+  checkSkills: () => ipcRenderer.invoke("skill:check"),
+  readPlan: (repoPath: string, workSlug: string) => ipcRenderer.invoke("skill:read-plan", repoPath, workSlug),
+  readReviews: (repoPath: string, workSlug: string) => ipcRenderer.invoke("skill:read-review", repoPath, workSlug),
+
+  // Projects
+  getAllProjects: () => ipcRenderer.invoke("projects:get-all"),
+  getProject: (id: string) => ipcRenderer.invoke("projects:get", id),
 
   // Config (onboarding)
   hasConfig: () => ipcRenderer.invoke("config:has") as Promise<boolean>,
