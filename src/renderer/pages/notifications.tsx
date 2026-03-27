@@ -59,7 +59,7 @@ const SHARED_STAGES: StageConfig[] = [
 
 const AGENT_STAGES: StageConfig[] = [
   { key: "start_work", label: STAGE_META.start_work.label, Icon: IconSparkles, color: STAGE_META.start_work.color, tip: STAGE_META.start_work.tip },
-  { key: "plan_review", label: STAGE_META.plan_review.label, Icon: IconEye, color: STAGE_META.plan_review.color, tip: STAGE_META.plan_review.tip },
+  // plan_review has no column — tasks in plan_review appear under Planning (start_work)
   { key: "hack", label: STAGE_META.hack.label, Icon: IconPlayerPlay, color: STAGE_META.hack.color, tip: STAGE_META.hack.tip },
   { key: "ship", label: STAGE_META.ship.label, Icon: IconGitPullRequest, color: STAGE_META.ship.color, tip: STAGE_META.ship.tip },
   { key: "code_review", label: STAGE_META.code_review.label, Icon: IconFileText, color: STAGE_META.code_review.color, tip: STAGE_META.code_review.tip },
@@ -339,7 +339,10 @@ export function Notifications() {
       const filtered = notifications.filter(n => {
         if (HUMAN_ONLY_TYPES.has(n.taskType ?? "")) return false;
         if (n.stage === "skipped") return false;
-        return (n.stage ?? "new") === stage.key;
+        const nStage = n.stage ?? "new";
+        // plan_review tasks appear in the Planning (start_work) column
+        const effectiveStage = nStage === "plan_review" ? "start_work" : nStage;
+        return effectiveStage === stage.key;
       }).sort(sortByPriority);
       map.set(stage.key, filtered);
     }

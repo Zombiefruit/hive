@@ -27,8 +27,8 @@ export const HUMAN_ONLY_TYPES = new Set(["meeting_prep", "response"]);
 /** Valid stage transitions — maps each stage to its allowed next stages. */
 const VALID_TRANSITIONS: Record<string, string[]> = {
   new: ["start_work"],
-  start_work: ["plan_review", "hack"],
-  plan_review: ["hack", "start_work"],
+  start_work: ["hack"],          // drag from Planning → Hacking = approve plan
+  plan_review: ["hack"],         // legacy: plan_review also goes to hack
   hack: ["ship"],
   ship: ["code_review"],
   code_review: ["pr_feedback", "done"],

@@ -19,8 +19,10 @@ describe("STAGE_META", () => {
     }
   });
 
-  it("should have unique labels for each stage", () => {
-    const labels = Object.values(STAGE_META).map(m => m.label);
+  it("should have unique labels for visible columns", () => {
+    // plan_review shares "Planning" with start_work (it's not a visible column)
+    const visibleStages = Object.entries(STAGE_META).filter(([key]) => key !== "plan_review");
+    const labels = visibleStages.map(([, m]) => m.label);
     expect(new Set(labels).size).toBe(labels.length);
   });
 

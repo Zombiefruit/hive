@@ -41,8 +41,8 @@ describe("Stage Transitions", () => {
   it("should allow start_work → hack", () => {
     expect(isValidTransition("start_work", "hack")).toBe(true);
   });
-  it("should allow start_work → plan_review", () => {
-    expect(isValidTransition("start_work", "plan_review")).toBe(true);
+  it("should NOT allow start_work → plan_review (plan_review merged into Planning)", () => {
+    expect(isValidTransition("start_work", "plan_review")).toBe(false);
   });
   it("should allow plan_review → hack", () => {
     expect(isValidTransition("plan_review", "hack")).toBe(true);
