@@ -160,6 +160,7 @@ export function buildResponsePrompt(notification: {
   summary: string;
   url?: string;
   links?: Array<{ type: string; label: string; url: string }>;
+  userSlackId?: string;
 }): string {
   const linksList = (notification.links ?? []).map(l => `- **${l.label}**: ${l.url}`).join("\n");
   const urlLine = notification.url ? `- **URL**: ${notification.url}` : "";
@@ -169,6 +170,7 @@ export function buildResponsePrompt(notification: {
     SUMMARY: notification.summary,
     URL_LINE: urlLine,
     LINKS_SECTION: linksList ? `## Links to fetch\n${linksList}` : "",
+    USER_SLACK_ID: notification.userSlackId ?? "the user",
   });
 }
 

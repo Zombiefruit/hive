@@ -436,7 +436,7 @@ export function Settings() {
                       </Text>
                     )}
                   </div>
-                  <ActionIcon size="sm" variant="subtle" color="red" onClick={() => setCoworkers(prev => prev.filter((_, j) => j !== i))}>
+                  <ActionIcon size="sm" variant="subtle" color="red" aria-label="Remove coworker" onClick={() => setCoworkers(prev => prev.filter((_, j) => j !== i))}>
                     <IconTrash size={14} />
                   </ActionIcon>
                 </div>
@@ -496,6 +496,7 @@ export function Settings() {
                   size="md"
                   variant="light"
                   color="blue"
+                  aria-label="Add coworker"
                   disabled={!newCoworkerName.trim()}
                   onClick={() => {
                     if (!newCoworkerName.trim()) return;
@@ -552,6 +553,7 @@ export function Settings() {
                     size="sm"
                     variant="subtle"
                     color="red"
+                    aria-label="Remove channel"
                     onClick={() => removeChannel(ch.id)}
                   >
                     <IconTrash size={14} />
@@ -581,6 +583,7 @@ export function Settings() {
                   size="md"
                   variant="light"
                   color="blue"
+                  aria-label="Add channel"
                   onClick={addCustomChannel}
                   disabled={!newChannelName.trim() || !newChannelId.trim()}
                 >
@@ -791,7 +794,7 @@ export function Settings() {
                 <Group key={i} gap={8} style={{ padding: "6px 10px", borderRadius: 6, backgroundColor: "var(--mantine-color-dark-7)" }}>
                   <Badge size="xs" variant="light" color="teal">{m.pattern}</Badge>
                   <Text size="xs" style={{ fontFamily: "var(--mantine-font-family-monospace)", fontSize: "0.7rem", flex: 1 }}>{m.repoPath}</Text>
-                  <ActionIcon size="sm" variant="subtle" color="red" onClick={() => setRepoMappings(prev => (prev ?? []).filter((_, j) => j !== i))}>
+                  <ActionIcon size="sm" variant="subtle" color="red" aria-label="Remove repo mapping" onClick={() => setRepoMappings(prev => (prev ?? []).filter((_, j) => j !== i))}>
                     <IconTrash size={14} />
                   </ActionIcon>
                 </Group>
@@ -805,7 +808,7 @@ export function Settings() {
               <Group gap={8}>
                 <TextInput placeholder="Pattern (e.g., VEC-*)" value={newPattern} onChange={e => setNewPattern(e.currentTarget.value)} size="xs" style={{ flex: 1 }} />
                 <TextInput placeholder="Repo path (e.g., /Users/kieran/repos/monolith)" value={newRepoPath} onChange={e => setNewRepoPath(e.currentTarget.value)} size="xs" style={{ flex: 2 }} />
-                <ActionIcon size="md" variant="light" color="teal" disabled={!newPattern.trim() || !newRepoPath.trim()} onClick={() => {
+                <ActionIcon size="md" variant="light" color="teal" aria-label="Add repo mapping" disabled={!newPattern.trim() || !newRepoPath.trim()} onClick={() => {
                   setRepoMappings(prev => [...(prev ?? []), { pattern: newPattern.trim(), repoPath: newRepoPath.trim() }]);
                   setNewPattern(""); setNewRepoPath("");
                 }}>

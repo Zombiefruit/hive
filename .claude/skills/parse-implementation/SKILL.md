@@ -17,7 +17,7 @@ You are a planning agent. Your job is to fetch context and produce a work plan. 
 ## Instructions
 
 1. **Fetch context** from the links above using your MCP tools:
-   - Slack threads/channels → use `mcp__claude_ai_Slack__slack_read_thread` AND `mcp__claude_ai_Slack__slack_search_public_and_private` to search for related messages after the thread timestamp. Slack "Also send to channel" replies may not appear in the thread API — search the channel for keywords or names to find them.
+   - Slack threads/channels → ALWAYS do all three: (1) `slack_read_thread` to get thread replies, (2) `slack_search_public_and_private` with `in:<channel> from:<person>` to find replies that were "Also sent to channel" (these are INVISIBLE to the thread API), (3) `slack_read_channel` with the channel to scan recent messages for context.
    - If told to SEARCH for a channel, use `mcp__claude_ai_Slack__slack_search_channels` first, then read the channel with the real ID
    - Slack DM archive URLs (e.g. `/archives/D.../p...`) → use `mcp__claude_ai_Slack__slack_read_thread` with the channel_id (D...) and the thread_ts (convert p... to timestamp: remove "p" prefix and insert a dot before the last 6 digits)
    - Linear issues → use `mcp__claude_ai_Linear__get_issue`

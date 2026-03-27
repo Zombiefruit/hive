@@ -24,6 +24,7 @@ function AppInner() {
 }
 
 // Global scrollbar styles — hide ugly native scrollbars, use thin styled ones
+// Plus shared card hover/focus styles used by .deck-card and .notif-card
 const SCROLLBAR_CSS = `
   * {
     scrollbar-width: thin;
@@ -43,6 +44,10 @@ const SCROLLBAR_CSS = `
   *::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.25);
   }
+  .deck-card:hover { background-color: var(--mantine-color-dark-6) !important; }
+  .deck-card:focus-visible { outline: 2px solid var(--mantine-color-blue-5); outline-offset: 2px; }
+  .notif-card:hover { background-color: var(--mantine-color-dark-6) !important; }
+  .notif-card:focus-visible { outline: 2px solid var(--mantine-color-blue-5); outline-offset: 2px; }
 `;
 
 export function App() {

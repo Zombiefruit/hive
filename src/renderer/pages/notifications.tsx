@@ -15,6 +15,7 @@ import { AddTaskModal } from "../components/AddTaskModal";
 import { AppHeader } from "../components/AppHeader";
 import { buildSlackArchiveUrl } from "../../shared/task-utils";
 import { STAGE_META, SOURCE_COLORS } from "../../shared/ui-constants";
+import { formatTimeSince } from "../components/shared";
 import { getDetailViewType } from "../../shared/detail-view-routing";
 import { ImplementationDetailView } from "../components/ImplementationDetailView";
 import { ResponseDetailView } from "../components/ResponseDetailView";
@@ -95,15 +96,6 @@ const sourceIcons: Record<string, React.FC<{ size?: number; color?: string }>> =
 };
 
 const sourceColors = SOURCE_COLORS;
-
-function formatTimeSince(iso: string): string {
-  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
-}
 
 // Modal for adding context before stage transitions
 // No modal needed — drag-and-drop triggers actions immediately.
@@ -374,7 +366,6 @@ export function Notifications() {
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--mantine-color-body)" }}>
       <style>{`
-        .notif-card:hover { background-color: var(--mantine-color-dark-6) !important; }
         .notif-card:hover .drag-handle { opacity: 1 !important; }
         .notif-action-btn { transition: filter 0.15s ease; }
         .notif-action-btn:hover { filter: brightness(1.2); }
@@ -395,7 +386,7 @@ export function Notifications() {
               itemLabel="items"
             />
             {!pollStatus.fetching && notifications.some(n => n.pollCycle && (!seenCycle.has(n.id) || (seenCycle.get(n.id) ?? 0) < n.pollCycle)) && (
-              <UnstyledButton onClick={markAllSeen} style={{ fontSize: "0.6rem", color: "var(--mantine-color-blue-4)", padding: "2px 6px", borderRadius: 4, backgroundColor: "color-mix(in srgb, var(--mantine-color-blue-9) 15%, transparent)" }}>
+              <UnstyledButton onClick={markAllSeen} aria-label="Mark all as read" style={{ fontSize: "0.6rem", color: "var(--mantine-color-blue-4)", padding: "2px 6px", borderRadius: 4, backgroundColor: "color-mix(in srgb, var(--mantine-color-blue-9) 15%, transparent)" }}>
                 Mark all read
               </UnstyledButton>
             )}
@@ -475,7 +466,7 @@ export function Notifications() {
                             <Text size="xs" fw={600} c={items.length > 0 || isOver ? undefined : "dimmed"}>{stage.label}</Text>
                             {items.length > 0 && <Badge size="xs" variant="light" color="gray" circle>{items.length}</Badge>}
                           </Group>
-                          <UnstyledButton onClick={(e) => { e.stopPropagation(); toggleCollapse(stage.key); }} style={{ opacity: 0.4, padding: 2 }}>
+                          <UnstyledButton onClick={(e) => { e.stopPropagation(); toggleCollapse(stage.key); }} aria-label={isCollapsed ? "Expand column" : "Collapse column"} style={{ opacity: 0.4, padding: 2 }}>
                             {isCollapsed ? <IconChevronRight size={12} /> : <IconChevronDown size={12} />}
                           </UnstyledButton>
                         </Group>
@@ -666,7 +657,7 @@ export function Notifications() {
                           <Text size="xs" fw={600} c={items.length > 0 || isOver ? undefined : "dimmed"}>{stage.label}</Text>
                           {items.length > 0 && <Badge size="xs" variant="light" color="gray" circle>{items.length}</Badge>}
                         </Group>
-                        <UnstyledButton onClick={(e) => { e.stopPropagation(); toggleCollapse(`human-${stage.key}`); }} style={{ opacity: 0.4, padding: 2 }}>
+                        <UnstyledButton onClick={(e) => { e.stopPropagation(); toggleCollapse(`human-${stage.key}`); }} aria-label={isCollapsed ? "Expand column" : "Collapse column"} style={{ opacity: 0.4, padding: 2 }}>
                           {isCollapsed ? <IconChevronRight size={12} /> : <IconChevronDown size={12} />}
                         </UnstyledButton>
                       </Group>
@@ -1221,7 +1212,7 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss, onPlanRead
             <Badge color={stage?.color ?? "gray"} size="xs">{stage?.label ?? n.stage}</Badge>
             {n.priority && <Badge size="xs" variant="dot" color={n.priority === "critical" ? "red" : n.priority === "high" ? "yellow" : n.priority === "medium" ? "blue" : "gray"}>{n.priority}</Badge>}
           </Group>
-          <UnstyledButton onClick={onClose}><Text size="xs" c="dimmed">Close</Text></UnstyledButton>
+          <UnstyledButton onClick={onClose} aria-label="Close detail pane"><Text size="xs" c="dimmed">Close</Text></UnstyledButton>
         </Group>
         <Text size="sm" fw={600}>{n.title}</Text>
         <Group gap={6}>

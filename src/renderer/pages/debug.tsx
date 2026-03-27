@@ -97,12 +97,12 @@ export function Debug() {
           WebkitAppRegion: "drag",
         }}
       >
-        <UnstyledButton onClick={() => navigate("/")} style={{ WebkitAppRegion: "no-drag", padding: 4 }}>
+        <UnstyledButton onClick={() => navigate("/")} aria-label="Back to inbox" style={{ WebkitAppRegion: "no-drag", padding: 4 }}>
           <IconArrowLeft size={16} />
         </UnstyledButton>
         <Title order={4}>Debug</Title>
         <div style={{ flex: 1 }} />
-        <UnstyledButton onClick={() => { fetchLog(); fetchStats(); }} style={{ WebkitAppRegion: "no-drag", padding: 4 }}>
+        <UnstyledButton onClick={() => { fetchLog(); fetchStats(); }} aria-label="Refresh debug data" style={{ WebkitAppRegion: "no-drag", padding: 4 }}>
           <IconRefresh size={14} />
         </UnstyledButton>
       </div>

@@ -37,7 +37,7 @@ user-invocable: false
    - **low**: When you have time. FYI threads, optional reviews, nice-to-have improvements.
    - **backlog**: Informational only. Tips, announcements, completed items that don't need action.
 
-7. **UNREAD THREADS**: If someone tagged/messaged the user and they haven't replied, that's a "response" item. Priority depends on WHO asked — manager = critical, lead = high, peer = high, external = medium.
+7. **UNREAD THREADS**: If someone tagged/messaged the user and they haven't replied, that's a "response" item. Priority depends on WHO asked — manager = critical, lead = high, peer = high, external = medium. **Important:** A reply from the user that appears in the CHANNEL but not in the thread (Slack's "Also send to channel" feature) still counts as a reply — check channel messages too, not just the thread API.
 
 8. **Classify task type** — be precise, this determines the UI:
    - **response**: Someone asked the user something and they haven't replied (DMs, @mentions, thread questions)

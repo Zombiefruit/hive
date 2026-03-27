@@ -17,11 +17,11 @@ export interface StageMeta {
 
 export const STAGE_META: Record<Stage, StageMeta> = {
   new:          { label: "Inbox",       color: "#3b82f6", tip: "New items from all sources." },
-  start_work:   { label: "Planning",    color: "#a855f7", tip: "Agent running /start-work." },
-  plan_review:  { label: "Plan Review", color: "#f59e0b", tip: "Plan reviewers assessing." },
-  hack:         { label: "Building",    color: "#22c55e", tip: "Agent implementing plan." },
-  ship:         { label: "Shipping",    color: "#06b6d4", tip: "Verifying, pushing, opening PR." },
-  code_review:  { label: "Reviewing",   color: "#f97316", tip: "Code review agents running." },
+  start_work:   { label: "/start-work", color: "#a855f7", tip: "Agent creating implementation plan." },
+  plan_review:  { label: "Plan Review", color: "#f59e0b", tip: "Review the plan before approving." },
+  hack:         { label: "/hack",       color: "#22c55e", tip: "Agent implementing the plan." },
+  ship:         { label: "/ship",       color: "#06b6d4", tip: "Running tests, pushing branch, opening PR." },
+  code_review:  { label: "/code-review",color: "#f97316", tip: "Reviewing the pull request." },
   pr_feedback:  { label: "PR Feedback", color: "#ec4899", tip: "Addressing reviewer comments." },
   preparing:    { label: "Preparing",   color: "#a855f7", tip: "Gathering context." },
   ready:        { label: "Ready",       color: "#22c55e", tip: "Context ready — review and act." },

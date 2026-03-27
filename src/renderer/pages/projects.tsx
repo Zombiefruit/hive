@@ -8,6 +8,7 @@ import { PollStatusIndicator } from "../components/PollStatusIndicator";
 import { usePollStatus } from "../hooks/usePollStatus";
 import type { Project } from "../../shared/project-model";
 import { STAGE_META, SOURCE_COLORS } from "../../shared/ui-constants";
+import { formatTimeSince, EmptyState } from "../components/shared";
 
 // --- Notification shape (matches poll-service output) ---
 interface NotificationItem {
@@ -39,15 +40,6 @@ const sourceColors = SOURCE_COLORS;
 const STAGE_LABELS: Record<string, { label: string; color: string }> = Object.fromEntries(
   Object.entries(STAGE_META).map(([key, meta]) => [key, { label: meta.label, color: meta.color }]),
 );
-
-function formatTimeSince(iso: string): string {
-  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
-}
 
 /** Find the most recent timeline event across a set of notifications. */
 function latestActivity(notifications: NotificationItem[]): { timestamp: string; event: string } | null {
@@ -120,6 +112,7 @@ export default function ProjectsPage() {
         <UnstyledButton
           onClick={() => fetchData()}
           disabled={pollStatus.fetching}
+          aria-label="Refresh projects"
           style={{
             padding: "2px 8px",
             borderRadius: 4,
@@ -171,6 +164,7 @@ export default function ProjectsPage() {
         <Group gap={8} mb={20}>
           <UnstyledButton
             onClick={() => navigate("/projects")}
+            aria-label="Back to projects list"
             style={{
               display: "flex", alignItems: "center", gap: 4,
               color: "var(--mantine-color-blue-4)", fontSize: "0.8rem",
@@ -279,10 +273,7 @@ export default function ProjectsPage() {
 
         {/* Task list grouped by stage */}
         {taskCount === 0 || projectTasks.length === 0 ? (
-          <Stack align="center" py="xl" gap="sm">
-            <IconFolder size={40} color="var(--mantine-color-dimmed)" stroke={1} />
-            <Text size="sm" c="dimmed">No tasks in this project yet</Text>
-          </Stack>
+          <EmptyState icon={IconFolder} message="No tasks in this project yet" />
         ) : (
           <Stack gap={16}>
             {[...tasksByStage.entries()].map(([stage, items]) => {
@@ -355,9 +346,6 @@ export default function ProjectsPage() {
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--mantine-color-body)" }}>
-      <style>{`
-        .notif-card:hover { background-color: var(--mantine-color-dark-6) !important; }
-      `}</style>
       <AppHeader rightContent={headerRight} />
 
       {showDetail ? renderDetail(selectedProject) : (
@@ -372,11 +360,7 @@ export default function ProjectsPage() {
               <Text size="sm" c="dimmed">Loading projects...</Text>
             </Group>
           ) : projects.length === 0 ? (
-            <Stack align="center" py="xl" gap="sm">
-              <IconFolder size={40} color="var(--mantine-color-dimmed)" stroke={1} />
-              <Text size="sm" c="dimmed">No projects detected yet.</Text>
-              <Text size="xs" c="dimmed">Projects are auto-created when the triage agent groups related tasks.</Text>
-            </Stack>
+            <EmptyState icon={IconFolder} message="No projects detected yet." detail="Projects are auto-created when the triage agent groups related tasks." />
           ) : (
             <Stack gap={8}>
               {projects.filter(proj => {
@@ -406,6 +390,7 @@ export default function ProjectsPage() {
                   <UnstyledButton
                     key={proj.id}
                     onClick={() => navigate(`/projects/${proj.id}`)}
+                    aria-label={proj.name}
                     style={{
                       padding: "14px 16px", borderRadius: 8,
                       border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",

@@ -16,6 +16,7 @@ import { trackProcess, untrackProcess } from "../process-monitor";
 import { BrowserWindow } from "electron";
 import { registerAgent, recordAgentEvent, unregisterAgent } from "./agent-monitor";
 import { buildSlackArchiveUrl } from "../../shared/task-utils";
+import { hasConfig, getConfig } from "../config";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -180,11 +181,13 @@ export async function prepareWorkPlan(notification: {
   const taskType = notification.taskType ?? "implementation";
   let prompt: string;
   if (taskType === "response") {
+    const cfg = hasConfig() ? getConfig() : null;
     prompt = buildResponsePrompt({
       title: notification.title,
       summary: notification.summary,
       url: notification.url,
       links: notification.links,
+      userSlackId: cfg?.slackUserId,
     });
   } else if (taskType === "meeting_prep") {
     prompt = buildMeetingPrepPrompt({
