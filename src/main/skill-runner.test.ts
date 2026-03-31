@@ -22,6 +22,12 @@ describe("Skill Runner — buildSkillArgs", () => {
     const args = buildSkillArgs(null);
     expect(args).not.toContain("--no-session-persistence");
   });
+
+  it("should auto-approve all tools for non-interactive execution", () => {
+    const args = buildSkillArgs(null);
+    expect(args).toContain("--allowedTools");
+    expect(args).toContain("*");
+  });
 });
 
 describe("Skill Runner — buildSkillEnv", () => {

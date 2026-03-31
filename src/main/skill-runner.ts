@@ -69,6 +69,9 @@ export function buildSkillArgs(sessionId: string | null): string[] {
     "stream-json",
     "--verbose",
     "--no-chrome",
+    // Auto-approve all tools — skills run non-interactively under CLAUDE_HIVE
+    "--allowedTools",
+    "*",
   ];
 
   if (sessionId) {
