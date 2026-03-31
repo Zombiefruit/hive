@@ -125,6 +125,36 @@ export function checkRequiredSkills(): { installed: boolean; missing: string[] }
   return { installed: missing.length === 0, missing };
 }
 
+// ── Running process registry (for sending messages to running agents) ──
+
+const runningSkills = new Map<string, { proc: ChildProcess; sessionId: string | null }>();
+
+/**
+ * Send a follow-up message to a running skill process.
+ * Returns true if the message was sent, false if no process found.
+ */
+export function sendToSkill(notificationId: string, message: string): boolean {
+  const entry = runningSkills.get(notificationId);
+  if (!entry?.proc?.stdin?.writable) return false;
+
+  entry.proc.stdin.write(
+    JSON.stringify({
+      type: "user",
+      message: { role: "user", content: message },
+      parent_tool_use_id: null,
+      uuid: randomUUID(),
+      session_id: entry.sessionId ?? "",
+    }) + "\n",
+  );
+  log(`[skill] Sent message to ${notificationId}: ${message.slice(0, 100)}`);
+  return true;
+}
+
+/** Check if a skill process is currently running for a notification. */
+export function isSkillRunning(notificationId: string): boolean {
+  return runningSkills.has(notificationId);
+}
+
 // ── Worktree helpers ──
 
 /** Skills that modify code and should run in an isolated worktree. */
@@ -249,6 +279,8 @@ export function runSkill(
     };
 
     if (proc.pid) trackProcess(proc.pid, "planning", skillLabel);
+    // Register so we can send follow-up messages
+    runningSkills.set(invocation.notificationId, { proc, sessionId: invocation.sessionId });
 
     log(`[skill] Spawned PID ${proc.pid}`);
     emit("status", `Spawned skill runner — loading tools...`);
@@ -280,6 +312,7 @@ export function runSkill(
         done = true;
         clearInterval(initTicker);
         if (proc.pid) untrackProcess(proc.pid);
+        runningSkills.delete(invocation.notificationId);
         log(`[skill] Timed out after ${Math.round(timeoutMs / 1000)}s (${bytesReceived} bytes received)`);
         emit("error", `Timed out after ${Math.round(timeoutMs / 1000)}s`);
         proc.kill();
@@ -310,7 +343,12 @@ export function runSkill(
             initialized = true;
             clearInterval(initTicker);
             const extractedId = extractSessionId(msg);
-            if (extractedId) sessionId = extractedId;
+            if (extractedId) {
+              sessionId = extractedId;
+              // Update registry with real session ID
+              const entry = runningSkills.get(invocation.notificationId);
+              if (entry) entry.sessionId = extractedId;
+            }
             const tools: string[] = msg.tools ?? [];
             log(`[skill] Initialized: ${tools.length} tools, session=${sessionId}`);
             emit("init", `Agent ready — ${tools.length} tools`);
@@ -384,6 +422,7 @@ export function runSkill(
     proc.on("exit", (code) => {
       clearInterval(initTicker);
       if (proc.pid) untrackProcess(proc.pid);
+      runningSkills.delete(invocation.notificationId);
       if (!done) {
         done = true;
         clearTimeout(timeout);

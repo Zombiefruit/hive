@@ -3,7 +3,7 @@
  * Low-risk: immediate click. Medium-risk: inline confirm. High-risk: editable preview.
  */
 
-import { Button, Group, Stack, Text, Textarea, UnstyledButton } from "@mantine/core";
+import { Button, Group, Loader, Stack, Text, Textarea, UnstyledButton } from "@mantine/core";
 import {
   IconRocket, IconExternalLink, IconBrandSlack, IconMail,
   IconCalendar, IconGitPullRequest, IconCheck, IconClock,
@@ -80,11 +80,15 @@ function ActionRow({
   onExecute,
   onSendSlack,
   onSendEmail,
+  disabled,
+  executing,
 }: {
   action: Action;
   onExecute: () => void;
   onSendSlack: (channel: string, message: string, threadTs?: string) => void;
   onSendEmail: (to: string, subject: string, body: string) => void;
+  disabled: boolean;
+  executing: boolean;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -94,7 +98,7 @@ function ActionRow({
   const confirmMsg = getConfirmMessage(action);
 
   const handleClick = () => {
-    if (action.type === "no_action") return;
+    if (action.type === "no_action" || disabled || executing) return;
     if (risk === "low") { onExecute(); return; }
     if (risk === "medium") { setConfirming(true); return; }
     if (risk === "high") {
@@ -131,18 +135,28 @@ function ActionRow({
         </Group>
 
         {action.type !== "no_action" && !confirming && !expanded && (
-          <UnstyledButton
-            onClick={handleClick}
-            aria-label={action.label}
-            style={{
-              padding: "4px 12px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 500,
-              backgroundColor: risk === "high" ? "var(--mantine-color-dark-5)" : "var(--mantine-color-blue-9)",
-              color: "var(--mantine-color-text)",
-              flexShrink: 0,
-            }}
-          >
-            {risk === "high" ? "Edit & Send" : risk === "medium" ? "Run" : "Go"}
-          </UnstyledButton>
+          executing ? (
+            <Group gap={6} style={{ flexShrink: 0 }}>
+              <Loader size={12} />
+              <Text size="xs" c="dimmed">Running...</Text>
+            </Group>
+          ) : (
+            <UnstyledButton
+              onClick={handleClick}
+              aria-label={action.label}
+              disabled={disabled}
+              style={{
+                padding: "4px 12px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 500,
+                backgroundColor: disabled ? "var(--mantine-color-dark-6)" : risk === "high" ? "var(--mantine-color-dark-5)" : "var(--mantine-color-blue-9)",
+                color: disabled ? "var(--mantine-color-dimmed)" : "var(--mantine-color-text)",
+                opacity: disabled ? 0.5 : 1,
+                cursor: disabled ? "not-allowed" : "pointer",
+                flexShrink: 0,
+              }}
+            >
+              {risk === "high" ? "Edit & Send" : risk === "medium" ? "Run" : "Go"}
+            </UnstyledButton>
+          )
         )}
       </Group>
 
@@ -215,9 +229,12 @@ export function NextStepsCard({
   onDismiss,
   onSnooze,
 }: NextStepsCardProps) {
+  const [executingIndex, setExecutingIndex] = useState<number | null>(null);
+
   if (actions.length === 0) return null;
 
-  const executeAction = (action: Action) => {
+  const executeAction = (action: Action, index: number) => {
+    setExecutingIndex(index);
     switch (action.type) {
       case "run_skill": onRunSkill(action.skill, action.params); break;
       case "update_linear": onUpdateLinear(action.ticket, action.field, action.value); break;
@@ -244,9 +261,11 @@ export function NextStepsCard({
           <ActionRow
             key={i}
             action={action}
-            onExecute={() => executeAction(action)}
+            onExecute={() => executeAction(action, i)}
             onSendSlack={onSendSlack}
             onSendEmail={onSendEmail}
+            disabled={executingIndex !== null && executingIndex !== i}
+            executing={executingIndex === i}
           />
         ))}
       </Stack>

@@ -177,6 +177,10 @@ const api = {
 
   // Skill runner
   runSkill: (invocation: unknown) => ipcRenderer.invoke("skill:run", invocation),
+  sendToSkill: (notificationId: string, message: string) =>
+    ipcRenderer.invoke("skill:send-message", notificationId, message) as Promise<{ sent: boolean }>,
+  isSkillRunning: (notificationId: string) =>
+    ipcRenderer.invoke("skill:is-running", notificationId) as Promise<boolean>,
   checkSkills: () => ipcRenderer.invoke("skill:check"),
   readPlan: (repoPath: string, workSlug: string) => ipcRenderer.invoke("skill:read-plan", repoPath, workSlug),
   readReviews: (repoPath: string, workSlug: string) => ipcRenderer.invoke("skill:read-review", repoPath, workSlug),

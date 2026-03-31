@@ -1123,10 +1123,17 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss, onPlanRead
     setLoading(true);
     sendingFeedbackRef.current = true;
     try {
-      const result = await window.deck.iteratePlan(n.id, msg);
-      const plan = result as { conversationHistory: typeof conversation };
-      if (plan?.conversationHistory) {
-        setConversation(plan.conversationHistory);
+      // Check if a skill agent is running — if so, send directly to it
+      const skillRunning = await window.deck.isSkillRunning?.(n.id);
+      if (skillRunning) {
+        await window.deck.sendToSkill?.(n.id, msg);
+        // Agent response will come via planning:event stream
+      } else {
+        const result = await window.deck.iteratePlan(n.id, msg);
+        const plan = result as { conversationHistory: typeof conversation };
+        if (plan?.conversationHistory) {
+          setConversation(plan.conversationHistory);
+        }
       }
     } catch {}
     sendingFeedbackRef.current = false;

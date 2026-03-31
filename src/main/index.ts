@@ -27,7 +27,7 @@ import {
   getActiveManagerMessages,
   stopManager,
 } from "./manager/manager-ai";
-import { runSkill, checkRequiredSkills, type SkillInvocation } from "./skill-runner";
+import { runSkill, checkRequiredSkills, sendToSkill, isSkillRunning, type SkillInvocation } from "./skill-runner";
 import type { PlanningEvent } from "./mcp-bridge";
 import { getAllProjects, getProject } from "../shared/project-model";
 import { startSlackHook, stopSlackHook } from "./notifications/slack-hook-service";
@@ -362,6 +362,16 @@ app.whenReady().then(() => {
       }
     };
     return runSkill(invocation, onEvent);
+  });
+
+  // Send message to a running skill agent
+  ipcMain.handle("skill:send-message", (_event, notificationId: string, message: string) => {
+    return { sent: sendToSkill(notificationId, message) };
+  });
+
+  // Check if a skill is running for a notification
+  ipcMain.handle("skill:is-running", (_event, notificationId: string) => {
+    return isSkillRunning(notificationId);
   });
 
   ipcMain.handle("skill:check", () => checkRequiredSkills());
