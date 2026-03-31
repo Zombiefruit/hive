@@ -21,6 +21,8 @@ import { ImplementationDetailView } from "../components/ImplementationDetailView
 import { ResponseDetailView } from "../components/ResponseDetailView";
 import { MeetingPrepDetailView } from "../components/MeetingPrepDetailView";
 import { StartWorkModal } from "../components/StartWorkModal";
+import { NextStepsCard } from "../components/NextStepsCard";
+import { parseActions } from "../../shared/action-parser";
 import { detectRepo } from "../../shared/repo-detection";
 
 interface NotificationItem {
@@ -1666,6 +1668,50 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss, onPlanRead
                     </Group>
                   )}
 
+                  {/* Structured actions from agent output */}
+                  {(() => {
+                    const lastAssistant = [...conversation].reverse().find(m => m.role === "assistant");
+                    const actions = lastAssistant ? parseActions(lastAssistant.content) : [];
+                    if (actions.length === 0) return null;
+                    return (
+                      <div style={{ marginTop: 8 }}>
+                        <NextStepsCard
+                          actions={actions}
+                          onRunSkill={async (skill, params) => {
+                            const nextStage = skill === "/hack" ? "hack" : skill === "/ship" ? "ship" : skill === "/code-review" ? "code_review" : undefined;
+                            if (nextStage) window.deck?.updateNotificationById?.(n.id, { stage: nextStage });
+                            setLoading(true);
+                            try {
+                              await window.deck.runSkill({
+                                skill,
+                                args: params?.phase ? `phase ${params.phase}` : "",
+                                repoPath: n.repoPath ?? "",
+                                sessionId: n.sessionId ?? null,
+                                notificationId: n.id,
+                              });
+                            } catch (err) { console.error(`Skill ${skill} failed:`, err); }
+                            setLoading(false);
+                          }}
+                          onUpdateLinear={async (ticket, field, value) => {
+                            await window.deck.updateLinear?.(ticket, field, value);
+                          }}
+                          onSendSlack={async (ch, msg, ts) => {
+                            await window.deck.sendSlackMessage?.(ch, ts ?? "", msg);
+                          }}
+                          onSendEmail={() => {}}
+                          onOpenUrl={(url) => window.deck.openExternal(url)}
+                          onDismiss={() => {
+                            window.deck?.updateNotificationById?.(n.id, { stage: "done" });
+                            onDismiss();
+                          }}
+                          onSnooze={() => {
+                            window.deck?.updateNotificationById?.(n.id, { stage: "backlog" });
+                          }}
+                        />
+                      </div>
+                    );
+                  })()}
+
                   {/* Activity log removed — now in shared section above router */}
                   {loading && activity.length === 0 && conversation.length === 0 && (
                     <Group gap={8} py="sm">
@@ -1703,7 +1749,11 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss, onPlanRead
                         </UnstyledButton>
                       </Group>
                       <Group gap="xs">
-                        {!hasApproved && (
+                        {/* Hide hardcoded buttons when structured actions are available */}
+                        {!hasApproved && !(() => {
+                          const lastA = [...conversation].reverse().find(m => m.role === "assistant");
+                          return lastA ? parseActions(lastA.content).length > 0 : false;
+                        })() && (
                           <div>
                             <UnstyledButton onClick={handleApprove} style={{
                               padding: "8px 16px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 600,
