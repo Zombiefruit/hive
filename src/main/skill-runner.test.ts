@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildSkillArgs, buildSkillEnv, extractSessionId, type SkillInvocation, type SkillResult } from "./skill-runner";
+import { buildSkillArgs, buildSkillEnv, extractSessionId, createWorktree, type SkillInvocation, type SkillResult } from "./skill-runner";
 
 describe("Skill Runner — buildSkillArgs", () => {
   it("should build args without --resume on first invocation", () => {
