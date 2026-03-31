@@ -13,6 +13,8 @@ import { PlanView } from "./PlanView";
 import { ReviewView } from "./ReviewView";
 import { parsePlanMd } from "../../shared/plan-parser";
 import { parseReviewMd } from "../../shared/review-parser";
+import { parseActions } from "../../shared/action-parser";
+import { NextStepsCard } from "./NextStepsCard";
 
 interface ImplementationDetailViewProps {
   notification: {
@@ -26,6 +28,7 @@ interface ImplementationDetailViewProps {
   };
   fetchedContext: Array<{ type: string; content: string; timestamp: string }>;
   planText: string | null;
+  agentOutput: string | null;
   reviewTexts: string[];
   onStartWork: () => void;
   onStartHack: () => void;
@@ -33,6 +36,11 @@ interface ImplementationDetailViewProps {
   onShip: () => void;
   onCodeReview: () => void;
   onFixFindings: (findingIds: string[]) => void;
+  onRunSkill: (skill: string, params?: Record<string, unknown>) => void;
+  onUpdateLinear: (ticket: string, field: string, value: string) => void;
+  onOpenUrl: (url: string) => void;
+  onDismiss: (reason?: string) => void;
+  onSnooze: (reason?: string) => void;
   loading: boolean;
 }
 
@@ -67,6 +75,7 @@ export function ImplementationDetailView({
   notification,
   fetchedContext,
   planText,
+  agentOutput,
   reviewTexts,
   onStartWork,
   onStartHack,
@@ -74,6 +83,11 @@ export function ImplementationDetailView({
   onShip,
   onCodeReview,
   onFixFindings,
+  onRunSkill,
+  onUpdateLinear,
+  onOpenUrl,
+  onDismiss,
+  onSnooze,
   loading,
 }: ImplementationDetailViewProps) {
   const stage = notification.stage ?? "new";
@@ -82,6 +96,11 @@ export function ImplementationDetailView({
   const parsedPlan = useMemo(
     () => (planText ? parsePlanMd(planText) : null),
     [planText],
+  );
+
+  const actions = useMemo(
+    () => parseActions(agentOutput ?? planText ?? ""),
+    [agentOutput, planText],
   );
 
   const parsedReview = useMemo(
@@ -124,14 +143,27 @@ export function ImplementationDetailView({
               />
             )}
 
-            <ActionButton
-              label="Start Hack"
-              description={`Runs /hack in ${repoLabel} \u2014 implements plan phases, runs tests, commits per task. No PRs created yet.`}
-              onClick={onStartHack}
-              icon={<IconPlayerPlay size={14} />}
-              disabled={!parsedPlan}
-              loading={loading}
-            />
+            {actions.length > 0 ? (
+              <NextStepsCard
+                actions={actions}
+                onRunSkill={onRunSkill}
+                onUpdateLinear={onUpdateLinear}
+                onSendSlack={() => {}}
+                onSendEmail={() => {}}
+                onOpenUrl={onOpenUrl}
+                onDismiss={onDismiss}
+                onSnooze={onSnooze}
+              />
+            ) : (
+              <ActionButton
+                label="Start Hack"
+                description={`Runs /hack in ${repoLabel} \u2014 implements plan phases, runs tests, commits per task. No PRs created yet.`}
+                onClick={onStartHack}
+                icon={<IconPlayerPlay size={14} />}
+                disabled={!parsedPlan}
+                loading={loading}
+              />
+            )}
           </Stack>
         );
       }

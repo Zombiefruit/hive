@@ -1,7 +1,10 @@
 import { Badge, Group, Stack, Text, UnstyledButton } from "@mantine/core";
 import { IconUser, IconExternalLink } from "@tabler/icons-react";
+import { useMemo } from "react";
 import { ActionButton } from "./ActionButton";
 import { parseMeetingPrepContext } from "../../shared/meeting-prep-parser";
+import { parseActions } from "../../shared/action-parser";
+import { NextStepsCard } from "./NextStepsCard";
 
 interface MeetingPrepDetailViewProps {
   notification: {
@@ -11,10 +14,15 @@ interface MeetingPrepDetailViewProps {
   };
   fetchedContext: Array<{ type: string; content: string; timestamp: string }>;
   onMarkDone?: () => void;
+  onOpenUrl?: (url: string) => void;
+  onDismiss?: (reason?: string) => void;
+  onSnooze?: (reason?: string) => void;
 }
 
-export function MeetingPrepDetailView({ notification, fetchedContext, onMarkDone }: MeetingPrepDetailViewProps) {
+export function MeetingPrepDetailView({ notification, fetchedContext, onMarkDone, onOpenUrl, onDismiss, onSnooze }: MeetingPrepDetailViewProps) {
   const data = parseMeetingPrepContext(fetchedContext);
+  const contextText = fetchedContext.map(c => c.content).join("\n");
+  const actions = useMemo(() => parseActions(contextText), [contextText]);
 
   const isPreparing = notification.stage === "preparing";
   const isReady = notification.stage === "ready";
@@ -103,7 +111,19 @@ export function MeetingPrepDetailView({ notification, fetchedContext, onMarkDone
       )}
 
       {/* Actions */}
-      {isReady && onMarkDone && (
+      {isReady && actions.length > 0 && (
+        <NextStepsCard
+          actions={actions}
+          onRunSkill={() => {}}
+          onUpdateLinear={() => {}}
+          onSendSlack={() => {}}
+          onSendEmail={() => {}}
+          onOpenUrl={onOpenUrl ?? (() => {})}
+          onDismiss={onDismiss ?? (() => {})}
+          onSnooze={onSnooze ?? (() => {})}
+        />
+      )}
+      {isReady && actions.length === 0 && onMarkDone && (
         <ActionButton
           label="Mark Done"
           description="Meeting completed. No agent action — just marks this task as done."

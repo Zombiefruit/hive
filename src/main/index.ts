@@ -413,6 +413,19 @@ app.whenReady().then(() => {
     }
   });
 
+  ipcMain.handle("linear:update", async (_event, data: { ticket: string; field: string; value: string }) => {
+    try {
+      const { askBridge } = require("./mcp-bridge");
+      const result = await askBridge(
+        `Use mcp__claude_ai_Linear__save_issue to update issue ${data.ticket}: set ${data.field} to "${data.value}". Return "updated" on success.`,
+        30000,
+      );
+      return { ok: true, data: result };
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  });
+
   // Load persisted planning events for a notification (survives page navigation)
   ipcMain.handle("planning:get-events", (_event, notificationId: string) => {
     try {

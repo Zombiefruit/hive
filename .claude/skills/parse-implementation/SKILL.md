@@ -42,3 +42,23 @@ The "---" separator on its own line is REQUIRED between sections.
 - Do NOT explore the local filesystem or assume the task is about the current directory.
 - If a fetch fails, note it and plan with what you have.
 - You MUST produce a plan with SECTION 1 and SECTION 2. Never return just a status update or question.
+
+## Structured Actions
+
+After your plan, append a structured actions block:
+
+```actions
+[
+  { "type": "run_skill", "skill": "/hack", "label": "Implement Phase 1: <description>", "risk": "medium", "params": { "phase": 1 } }
+]
+```
+
+Choose actions based on what the plan requires:
+- Code tasks to implement → `run_skill` with `/hack` and the phase number
+- Linear ticket needs status change → `update_linear` with ticket ID, field, value
+- Work is already done → `no_action` with explanation
+- PR needs review → `review_pr` with the PR URL
+- Multiple actions allowed — list them in recommended execution order
+
+Action types: `run_skill`, `update_linear`, `open_url`, `send_slack`, `review_pr`, `dismiss`, `snooze`, `no_action`.
+Every action needs `type`, `label`, and `risk` (`low` | `medium` | `high`). Exception: `no_action` has no risk.

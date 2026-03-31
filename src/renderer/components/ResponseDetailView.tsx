@@ -1,8 +1,10 @@
 import { Badge, Group, Stack, Text, Textarea, UnstyledButton } from "@mantine/core";
 import { IconSend, IconCopy, IconCheck, IconCircleCheck } from "@tabler/icons-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ActionButton } from "./ActionButton";
 import { parseResponseContext } from "../../shared/response-parser";
+import { parseActions } from "../../shared/action-parser";
+import { NextStepsCard } from "./NextStepsCard";
 
 interface ResponseDetailViewProps {
   notification: {
@@ -11,15 +13,24 @@ interface ResponseDetailViewProps {
     stage?: string;
   };
   fetchedContext: Array<{ type: string; content: string; timestamp: string }>;
-  /** Plan conversation — the assistant's response often contains the structured key points + suggestions */
   conversation?: Array<{ role: string; content: string }>;
   onSendSlack?: (message: string, channel: string, threadTs: string) => void;
   onMarkDone?: () => void;
+  onRunSkill?: (skill: string, params?: Record<string, unknown>) => void;
+  onUpdateLinear?: (ticket: string, field: string, value: string) => void;
+  onOpenUrl?: (url: string) => void;
+  onDismiss?: (reason?: string) => void;
+  onSnooze?: (reason?: string) => void;
 }
 
-export function ResponseDetailView({ notification, fetchedContext, conversation, onSendSlack, onMarkDone }: ResponseDetailViewProps) {
+export function ResponseDetailView({ notification, fetchedContext, conversation, onSendSlack, onMarkDone, onRunSkill, onUpdateLinear, onOpenUrl, onDismiss, onSnooze }: ResponseDetailViewProps) {
   // Parse from BOTH fetchedContext AND conversation text
   const data = parseResponseContext(fetchedContext);
+
+  // Parse structured actions from agent output
+  const agentText = [...(conversation ?? [])].filter(m => m.role === "assistant").map(m => m.content).join("\n");
+  const contextText = fetchedContext.map(c => c.content).join("\n");
+  const actions = useMemo(() => parseActions(agentText || contextText), [agentText, contextText]);
 
   // Also try to parse from the assistant's conversation response (plan text often has the structured output)
   if (conversation && (data.keyPoints.length === 0 || data.suggestedReplies.length === 0)) {
@@ -116,7 +127,19 @@ export function ResponseDetailView({ notification, fetchedContext, conversation,
             </Stack>
           </div>
         )}
-        {onMarkDone && (
+        {actions.length > 0 && (
+          <NextStepsCard
+            actions={actions}
+            onRunSkill={onRunSkill ?? (() => {})}
+            onUpdateLinear={onUpdateLinear ?? (() => {})}
+            onSendSlack={onSendSlack ? (ch, msg, ts) => onSendSlack(msg, ch, ts ?? "") : () => {}}
+            onSendEmail={() => {}}
+            onOpenUrl={onOpenUrl ?? (() => {})}
+            onDismiss={onDismiss ?? (() => {})}
+            onSnooze={onSnooze ?? (() => {})}
+          />
+        )}
+        {onMarkDone && actions.length === 0 && (
           <ActionButton
             label="Mark Done"
             description="Dismiss this task."

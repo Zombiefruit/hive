@@ -1543,6 +1543,17 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss, onPlanRead
                       onDismiss();
                     }
                   }}
+                  onUpdateLinear={async (ticket, field, value) => {
+                    await window.deck.updateLinear?.(ticket, field, value);
+                  }}
+                  onOpenUrl={(url) => window.deck.openExternal(url)}
+                  onDismiss={() => {
+                    window.deck?.updateNotificationById?.(n.id, { stage: "done" });
+                    onDismiss();
+                  }}
+                  onSnooze={() => {
+                    window.deck?.updateNotificationById?.(n.id, { stage: "backlog" });
+                  }}
                 />
               </div>
             );
@@ -1554,6 +1565,14 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss, onPlanRead
                   notification={n}
                   fetchedContext={fetchedContext}
                   onMarkDone={() => onDismiss()}
+                  onOpenUrl={(url) => window.deck.openExternal(url)}
+                  onDismiss={() => {
+                    window.deck?.updateNotificationById?.(n.id, { stage: "done" });
+                    onDismiss();
+                  }}
+                  onSnooze={() => {
+                    window.deck?.updateNotificationById?.(n.id, { stage: "backlog" });
+                  }}
                 />
               </div>
             );
@@ -1639,8 +1658,16 @@ function DetailPane({ notification: n, onClose, onAdvance, onDismiss, onPlanRead
                     );
                   })()}
 
+                  {/* Conversation loading indicator */}
+                  {loading && conversation.length > 0 && (
+                    <Group gap={8} py="sm" px={12}>
+                      <Loader size={14} />
+                      <Text size="xs" c="dimmed">Thinking...</Text>
+                    </Group>
+                  )}
+
                   {/* Activity log removed — now in shared section above router */}
-                  {loading && activity.length === 0 && (
+                  {loading && activity.length === 0 && conversation.length === 0 && (
                     <Group gap={8} py="sm">
                       <Loader size={14} />
                       <Text size="xs" c="dimmed">Working...</Text>

@@ -47,3 +47,19 @@ Suggested replies:
 - Do NOT send any messages. Read-only.
 - You MUST include both "Key points:" and "Suggested replies:" sections.
 - If the user already responded, say "No action needed" instead of suggesting replies.
+
+## Structured Actions
+
+After your key points and suggested replies, append:
+
+```actions
+[
+  { "type": "send_slack", "channel": "<channel_id>", "message": "<draft reply>", "threadTs": "<thread_ts>", "label": "Reply to <person> in #<channel>", "risk": "high" }
+]
+```
+
+Choose actions:
+- User needs to reply → `send_slack` with draft message, channel, and threadTs
+- User already replied → `no_action` with "Already responded" and what was said
+- Related ticket needs updating → `update_linear`
+- Link to open → `open_url`
