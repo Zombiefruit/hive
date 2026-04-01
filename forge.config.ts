@@ -23,7 +23,7 @@ const config: ForgeConfig = {
     },
     name: "Hive",
     executableName: "hive",
-    icon: "resources/icon",
+    icon: path.resolve(__dirname, "resources", "icon"),
     appBundleId: "com.hive-deck.app",
     appCategoryType: "public.app-category.developer-tools",
   },
