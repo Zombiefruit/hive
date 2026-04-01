@@ -131,7 +131,7 @@ export function FloatingPanel({ dockedWidth = 480 }: { dockedWidth?: number }) {
           bottom: 0,
           width: dockedWidth,
           zIndex: 90,
-          backgroundColor: "var(--mantine-color-dark-8)",
+          backgroundColor: "var(--mantine-color-body)",
           borderLeft: "1px solid var(--mantine-color-default-border)",
           display: "flex",
           flexDirection: "row",
@@ -160,7 +160,7 @@ export function FloatingPanel({ dockedWidth = 480 }: { dockedWidth?: number }) {
             borderRadius: 12,
             overflow: "hidden",
             boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--mantine-color-default-border)",
-            backgroundColor: "var(--mantine-color-dark-8)",
+            backgroundColor: "var(--mantine-color-body)",
             display: "flex",
             flexDirection: "row",
           }}

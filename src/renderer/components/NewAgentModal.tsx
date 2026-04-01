@@ -325,7 +325,7 @@ export function NewAgentModal({ opened, onClose }: NewAgentModalProps) {
 
         <TextInput
           label="Working directory"
-          placeholder="/Users/kieranwilliams/Documents/GitHub/..."
+          placeholder="/path/to/your/repo"
           value={cwd}
           onChange={(e) => setCwd(e.currentTarget.value)}
         />

@@ -1,14 +1,17 @@
 /**
- * MCP Bridge — a persistent, non-headless Claude Code process
- * that has access to all claude.ai MCP connectors (Slack, Linear, etc.).
+ * MCP Bridge — persistent Claude Code processes with MCP connector access.
  *
- * The Manager sends it natural language prompts and gets structured data back.
- * This is the only process that needs MCP access — everything else is headless.
+ * TWO bridges run independently:
+ * - pollBridge: owned by poll-service (fetch + triage). Restarts between steps.
+ * - contextBridge: owned by work-dispatcher (planning context). Never restarts mid-request.
+ *
+ * No process blocks another. Each bridge has its own process, session, pending requests.
  */
 
 import { spawn, ChildProcess } from "node:child_process";
 import { app } from "electron";
 import { getClaudeCodePath } from "./claude-path";
+import { trackProcess, untrackProcess } from "./process-monitor";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -24,21 +27,26 @@ function log(msg: string): void {
   } catch {}
 }
 
-let bridgeProcess: ChildProcess | null = null;
-let sessionId: string = "";
-let isReady = false;
-let lastMcpToolCount = 0;
-let bridgeGeneration = 0; // Incremented on each startBridge() to invalidate stale timeouts
-const MIN_EXPECTED_MCP_TOOLS = 85;
-let pendingRequests = new Map<string, { resolve: (text: string) => void; timeout: ReturnType<typeof setTimeout> }>();
-let outputBuffer = "";
+// ── Shared types ──
 
-// Debug log of all bridge I/O for the debug tab
-const debugLog: Array<{ timestamp: string; direction: "in" | "out"; content: string }> = [];
+export interface BridgeConnectorStatus {
+  ready: boolean;
+  mcpToolCount: number;
+  connectors: {
+    slack: boolean;
+    linear: boolean;
+    gmail: boolean;
+    calendar: boolean;
+    notion: boolean;
+  };
+}
+
+// ── Debug log (shared across both bridges) ──
+
+const debugLog: Array<{ timestamp: string; direction: "in" | "out"; content: string; source?: string }> = [];
 const MAX_DEBUG_LOG = 200;
 
-export function addDebugEntry(direction: "in" | "out", content: string): void {
-  // Parse JSON to create human-readable entries
+export function addDebugEntry(direction: "in" | "out", content: string, source?: string): void {
   if (direction === "out") {
     for (const line of content.split("\n")) {
       if (!line.trim()) continue;
@@ -46,23 +54,19 @@ export function addDebugEntry(direction: "in" | "out", content: string): void {
         const msg = JSON.parse(line);
         const readable = formatBridgeMessage(msg);
         if (readable) {
-          debugLog.push({ timestamp: new Date().toISOString(), direction, content: readable });
+          debugLog.push({ timestamp: new Date().toISOString(), direction, content: readable, source });
           if (debugLog.length > MAX_DEBUG_LOG) debugLog.shift();
         }
-      } catch {
-        // Not JSON — skip
-      }
+      } catch {}
     }
     return;
   }
-
-  // For prompts (input), extract the readable part
   try {
     const msg = JSON.parse(content);
     const text = msg.message?.content ?? content;
-    debugLog.push({ timestamp: new Date().toISOString(), direction, content: typeof text === "string" ? text.slice(0, 1000) : JSON.stringify(text).slice(0, 1000) });
+    debugLog.push({ timestamp: new Date().toISOString(), direction, content: typeof text === "string" ? text.slice(0, 1000) : JSON.stringify(text).slice(0, 1000), source });
   } catch {
-    debugLog.push({ timestamp: new Date().toISOString(), direction, content: content.slice(0, 1000) });
+    debugLog.push({ timestamp: new Date().toISOString(), direction, content: content.slice(0, 1000), source });
   }
   if (debugLog.length > MAX_DEBUG_LOG) debugLog.shift();
 }
@@ -73,299 +77,530 @@ function formatBridgeMessage(msg: { type?: string; subtype?: string; message?: {
     const mcpCount = (msg.tools ?? []).filter((t: string) => t.includes("mcp__claude_ai")).length;
     return `🔧 Bridge initialized: ${toolCount} tools (${mcpCount} MCP connectors)`;
   }
-  if (msg.type === "system" && msg.subtype === "hook_started") return null; // Skip hooks
-  if (msg.type === "system" && msg.subtype === "hook_response") return null;
+  if (msg.type === "system" && (msg.subtype === "hook_started" || msg.subtype === "hook_response")) return null;
   if (msg.type === "system") return `⚙️ System: ${msg.subtype ?? "unknown"}`;
-
   if (msg.type === "assistant" && Array.isArray(msg.message?.content)) {
     const parts: string[] = [];
     for (const block of msg.message!.content as Array<{ type: string; text?: string; name?: string; input?: Record<string, unknown> }>) {
-      if (block.type === "text" && block.text) {
-        parts.push(`💬 ${block.text.slice(0, 300)}`);
-      }
+      if (block.type === "text" && block.text) parts.push(`💬 ${block.text.slice(0, 300)}`);
       if (block.type === "tool_use" && block.name) {
         const input = block.input ?? {};
         if (block.name.includes("Slack")) parts.push(`📱 Slack: ${block.name.split("__").pop()} ${JSON.stringify(input).slice(0, 100)}`);
         else if (block.name.includes("Linear")) parts.push(`📋 Linear: ${block.name.split("__").pop()} ${JSON.stringify(input).slice(0, 100)}`);
         else if (block.name.includes("Gmail")) parts.push(`📧 Gmail: ${block.name.split("__").pop()}`);
         else if (block.name.includes("Notion")) parts.push(`📝 Notion: ${block.name.split("__").pop()}`);
-        else if (block.name === "ToolSearch") parts.push(`🔍 Loading tools: ${input.query ?? ""}`);
         else parts.push(`🔧 Tool: ${block.name}`);
-      }
-      if (block.type === "thinking") {
-        // Skip thinking blocks
       }
     }
     return parts.join("\n") || null;
   }
+  if (msg.type === "result") return `✅ Result: ${String(msg.result ?? "").slice(0, 200)}`;
+  return null;
+}
 
-  if (msg.type === "result") {
-    return `✅ Result: ${String(msg.result ?? "").slice(0, 200)}`;
+export function getBridgeDebugLog(): typeof debugLog { return debugLog; }
+export function clearBridgeDebugLog(): void { debugLog.length = 0; }
+
+// ── Disallowed tools (shared) ──
+
+const DISALLOWED_TOOLS = [
+  "Write", "Edit", "Bash", "NotebookEdit", "Agent", "EnterWorktree", "ExitWorktree",
+  "mcp__claude_ai_Slack__slack_send_message", "mcp__claude_ai_Slack__slack_send_message_draft",
+  "mcp__claude_ai_Slack__slack_schedule_message", "mcp__claude_ai_Slack__slack_create_canvas",
+  "mcp__claude_ai_Slack__slack_update_canvas",
+  "mcp__claude_ai_Linear__save_issue", "mcp__claude_ai_Linear__save_comment",
+  "mcp__claude_ai_Linear__save_project", "mcp__claude_ai_Linear__save_initiative",
+  "mcp__claude_ai_Linear__save_milestone", "mcp__claude_ai_Linear__save_customer",
+  "mcp__claude_ai_Linear__save_customer_need", "mcp__claude_ai_Linear__save_status_update",
+  "mcp__claude_ai_Linear__delete_comment", "mcp__claude_ai_Linear__delete_customer",
+  "mcp__claude_ai_Linear__delete_customer_need", "mcp__claude_ai_Linear__delete_status_update",
+  "mcp__claude_ai_Linear__delete_attachment", "mcp__claude_ai_Linear__create_issue_label",
+  "mcp__claude_ai_Linear__create_document", "mcp__claude_ai_Linear__create_attachment",
+  "mcp__claude_ai_Linear__update_document",
+  "mcp__claude_ai_Notion__notion-create-pages", "mcp__claude_ai_Notion__notion-create-database",
+  "mcp__claude_ai_Notion__notion-create-comment", "mcp__claude_ai_Notion__notion-update-page",
+  "mcp__claude_ai_Notion__notion-move-pages", "mcp__claude_ai_Notion__notion-duplicate-page",
+  "mcp__claude_ai_Notion__notion-create-view", "mcp__claude_ai_Notion__notion-update-view",
+  "mcp__claude_ai_Notion__notion-update-data-source",
+  "mcp__claude_ai_Gmail__gmail_create_draft",
+  "mcp__claude_ai_Google_Calendar__gcal_create_event",
+  "mcp__claude_ai_Google_Calendar__gcal_delete_event",
+  "mcp__claude_ai_Google_Calendar__gcal_update_event",
+  "mcp__claude_ai_Google_Calendar__gcal_respond_to_event",
+];
+
+const SYSTEM_PROMPT = "You are a READ-ONLY data fetcher. Rules: (1) ONLY read and search data — never write, edit, or send anything. (2) Each message is INDEPENDENT — never reference prior messages. (3) Return ONLY the requested data as plain text. NO commentary, NO narration. Just the raw results. (4) If a tool call fails, include a one-line error note and move on.";
+
+const MIN_EXPECTED_MCP_TOOLS = 85;
+
+// ═══════════════════════════════════════════════════════════════
+// BRIDGE FACTORY — creates independent bridge instances
+// ═══════════════════════════════════════════════════════════════
+
+export interface BridgeInstance {
+  start: () => void;
+  ask: (prompt: string, timeoutMs?: number) => Promise<string>;
+  isReady: () => boolean;
+  restart: () => Promise<void>;
+  stop: () => void;
+  getStatus: () => BridgeConnectorStatus;
+  label: string;
+}
+
+export function createBridge(label: string): BridgeInstance {
+  let bridgeProcess: ChildProcess | null = null;
+  let sessionId = "";
+  let isReady = false;
+  let generation = 0;
+  let outputBuffer = "";
+  let pendingRequests = new Map<string, { resolve: (text: string) => void; timeout: ReturnType<typeof setTimeout> | null }>();
+  let connectorStatus: BridgeConnectorStatus = {
+    ready: false, mcpToolCount: 0,
+    connectors: { slack: false, linear: false, gmail: false, calendar: false, notion: false },
+  };
+
+  function processOutput(): void {
+    const lines = outputBuffer.split("\n");
+    outputBuffer = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const msg = JSON.parse(line);
+        if (msg.type === "system" && msg.subtype === "init") {
+          sessionId = msg.session_id ?? "";
+          const allTools: string[] = msg.tools ?? [];
+          const mcpTools = allTools.filter((t: string) => t.includes("mcp__claude_ai"));
+          connectorStatus = {
+            ready: true, mcpToolCount: mcpTools.length,
+            connectors: {
+              slack: mcpTools.some((t: string) => t.includes("Slack")),
+              linear: mcpTools.some((t: string) => t.includes("Linear")),
+              gmail: mcpTools.some((t: string) => t.includes("Gmail")),
+              calendar: mcpTools.some((t: string) => t.includes("Google_Calendar")),
+              notion: mcpTools.some((t: string) => t.includes("Notion")),
+            },
+          };
+          isReady = true;
+          log(`[${label}] Initialized: ${allTools.length} tools, ${mcpTools.length} MCP`);
+        }
+        if (msg.type === "result") {
+          const resultText = String(msg.result ?? "");
+          log(`[${label}] Result: ${resultText.length} chars`);
+          for (const [reqId, req] of pendingRequests) {
+            if (req.timeout) clearTimeout(req.timeout);
+            req.resolve(resultText);
+            pendingRequests.delete(reqId);
+            break;
+          }
+        }
+      } catch {}
+    }
   }
 
-  return null; // Skip unknown types
-}
+  const instance: BridgeInstance = {
+    label,
 
-/** Get the debug log for the UI. */
-export function getBridgeDebugLog(): typeof debugLog {
-  return debugLog;
-}
+    start() {
+      if (bridgeProcess) return;
+      generation++;
+      const claudePath = getClaudeCodePath();
+      log(`[${label}] Starting bridge`);
 
-/**
- * Start the MCP Bridge process.
- * This spawns an interactive Claude Code session that loads all MCP connectors.
- */
-export function startBridge(): void {
-  if (bridgeProcess) return;
-  bridgeGeneration++;
+      bridgeProcess = spawn(claudePath, [
+        "--output-format", "stream-json",
+        "--verbose",
+        "--input-format", "stream-json",
+        "--no-chrome",
+        "--model", "claude-opus-4-6[1m]",
+        "--no-session-persistence",
+        "--disallowedTools", DISALLOWED_TOOLS.join(","),
+        "--system-prompt", SYSTEM_PROMPT,
+      ], {
+        cwd: app.isPackaged ? os.homedir() : app.getAppPath(),
+        env: { ...process.env },
+        stdio: ["pipe", "pipe", "pipe"],
+      });
 
-  const claudePath = getClaudeCodePath();
-  log("Starting MCP Bridge process");
+      if (bridgeProcess.pid) trackProcess(bridgeProcess.pid, "poll-bridge", label);
 
-  // Write tools to block — everything else is auto-approved via bypassPermissions
-  const disallowedTools = [
-    "Write", "Edit", "Bash", "NotebookEdit", "Agent", "EnterWorktree", "ExitWorktree",
-    "mcp__claude_ai_Slack__slack_send_message",
-    "mcp__claude_ai_Slack__slack_send_message_draft",
-    "mcp__claude_ai_Slack__slack_schedule_message",
-    "mcp__claude_ai_Slack__slack_create_canvas",
-    "mcp__claude_ai_Slack__slack_update_canvas",
-    "mcp__claude_ai_Linear__save_issue",
-    "mcp__claude_ai_Linear__save_comment",
-    "mcp__claude_ai_Linear__save_project",
-    "mcp__claude_ai_Linear__save_initiative",
-    "mcp__claude_ai_Linear__save_milestone",
-    "mcp__claude_ai_Linear__save_customer",
-    "mcp__claude_ai_Linear__save_customer_need",
-    "mcp__claude_ai_Linear__save_status_update",
-    "mcp__claude_ai_Linear__delete_comment",
-    "mcp__claude_ai_Linear__delete_customer",
-    "mcp__claude_ai_Linear__delete_customer_need",
-    "mcp__claude_ai_Linear__delete_status_update",
-    "mcp__claude_ai_Linear__delete_attachment",
-    "mcp__claude_ai_Linear__create_issue_label",
-    "mcp__claude_ai_Linear__create_document",
-    "mcp__claude_ai_Linear__create_attachment",
-    "mcp__claude_ai_Linear__update_document",
-    "mcp__claude_ai_Notion__notion-create-pages",
-    "mcp__claude_ai_Notion__notion-create-database",
-    "mcp__claude_ai_Notion__notion-create-comment",
-    "mcp__claude_ai_Notion__notion-update-page",
-    "mcp__claude_ai_Notion__notion-move-pages",
-    "mcp__claude_ai_Notion__notion-duplicate-page",
-    "mcp__claude_ai_Notion__notion-create-view",
-    "mcp__claude_ai_Notion__notion-update-view",
-    "mcp__claude_ai_Notion__notion-update-data-source",
-    "mcp__claude_ai_Gmail__gmail_create_draft",
-    "mcp__claude_ai_Google_Calendar__gcal_create_event",
-    "mcp__claude_ai_Google_Calendar__gcal_delete_event",
-    "mcp__claude_ai_Google_Calendar__gcal_update_event",
-    "mcp__claude_ai_Google_Calendar__gcal_respond_to_event",
-  ];
+      bridgeProcess.stdout?.on("data", (chunk: Buffer) => {
+        addDebugEntry("out", chunk.toString("utf-8"), label);
+        outputBuffer += chunk.toString("utf-8");
+        processOutput();
+      });
 
-  bridgeProcess = spawn(claudePath, [
-    "--output-format", "stream-json",
-    "--verbose",
-    "--input-format", "stream-json",
-    "--no-chrome",
-    "--model", "claude-haiku-4-5-20251001",
-    "--no-session-persistence",
-    // No explicit permission mode — MCP read tools work without approval in non-headless mode
-    "--disallowedTools", disallowedTools.join(","),
-    "--system-prompt", "You are a READ-ONLY data fetcher for Claude Deck. You can ONLY read and search data. You must NEVER write, edit, send messages, create issues, post comments, or modify anything. If asked to write or modify, refuse. Only fetch and return data in structured JSON format. IMPORTANT: Each message you receive is an INDEPENDENT request — do not reference previous messages or complain about repeated requests. Every request is new. Just fetch the data and respond.",
-  ], {
-    // Run from the claude-deck project dir so .claude/skills/ are auto-discovered
-    cwd: app.isPackaged ? os.homedir() : app.getAppPath(),
-    env: { ...process.env },
-    stdio: ["pipe", "pipe", "pipe"],
-  });
+      bridgeProcess.stderr?.on("data", (chunk: Buffer) => {
+        log(`[${label}] STDERR: ${chunk.toString("utf-8").slice(0, 200)}`);
+      });
 
-  bridgeProcess.stdout?.on("data", (chunk: Buffer) => {
-    const text = chunk.toString("utf-8");
-    addDebugEntry("out", text);
-    outputBuffer += text;
-    processOutputBuffer();
-  });
-
-  bridgeProcess.stderr?.on("data", (chunk: Buffer) => {
-    log(`STDERR: ${chunk.toString("utf-8").slice(0, 200)}`);
-  });
-
-  const startGen = bridgeGeneration;
-  bridgeProcess.on("exit", (code) => {
-    log(`Bridge process exited with code ${code}`);
-    bridgeProcess = null;
-    isReady = false;
-    lastMcpToolCount = 0;
-    // Only auto-restart if this wasn't an intentional stop (generation unchanged)
-    if (startGen === bridgeGeneration) {
-      log("Unexpected exit — auto-restarting in 5s");
-      setTimeout(() => startBridge(), 5000);
-    }
-  });
-
-  // Fallback: if init never arrives after 60s, mark ready to unblock callers.
-  // Use generation counter to prevent stale timeouts from affecting new bridge instances.
-  const gen = bridgeGeneration;
-  setTimeout(() => {
-    if (gen === bridgeGeneration && bridgeProcess && !isReady) {
-      isReady = true;
-      log("Bridge marked as ready (timeout fallback after 60s)");
-    }
-  }, 60000);
-}
-
-function processOutputBuffer(): void {
-  const lines = outputBuffer.split("\n");
-  outputBuffer = lines.pop() ?? ""; // Keep incomplete line in buffer
-
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    try {
-      const msg = JSON.parse(line);
-
-      // Track session ID from init
-      if (msg.type === "system" && msg.subtype === "init") {
-        sessionId = msg.session_id ?? "";
-        const allTools: string[] = msg.tools ?? [];
-        const mcpTools = allTools.filter((t: string) => t.includes("mcp__claude_ai"));
-        lastMcpToolCount = mcpTools.length;
-
-        // Check for required connectors
-        const hasSlack = mcpTools.some((t: string) => t.includes("Slack"));
-        const hasLinear = mcpTools.some((t: string) => t.includes("Linear"));
-        const hasGmail = mcpTools.some((t: string) => t.includes("Gmail"));
-        const hasCalendar = mcpTools.some((t: string) => t.includes("Google_Calendar"));
-        const hasNotion = mcpTools.some((t: string) => t.includes("Notion"));
-
-        isReady = true;
-        log(`Bridge initialized, session=${sessionId}, tools=${allTools.length}, MCP=${mcpTools.length}`);
-        log(`  Connectors: Slack=${hasSlack} Linear=${hasLinear} Gmail=${hasGmail} Calendar=${hasCalendar} Notion=${hasNotion}`);
-
-        if (mcpTools.length < MIN_EXPECTED_MCP_TOOLS) {
-          log(`  WARNING: Only ${mcpTools.length} MCP tools loaded (expected >=${MIN_EXPECTED_MCP_TOOLS}). Some connectors may be missing.`);
+      const startGen = generation;
+      bridgeProcess.on("exit", (code) => {
+        if (bridgeProcess?.pid) untrackProcess(bridgeProcess.pid);
+        log(`[${label}] Exited (code ${code})`);
+        bridgeProcess = null;
+        isReady = false;
+        if (startGen === generation) {
+          log(`[${label}] Unexpected exit — auto-restarting in 5s`);
+          setTimeout(() => instance.start(), 5000);
         }
+      });
+
+      // Fallback: mark ready after 60s if init never arrives
+      const gen = generation;
+      setTimeout(() => {
+        if (gen === generation && bridgeProcess && !isReady) {
+          isReady = true;
+          log(`[${label}] Marked ready (60s fallback)`);
+        }
+      }, 60000);
+    },
+
+    async ask(prompt: string, timeoutMs?: number): Promise<string> {
+      // Wait for ready
+      const waitStart = Date.now();
+      while (!instance.isReady() && Date.now() - waitStart < 90000) {
+        await new Promise(r => setTimeout(r, 500));
       }
 
-      // Log all message types when we have pending requests
-      if (pendingRequests.size > 0 && msg.type) {
-        if (msg.type === "assistant") {
-          const content = msg.message?.content;
-          if (Array.isArray(content)) {
-            for (const block of content as Array<{ type: string; name?: string; text?: string }>) {
-              if (block.type === "tool_use") log(`  Bridge calling tool: ${block.name}`);
-              if (block.type === "text" && block.text) log(`  Bridge text: ${block.text.slice(0, 100)}`);
-            }
-          }
-        } else if (msg.type === "tool_result" || (msg.type === "user" && msg.message?.content)) {
-          // Tool result came back
+      return new Promise((resolve) => {
+        if (!bridgeProcess || !bridgeProcess.stdin) {
+          resolve(`[${label}] Bridge not running`);
+          return;
         }
-      }
+        if (!isReady) {
+          resolve(`[${label}] Bridge still initializing after 90s`);
+          return;
+        }
 
-      // Check for result messages
-      if (msg.type === "result") {
-        const resultText = String(msg.result ?? "");
-        log(`  Bridge result received: ${resultText.length} chars`);
-        // Resolve any pending request
-        for (const [reqId, req] of pendingRequests) {
-          clearTimeout(req.timeout);
-          req.resolve(resultText);
+        const reqId = randomUUID();
+        log(`[${label}] Request ${reqId.slice(0, 8)}: ${prompt.slice(0, 100)}`);
+
+        const timeout = timeoutMs ? setTimeout(() => {
           pendingRequests.delete(reqId);
-          break; // One result per request
-        }
-      }
+          log(`[${label}] Request ${reqId.slice(0, 8)} timed out after ${timeoutMs}ms`);
+          resolve("Request timed out");
+        }, timeoutMs) : null;
 
-      // Also capture assistant text for pending requests
-      if (msg.type === "assistant" && msg.message?.content) {
-        const content = msg.message.content;
-        if (Array.isArray(content)) {
-          for (const block of content) {
-            if (block.type === "text" && block.text) {
-              // Store for result
-            }
-          }
-        }
+        pendingRequests.set(reqId, { resolve, timeout });
+
+        const message = JSON.stringify({
+          type: "user",
+          message: { role: "user", content: prompt },
+          parent_tool_use_id: null,
+          uuid: reqId,
+          session_id: sessionId,
+        });
+
+        addDebugEntry("in", message, label);
+        bridgeProcess.stdin.write(message + "\n");
+      });
+    },
+
+    isReady() {
+      return isReady && bridgeProcess !== null;
+    },
+
+    async restart(): Promise<void> {
+      log(`[${label}] Restarting`);
+      instance.stop();
+      await new Promise(r => setTimeout(r, 1000));
+      instance.start();
+    },
+
+    stop() {
+      generation++;
+      if (bridgeProcess) {
+        if (bridgeProcess.pid) untrackProcess(bridgeProcess.pid);
+        bridgeProcess.kill();
+        bridgeProcess = null;
+        isReady = false;
+        // Preserve last known connector status across restarts — only mark bridge as not ready
+        // Connectors will be updated when the new process initializes
+        connectorStatus = { ...connectorStatus, ready: false };
+        log(`[${label}] Stopped`);
       }
-    } catch {}
-  }
+    },
+
+    getStatus() {
+      return { ...connectorStatus, ready: instance.isReady() };
+    },
+  };
+
+  return instance;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TWO BRIDGE INSTANCES
+// ═══════════════════════════════════════════════════════════════
+
+/** Poll bridge — owned EXCLUSIVELY by poll-service (fetch + triage). */
+export const pollBridge = createBridge("poll");
+
+/** Context bridge — owned EXCLUSIVELY by work-dispatcher (planning context). */
+export const contextBridge = createBridge("context");
+
+// ── Backward-compatible exports (for gradual migration) ──
+
+export function startBridge(): void { pollBridge.start(); }
+export function askBridge(prompt: string, timeoutMs?: number): Promise<string> { return pollBridge.ask(prompt, timeoutMs); }
+export function isBridgeReady(): boolean { return pollBridge.isReady(); }
+export async function restartBridge(): Promise<void> { return pollBridge.restart(); }
+export function stopBridge(): void { pollBridge.stop(); }
+export function getBridgeStatus(): BridgeConnectorStatus { return pollBridge.getStatus(); }
+
+// ═══════════════════════════════════════════════════════════════
+// MCP PLANNING AGENT — single agent with full MCP tool access
+// ═══════════════════════════════════════════════════════════════
+
+export interface PlanningEvent {
+  type: "init" | "tool_use" | "text" | "result" | "error" | "status";
+  content: string;
+  timestamp: string;
 }
 
 /**
- * Restart the bridge process to clear conversation context.
- * Call after each poll cycle to prevent context accumulation.
+ * Spawn a fresh Claude Code process WITH MCP tools.
+ * The agent can read from Slack, Linear, Notion, GitHub, etc.
+ * Write/edit/send tools are blocked.
+ * ~60s MCP init time is expected and acceptable.
+ *
+ * @param onEvent — optional callback for streaming real-time events to the UI
  */
-export function restartBridge(): void {
-  log("Restarting bridge to clear context");
-  stopBridge();
-  setTimeout(() => startBridge(), 1000);
-}
+export function askMcpPlanningAgent(
+  prompt: string,
+  timeoutMs = 300000,
+  onEvent?: (event: PlanningEvent) => void,
+): Promise<string> {
+  return new Promise((resolve) => {
+    const claudePath = getClaudeCodePath();
 
-// restartBridgeAndWait removed — no longer needed since we don't restart between sources
+    const proc = spawn(claudePath, [
+      "--output-format", "stream-json",
+      "--verbose",
+      "--input-format", "stream-json",
+      "--no-chrome",
+      "--model", "claude-opus-4-6[1m]",
+      "--no-session-persistence",
+      "--disallowedTools", DISALLOWED_TOOLS.join(","),
+      "--system-prompt", "You are a READ-ONLY planning agent. You have MCP tools to fetch context from Slack, Linear, Notion, Gmail, and Google Calendar. Use them to gather all relevant information, then produce a work plan. NEVER write, edit, or send anything. NEVER explore the local filesystem — the task is NOT about the current directory.",
+    ], {
+      cwd: os.homedir(),
+      env: { ...process.env },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
 
-/**
- * Send a natural language prompt to the MCP Bridge and get a response.
- * The bridge has access to Slack, Linear, Notion, Gmail, etc.
- * Waits up to 90s for the bridge to be ready before sending (init takes ~45s).
- */
-export async function askBridge(prompt: string, timeoutMs = 60000): Promise<string> {
-  // Wait for bridge to be ready — init takes ~45s on first start
-  const waitStart = Date.now();
-  while (!isBridgeReady() && Date.now() - waitStart < 90000) {
-    await new Promise(r => setTimeout(r, 500));
-  }
+    let outputBuffer = "";
+    let resultText = "";
+    let assistantText = ""; // Accumulates text from assistant blocks (the actual plan content)
+    let done = false;
+    let bytesReceived = 0;
+    let initialized = false;
 
-  return new Promise((resolve, reject) => {
-    if (!bridgeProcess || !bridgeProcess.stdin) {
-      resolve("MCP Bridge not running");
-      return;
-    }
+    const emit = (type: PlanningEvent["type"], content: string) => {
+      onEvent?.({ type, content, timestamp: new Date().toISOString() });
+    };
 
-    if (!isReady) {
-      resolve("MCP Bridge still initializing after 20s wait");
-      return;
-    }
+    if (proc.pid) trackProcess(proc.pid, "planning", "planning-agent");
 
-    const reqId = randomUUID();
-    log(`Request ${reqId.slice(0, 8)}: ${prompt.slice(0, 100)}`);
+    addDebugEntry("in", `📋 [PLANNING] Spawned MCP planning agent (PID ${proc.pid})`, "planning");
+    log(`[planning] Spawned MCP agent PID ${proc.pid}`);
+    emit("status", "Spawned planning agent — loading MCP tools...");
 
-    const timeout = setTimeout(() => {
-      pendingRequests.delete(reqId);
-      log(`Request ${reqId.slice(0, 8)} timed out`);
-      resolve("Request timed out");
-    }, timeoutMs);
-
-    pendingRequests.set(reqId, { resolve, timeout });
-
-    // Send the message as stream-json
-    const message = JSON.stringify({
+    proc.stdin?.write(JSON.stringify({
       type: "user",
       message: { role: "user", content: prompt },
       parent_tool_use_id: null,
-      uuid: reqId,
-      session_id: sessionId,
+      session_id: "",
+    }) + "\n");
+
+    // Periodic status updates during silent MCP init period
+    const initTicker = setInterval(() => {
+      if (!initialized && !done) {
+        const elapsed = Math.round((Date.now() - startTs) / 1000);
+        emit("status", `Loading MCP tools... (${elapsed}s)`);
+      }
+    }, 10000);
+    const startTs = Date.now();
+
+    const timeout = setTimeout(() => {
+      if (!done) {
+        done = true;
+        clearInterval(initTicker);
+        if (proc.pid) untrackProcess(proc.pid);
+        addDebugEntry("out", `⏱️ [PLANNING] Timed out after ${Math.round(timeoutMs / 1000)}s (${bytesReceived} bytes received)`, "planning");
+        log(`[planning] Timed out after ${Math.round(timeoutMs / 1000)}s`);
+        emit("error", `Timed out after ${Math.round(timeoutMs / 1000)}s`);
+        proc.kill();
+        resolve(resultText || "Request timed out");
+      }
+    }, timeoutMs);
+
+    proc.stdout?.on("data", (chunk: Buffer) => {
+      bytesReceived += chunk.length;
+      outputBuffer += chunk.toString("utf-8");
+      const lines = outputBuffer.split("\n");
+      outputBuffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const msg = JSON.parse(line);
+          if (msg.type === "system" && msg.subtype === "init") {
+            initialized = true;
+            clearInterval(initTicker);
+            const tools: string[] = msg.tools ?? [];
+            const mcpCount = tools.filter((t: string) => t.includes("mcp__claude_ai")).length;
+            addDebugEntry("out", `🔧 [PLANNING] MCP agent initialized: ${tools.length} tools (${mcpCount} MCP)`, "planning");
+            log(`[planning] Initialized: ${tools.length} tools, ${mcpCount} MCP`);
+            emit("init", `Agent ready — ${tools.length} tools (${mcpCount} MCP connectors)`);
+          }
+          if (msg.type === "assistant" && Array.isArray(msg.message?.content)) {
+            for (const block of msg.message.content as Array<{ type: string; name?: string; text?: string; input?: Record<string, unknown> }>) {
+              if (block.type === "tool_use" && block.name) {
+                addDebugEntry("out", `🔧 [PLANNING] Tool: ${block.name}`, "planning");
+                const input = block.input ?? {};
+                let detail = block.name;
+                if (block.name.includes("Slack")) detail = `Slack: ${block.name.split("__").pop()} ${JSON.stringify(input).slice(0, 80)}`;
+                else if (block.name.includes("Linear")) detail = `Linear: ${block.name.split("__").pop()} ${JSON.stringify(input).slice(0, 80)}`;
+                else if (block.name.includes("Notion")) detail = `Notion: ${block.name.split("__").pop()}`;
+                else if (block.name.includes("Gmail")) detail = `Gmail: ${block.name.split("__").pop()}`;
+                emit("tool_use", detail);
+              }
+              if (block.type === "text" && block.text?.trim()) {
+                assistantText += (assistantText ? "\n" : "") + block.text;
+                emit("text", block.text.slice(0, 500));
+              }
+            }
+          }
+          if (msg.type === "result" && !done) {
+            resultText = String(msg.result ?? "");
+            // Use accumulated assistant text if result is empty (common with MCP agents)
+            const finalText = resultText.trim() || assistantText.trim();
+
+            // Check if this is a REAL final result with plan content, or a premature
+            // result from an intermediate turn. MCP agents do multi-turn tool calling
+            // and can emit empty/partial results before the plan is ready.
+            const hasPlanContent = finalText.includes("---") && finalText.length > 200;
+            if (!hasPlanContent && finalText.length < 200) {
+              // Premature result — agent is still working. Keep waiting.
+              log(`[planning] Ignoring premature result (${finalText.length} chars, no plan markers)`);
+              emit("status", `Agent still working... (${finalText.length} chars so far)`);
+              // Don't resolve — wait for process to continue or exit
+              return;
+            }
+
+            addDebugEntry("out", `✅ [PLANNING] Result: ${finalText.length} chars (result=${resultText.length}, assistant=${assistantText.length})`, "planning");
+            log(`[planning] Result: ${finalText.length} chars (result=${resultText.length}, assistant=${assistantText.length})`);
+            emit("result", `Plan complete (${finalText.length} chars)`);
+            done = true;
+            clearInterval(initTicker);
+            clearTimeout(timeout);
+            if (proc.pid) untrackProcess(proc.pid);
+            proc.kill();
+            resolve(finalText);
+          }
+        } catch {}
+      }
     });
 
-    addDebugEntry("in", message);
-    bridgeProcess.stdin.write(message + "\n");
+    proc.stderr?.on("data", () => {});
+    proc.on("exit", (code) => {
+      clearInterval(initTicker);
+      if (proc.pid) untrackProcess(proc.pid);
+      if (!done) {
+        done = true;
+        clearTimeout(timeout);
+        const finalText = resultText.trim() || assistantText.trim();
+        addDebugEntry("out", `🛑 [PLANNING] Exited (code=${code}, bytes=${bytesReceived}, text=${finalText.length})`, "planning");
+        log(`[planning] Exited code=${code}, bytes=${bytesReceived}, text=${finalText.length}`);
+        emit("error", `Agent exited (code ${code})`);
+        resolve(finalText || "Process exited without result");
+      }
+    });
   });
 }
 
-/**
- * Check if the bridge is ready (MCP servers connected).
- */
-export function isBridgeReady(): boolean {
-  return isReady && bridgeProcess !== null;
-}
+// Legacy ephemeral process (no MCP tools — used for plan iteration and work prompt composition)
+export function askEphemeralProcess(prompt: string, timeoutMs = 180000): Promise<string> {
+  return new Promise((resolve) => {
+    const claudePath = getClaudeCodePath();
 
-/**
- * Stop the bridge process.
- */
-export function stopBridge(): void {
-  bridgeGeneration++; // Invalidate stale timeouts and prevent auto-restart
-  if (bridgeProcess) {
-    bridgeProcess.kill();
-    bridgeProcess = null;
-    isReady = false;
-    log("Bridge stopped");
-  }
+    const proc = spawn(claudePath, [
+      "--output-format", "stream-json",
+      "--verbose",
+      "--input-format", "stream-json",
+      "--no-chrome",
+      "--model", "claude-opus-4-6[1m]",
+      "--no-session-persistence",
+      "--disallowedTools", "Write,Edit,Bash,NotebookEdit,Agent,EnterWorktree,ExitWorktree",
+      "--system-prompt", "You are a planning assistant for work tasks (NOT for the current repo/directory). All context has been provided in your prompt. Do NOT read local files, do NOT explore the filesystem, do NOT assume the task is about the current directory. Just analyze the provided context and create a plan. Return ONLY the plan or a JSON context request — no narration.",
+    ], {
+      cwd: os.homedir(),
+      env: { ...process.env },
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    let outputBuffer = "";
+    let resultText = "";
+    let done = false;
+    let bytesReceived = 0;
+
+    if (proc.pid) trackProcess(proc.pid, "ephemeral", "plan-iteration");
+
+    addDebugEntry("in", `📋 [PLANNING] Spawned ephemeral process (PID ${proc.pid})`, "planning");
+
+    proc.stdin?.write(JSON.stringify({
+      type: "user",
+      message: { role: "user", content: prompt },
+      parent_tool_use_id: null,
+      session_id: "",
+    }) + "\n");
+
+    const timeout = setTimeout(() => {
+      if (!done) {
+        done = true;
+        if (proc.pid) untrackProcess(proc.pid);
+        addDebugEntry("out", `⏱️ [PLANNING] Timed out (${bytesReceived} bytes received)`, "planning");
+        proc.kill();
+        resolve(resultText || "Request timed out");
+      }
+    }, timeoutMs);
+
+    proc.stdout?.on("data", (chunk: Buffer) => {
+      bytesReceived += chunk.length;
+      outputBuffer += chunk.toString("utf-8");
+      const lines = outputBuffer.split("\n");
+      outputBuffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const msg = JSON.parse(line);
+          if (msg.type === "assistant" && Array.isArray(msg.message?.content)) {
+            for (const block of msg.message.content as Array<{ type: string; name?: string; text?: string }>) {
+              if (block.type === "tool_use" && block.name) addDebugEntry("out", `🔧 [PLANNING] Tool: ${block.name}`, "planning");
+            }
+          }
+          if (msg.type === "result" && !done) {
+            resultText = String(msg.result ?? "");
+            addDebugEntry("out", `✅ [PLANNING] Result: ${resultText.length} chars`, "planning");
+            done = true;
+            clearTimeout(timeout);
+            if (proc.pid) untrackProcess(proc.pid);
+            proc.kill();
+            resolve(resultText);
+          }
+        } catch {}
+      }
+    });
+
+    proc.stderr?.on("data", () => {});
+    proc.on("exit", (code) => {
+      if (proc.pid) untrackProcess(proc.pid);
+      if (!done) {
+        done = true;
+        clearTimeout(timeout);
+        addDebugEntry("out", `🛑 [PLANNING] Exited (code=${code}, bytes=${bytesReceived})`, "planning");
+        resolve(resultText || "Process exited without result");
+      }
+    });
+  });
 }

@@ -15,9 +15,10 @@ const MOCK_AGENTS = [
     status: "active" as const,
     source: "deck" as const,
     task: "Implement retry logic for pipeline ingestion failures on the Vector team's data processing service",
+    summary: "Adding exponential backoff with jitter to the pipeline ingestion service to handle transient DynamoDB throttling errors.",
     model: "claude-sonnet-4-6",
-    branch: "kieran/vec-423-retry-logic",
-    cwd: "/Users/kieranwilliams/Documents/GitHub/monolith-django",
+    branch: "dev/vec-423-retry-logic",
+    cwd: "/Users/dev/projects/example-repo",
     parentAgentId: null,
     permissionMode: "default",
     maxBudgetUsd: 5,
@@ -34,9 +35,10 @@ const MOCK_AGENTS = [
     status: "active" as const,
     source: "deck" as const,
     task: "Fix flaky test in auth middleware — intermittent timeout in CI",
+    summary: "The test_login_rate_limiting test fails intermittently due to a race condition in the mock Redis connection pool.",
     model: "claude-haiku-4-5-20251001",
-    branch: "kieran/fix-auth-test",
-    cwd: "/Users/kieranwilliams/Documents/GitHub/frontend",
+    branch: "dev/fix-auth-test",
+    cwd: "/Users/dev/projects/frontend",
     parentAgentId: null,
     permissionMode: "acceptEdits",
     maxBudgetUsd: 1,
@@ -53,9 +55,10 @@ const MOCK_AGENTS = [
     status: "errored" as const,
     source: "external" as const,
     task: "Refactor GraphQL resolvers to use DataLoader pattern",
+    summary: "Replacing N+1 queries in the lineage resolver by batching through DataLoader. Currently profiling the hot path.",
     model: "claude-opus-4-6",
     branch: null,
-    cwd: "/Users/kieranwilliams/Documents/GitHub/monolith-django",
+    cwd: "/Users/dev/projects/example-repo",
     parentAgentId: null,
     permissionMode: "default",
     maxBudgetUsd: 10,
@@ -72,9 +75,10 @@ const MOCK_AGENTS = [
     status: "completed" as const,
     source: "deck" as const,
     task: "Add unit tests for the new notification service",
+    summary: null,
     model: "claude-sonnet-4-6",
-    branch: "kieran/vec-401-notif-tests",
-    cwd: "/Users/kieranwilliams/Documents/GitHub/monolith-django",
+    branch: "dev/vec-401-notif-tests",
+    cwd: "/Users/dev/projects/example-repo",
     parentAgentId: null,
     permissionMode: "acceptEdits",
     maxBudgetUsd: 2,
@@ -97,14 +101,14 @@ const MOCK_EVENTS = [
 ];
 
 const MOCK_APPROVALS = [
-  { id: "appr-1", agentId: "agent-1", toolName: "Bash", toolInput: JSON.stringify({ command: "git push origin kieran/vec-423-retry-logic" }), description: "Push branch to remote", riskLevel: "medium" as const, status: "pending" as const, timestamp: new Date(Date.now() - 60000).toISOString() },
+  { id: "appr-1", agentId: "agent-1", toolName: "Bash", toolInput: JSON.stringify({ command: "git push origin dev/vec-423-retry-logic" }), description: "Push branch to remote", riskLevel: "medium" as const, status: "pending" as const, timestamp: new Date(Date.now() - 60000).toISOString() },
   { id: "appr-2", agentId: "agent-2", toolName: "Bash", toolInput: JSON.stringify({ command: "rm -rf node_modules && pnpm install" }), description: "Clean reinstall dependencies", riskLevel: "high" as const, status: "pending" as const, timestamp: new Date(Date.now() - 30000).toISOString() },
 ];
 
 const MOCK_CONTEXT_REFS = [
-  { id: "ctx-1", agentId: "agent-1", type: "linear" as const, resourceId: "VEC-423", title: "VEC-423: Add retry logic to pipeline ingestion", url: "https://linear.app/monte-carlo/issue/VEC-423", detectedAt: new Date(Date.now() - 800000).toISOString() },
-  { id: "ctx-2", agentId: "agent-1", type: "slack" as const, resourceId: "C0AMSV2SK4Z", title: "#team-vector", url: "https://slack.com/archives/C0AMSV2SK4Z", detectedAt: new Date(Date.now() - 700000).toISOString() },
-  { id: "ctx-3", agentId: "agent-3", type: "github" as const, resourceId: "montecarlodata/monolith-django#4521", title: "PR #4521: DataLoader refactor", url: "https://github.com/montecarlodata/monolith-django/pull/4521", detectedAt: new Date(Date.now() - 3500000).toISOString() },
+  { id: "ctx-1", agentId: "agent-1", type: "linear" as const, resourceId: "VEC-423", title: "VEC-423: Add retry logic to pipeline ingestion", url: "https://linear.app/issue/VEC-423", detectedAt: new Date(Date.now() - 800000).toISOString() },
+  { id: "ctx-2", agentId: "agent-1", type: "slack" as const, resourceId: "C0EXAMPLE1", title: "#team-engineering", url: "https://slack.com/archives/C0EXAMPLE1", detectedAt: new Date(Date.now() - 700000).toISOString() },
+  { id: "ctx-3", agentId: "agent-3", type: "github" as const, resourceId: "org/example-repo#4521", title: "PR #4521: DataLoader refactor", url: "https://github.com/org/example-repo/pull/4521", detectedAt: new Date(Date.now() - 3500000).toISOString() },
 ];
 
 function buildMockState(): StoreState {

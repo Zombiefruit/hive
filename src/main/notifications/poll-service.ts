@@ -1,127 +1,21 @@
 import { app, BrowserWindow } from "electron";
 import { askBridge, isBridgeReady, restartBridge, addDebugEntry } from "../mcp-bridge";
-import { getClaudeCodePath } from "../claude-path";
-import { getAllAgents, getAllContextRefs } from "../db/database";
-import { spawn } from "node:child_process";
+import { getConfig } from "../config";
+import { getPlan } from "./work-dispatcher";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-
-/**
- * One-shot Claude Code call with MCP access via stream-json interactive mode.
- * Uses the same spawn pattern as the working bridge — identical args.
- */
-function askOneShot(prompt: string, timeoutMs: number): Promise<string> {
-  return new Promise((resolve) => {
-    const claudePath = getClaudeCodePath();
-
-    // Use IDENTICAL args to the bridge (which works) — including --disallowedTools
-    const proc = spawn(claudePath, [
-      "--output-format", "stream-json",
-      "--verbose",
-      "--input-format", "stream-json",
-      "--no-chrome",
-      "--model", "claude-haiku-4-5-20251001",
-      "--no-session-persistence",
-      "--disallowedTools", "Write,Edit,Bash,NotebookEdit,Agent,EnterWorktree,ExitWorktree",
-      "--system-prompt", "You are a READ-ONLY data fetcher. Fetch data using MCP tools and return as plain text. Each request is independent.",
-    ], {
-      cwd: app.isPackaged ? os.homedir() : app.getAppPath(),
-      env: { ...process.env },
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-
-    let outputBuffer = "";
-    let resultText = "";
-    let done = false;
-    let promptSent = false;
-    let bytesReceived = 0;
-
-    addDebugEntry("out", `⏳ Process spawned (PID ${proc.pid}), waiting for init...`);
-
-    const timeout = setTimeout(() => {
-      if (!done) {
-        done = true;
-        addDebugEntry("out", `⏱️ Process timed out (PID ${proc.pid}, ${bytesReceived} bytes received, promptSent=${promptSent})`);
-        proc.kill();
-        resolve(resultText || "Request timed out");
-      }
-    }, timeoutMs);
-
-    proc.stdout?.on("data", (chunk: Buffer) => {
-      bytesReceived += chunk.length;
-      outputBuffer += chunk.toString("utf-8");
-      const lines = outputBuffer.split("\n");
-      outputBuffer = lines.pop() ?? "";
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        try {
-          const msg = JSON.parse(line);
-
-          // Wait for init with MCP tools loaded, THEN send prompt
-          if (msg.type === "system" && msg.subtype === "init" && !promptSent) {
-            const mcpCount = ((msg.tools ?? []) as string[]).filter((t: string) => t.includes("mcp__claude_ai")).length;
-            logPoll(`    [oneshot] init: ${(msg.tools ?? []).length} tools, ${mcpCount} MCP`);
-            addDebugEntry("out", `🚀 Source agent initialized: ${(msg.tools ?? []).length} tools, ${mcpCount} MCP connectors`);
-            for (const win of BrowserWindow.getAllWindows()) {
-              try { if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", { source: `Initialized (${mcpCount} MCP tools)`, current: 1, total: 2 }); } catch {}
-            }
-
-            promptSent = true;
-            proc.stdin?.write(JSON.stringify({
-              type: "user",
-              message: { role: "user", content: prompt },
-              parent_tool_use_id: null,
-              session_id: msg.session_id ?? "",
-            }) + "\n");
-            addDebugEntry("in", `📤 Sent prompt: ${prompt.slice(0, 100)}...`);
-          }
-
-          // Log tool calls and text from the agent
-          if (msg.type === "assistant" && Array.isArray(msg.message?.content)) {
-            for (const block of msg.message.content as Array<{ type: string; name?: string; text?: string }>) {
-              if (block.type === "tool_use" && block.name) {
-                addDebugEntry("out", `🔧 Tool: ${block.name}`);
-              }
-              if (block.type === "text" && block.text) {
-                addDebugEntry("out", `💬 ${block.text.slice(0, 150)}`);
-              }
-            }
-          }
-
-          if (msg.type === "result" && !done) {
-            resultText = String(msg.result ?? "");
-            addDebugEntry("out", `✅ Result: ${resultText.slice(0, 150)}`);
-            done = true;
-            clearTimeout(timeout);
-            proc.kill();
-            resolve(resultText);
-          }
-        } catch {}
-      }
-    });
-
-    proc.stderr?.on("data", (chunk: Buffer) => {
-      const msg = chunk.toString("utf-8").trim();
-      if (msg) addDebugEntry("out", `⚠️ stderr: ${msg.slice(0, 150)}`);
-    });
-
-    proc.on("exit", (code) => {
-      if (!done) {
-        done = true;
-        clearTimeout(timeout);
-        addDebugEntry("out", `🛑 Process exited (code=${code}, bytes=${bytesReceived}, promptSent=${promptSent})`);
-        resolve(resultText || "Process exited without result");
-      }
-    });
-  });
-}
+import type { DeckConfig } from "../../shared/config-types";
+import { normalizePriority, extractKey as extractKeyUtil, STAGE_ORDER, CONFIDENCE_THRESHOLD, sanitizeUrl, cadenceToMs, setSlackWorkspace, getSlackBaseUrl } from "../../shared/task-utils";
+import { initSlackChannels } from "../agents/message-parser";
+import { loadSkills, loadSkillTemplate } from "../../shared/skill-loader";
+import { computeLookbackHours, migrateCacheFormat, buildCachePayload } from "../../shared/poll-cache";
+import { createProject, addTaskToProject, detectProjectFromSource, findProjectByName, getAllProjects, loadProjects, saveProjects } from "../../shared/project-model";
 
 export interface PollNotification {
   id: string;
   source: "slack" | "linear" | "github" | "notion" | "email" | "manual";
-  priority: "actionable" | "fyi" | "noise" | "urgent" | "today" | "low" | "medium";
+  priority: "critical" | "high" | "medium" | "low" | "backlog";
   status: "new" | "in_progress" | "done" | "dismissed";
   title: string;
   summary: string;
@@ -134,7 +28,19 @@ export interface PollNotification {
   createdAt: string;
   stage?: string;
   estimatedMinutes?: number;
+  timeline?: Array<{ timestamp: string; event: string }>;
+  completedAt?: string;
+  pollCycle?: number; // Incremented each poll — used to detect new/modified items
+  sessionId?: string;
+  repoPath?: string;
+  branch?: string;
+  workSlug?: string;
+  projectId?: string;
+  parentTaskId?: string;     // if this is a subtask, points to parent
+  subtaskIds?: string[];     // if this is a parent, lists child task IDs
 }
+
+// normalizePriority, extractKey, STAGE_ORDER, CONFIDENCE_THRESHOLD imported from shared/task-utils
 
 const POLL_LOG = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "poll.log");
 
@@ -150,6 +56,7 @@ let pollInterval: ReturnType<typeof setInterval> | null = null;
 const notifications: PollNotification[] = [];
 let isPolling = false;
 let hasCompletedFirstPoll = false;
+let currentPollCycle = 0;
 
 export function hasPolledOnce(): boolean {
   return hasCompletedFirstPoll;
@@ -161,13 +68,34 @@ export function startPolling(): void {
   if (pollInterval) return;
   logPoll("startPolling called");
   loadCachedNotifications();
+  loadProjects();
   loadCachedSkipped();
+  // Immediately re-save to ensure cache file exists (may have been deleted)
+  saveCacheToFile();
   broadcastNotifications();
 
   // Cancel any pending poll from a previous startPolling call
   if (startPollTimeout) clearTimeout(startPollTimeout);
-  // Single poll on startup after bridge initializes (no automatic interval)
-  startPollTimeout = setTimeout(() => poll(), 20000);
+
+  const config = getConfig() as DeckConfig | null;
+  if (config?.slackWorkspace) setSlackWorkspace(config.slackWorkspace);
+  if (config?.slackChannels?.length) initSlackChannels(config.slackChannels);
+  const cadence = config?.fetchCadence ?? "manual";
+  const intervalMs = cadenceToMs(cadence);
+
+  // Initial poll after bridge initializes, then schedule recurring AFTER it completes
+  startPollTimeout = setTimeout(async () => {
+    await poll();
+    // Start recurring interval only after first poll finishes
+    if (intervalMs && !pollInterval) {
+      logPoll(`Setting up poll interval: ${cadence} (${intervalMs / 60000}min) — starting after first poll`);
+      pollInterval = setInterval(() => poll(), intervalMs);
+    }
+  }, 20000);
+
+  if (!intervalMs) {
+    logPoll("Poll cadence: manual — no auto-polling");
+  }
 }
 
 export function stopPolling(): void {
@@ -207,6 +135,7 @@ export function clearAllNotifications(): void {
 }
 
 let nextLookbackHours = 168;
+let lastPollTimestamp: string | null = null;
 
 let pendingRefresh = false;
 
@@ -282,6 +211,15 @@ export function updateNotificationById(id: string, changes: Record<string, unkno
     logPoll(`  NOT FOUND! Available IDs: ${notifications.map(n => n.id.slice(0, 20)).join(", ")}`);
     return false;
   }
+  // Track stage changes in timeline
+  if (changes.stage && changes.stage !== n.stage) {
+    if (!n.timeline) n.timeline = [];
+    n.timeline.push({ timestamp: new Date().toISOString(), event: `Stage: ${n.stage ?? "new"} → ${changes.stage}` });
+    // Record completion timestamp
+    if (changes.stage === "done" && !n.completedAt) {
+      n.completedAt = new Date().toISOString();
+    }
+  }
   Object.assign(n, changes);
   saveCacheToFile();
   broadcastNotifications();
@@ -303,13 +241,19 @@ export function startWorkOnNotification(id: string): void {
   broadcastNotifications();
 }
 
+// Debounced broadcast — coalesces rapid updates into one IPC message per 100ms
+let broadcastTimer: ReturnType<typeof setTimeout> | null = null;
 function broadcastNotifications(): void {
-  const active = getNotifications();
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) {
-      win.webContents.send("notifications:update", active);
+  if (broadcastTimer) return;
+  broadcastTimer = setTimeout(() => {
+    broadcastTimer = null;
+    const active = getNotifications();
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send("notifications:update", active);
+      }
     }
-  }
+  }, 100);
 }
 
 function getCachePath(): string {
@@ -319,24 +263,74 @@ function getCachePath(): string {
 function loadCachedNotifications(): void {
   try {
     const raw = fs.readFileSync(getCachePath(), "utf-8");
-    const cached = JSON.parse(raw) as PollNotification[];
+    const { notifications: cachedRaw, lastPollTimestamp: lpt } = migrateCacheFormat(raw);
+    lastPollTimestamp = lpt;
+    const cached = cachedRaw as PollNotification[];
     for (const n of cached) {
+      // Normalize legacy values on load
+      n.priority = normalizePriority(n.priority);
+      // Fix follow_up → response (follow_up merged into response). Cast needed for legacy cached data.
+      if ((n.taskType as string) === "follow_up") n.taskType = "response" as PollNotification["taskType"];
+      if (n.stage === "follow_up") n.stage = "new";
+      // Fix response/meeting_prep tasks stuck in agent-only stages
+      if ((n.taskType === "response" || n.taskType === "meeting_prep") && n.stage === "start_work") n.stage = "preparing";
+      // Sanitize URLs on load (fix cached broken URLs like "https://slack//channel/...")
+      if (n.url) n.url = sanitizeUrl(n.url);
+      if (n.links) n.links = n.links.filter(l => sanitizeUrl(l.url) !== undefined).map(l => ({ ...l, url: sanitizeUrl(l.url)! }));
+      // Ensure all tasks have a timeline (seed if missing)
+      if (!n.timeline) {
+        n.timeline = [{ timestamp: n.createdAt ?? new Date().toISOString(), event: `Created from ${n.source}` }];
+      }
       if (!notifications.some(e => e.id === n.id)) notifications.push(n);
     }
+    // Reset orphaned planning tasks — but preserve stage if a completed plan exists
+    let orphaned = 0;
+    let preserved = 0;
+    for (const n of notifications) {
+      if (n.stage === "planning") {
+        const plan = getPlan(n.id);
+        if (plan && plan.conversationHistory?.length > 0) {
+          // Plan exists — keep in planning stage (user can view/iterate the plan)
+          preserved++;
+        } else {
+          // No plan — reset to inbox so user can re-trigger planning
+          n.stage = "new";
+          if (!n.timeline) n.timeline = [];
+          n.timeline.push({ timestamp: new Date().toISOString(), event: "Reset from planning (app restarted)" });
+          orphaned++;
+        }
+      }
+    }
+    if (orphaned > 0) logPoll(`Reset ${orphaned} orphaned planning tasks to inbox`);
+    if (preserved > 0) logPoll(`Preserved ${preserved} planning tasks with existing plans`);
+
     logPoll(`Loaded ${cached.length} cached notifications`);
   } catch {}
 }
 
+// Debounced file write — coalesces rapid mutations into one write per 500ms
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
 function saveCacheToFile(): void {
-  try {
-    fs.writeFileSync(getCachePath(), JSON.stringify(notifications));
-  } catch {}
+  if (saveTimer) return; // Already scheduled
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    try {
+      fs.writeFileSync(getCachePath(), buildCachePayload(notifications, lastPollTimestamp));
+    } catch {}
+  }, 500);
+}
+
+/** Force an immediate cache write (e.g., before app quit). */
+export function flushCache(): void {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  try { fs.writeFileSync(getCachePath(), buildCachePayload(notifications, lastPollTimestamp)); } catch {}
 }
 
 async function poll(): Promise<void> {
   if (isPolling) return;
   isPolling = true;
-  logPoll("poll starting");
+  currentPollCycle++;
+  logPoll(`poll starting (cycle ${currentPollCycle})`);
 
   // Broadcast that polling started so UI shows loading
   for (const win of BrowserWindow.getAllWindows()) {
@@ -350,9 +344,23 @@ async function poll(): Promise<void> {
       await new Promise(r => setTimeout(r, 1000));
     }
     if (!isBridgeReady()) {
-      logPoll("Bridge still not ready after 60s — aborting poll");
-      isPolling = false;
-      return;
+      logPoll("Bridge still not ready after 60s — restarting bridge and retrying");
+      try {
+        await restartBridge();
+        // Wait another 60s for the restarted bridge
+        const retryStart = Date.now();
+        while (!isBridgeReady() && Date.now() - retryStart < 60000) {
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      } catch (err) {
+        logPoll(`Bridge restart failed: ${String(err)}`);
+      }
+      if (!isBridgeReady()) {
+        logPoll("Bridge still not ready after restart — aborting poll");
+        isPolling = false;
+        return;
+      }
+      logPoll("Bridge recovered after restart");
     }
     logPoll("Bridge became ready after waiting");
   }
@@ -360,8 +368,13 @@ async function poll(): Promise<void> {
   // Don't seed from context refs — only use real triage results
 
   try {
-    const hours = nextLookbackHours;
-    nextLookbackHours = 168;
+    let hours: number;
+    if (nextLookbackHours !== 168) {
+      hours = nextLookbackHours;
+      nextLookbackHours = 168;
+    } else {
+      hours = computeLookbackHours(lastPollTimestamp);
+    }
     logPoll(`Polling (lookback: ${hours}h)`);
 
     // Compute date cutoff for search queries
@@ -369,184 +382,207 @@ async function poll(): Promise<void> {
     const cutoffStr = cutoffDate.toISOString().split("T")[0]; // YYYY-MM-DD
     const slackAfter = cutoffStr; // Slack search supports "after:YYYY-MM-DD"
 
-    // PASS 1: Gather raw data — one request per source for deterministic results
-    logPoll("Pass 1: Gathering raw data (per-source)");
+    // Load user config — all source prompts are built from this
+    const config = getConfig() as DeckConfig | null;
+    const userName = config?.name ?? "User";
+    const userSlackId = config?.slackUserId ?? "";
+    const linearUser = config?.linearUsername ?? "";
+    const managerName = config?.managerName ?? "";
+    const teamName = config?.teamName ?? "";
+    const tz = config?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const channels = config?.slackChannels ?? [];
+    const integrations = config?.integrations ?? { slack: true, linear: true, gmail: false, calendar: false, notion: false, github: true };
+    const coworkers = config?.coworkers ?? [];
 
-    const sources: Array<{ name: string; prompt: string; timeoutMs: number }> = [
-      {
-        name: "Slack",
-        timeoutMs: 240000, // 4 min — Slack is the most important source
-        prompt: `You MUST execute ALL of these Slack API calls. Do not skip any.
+    // Build manager Slack search if we know the manager's Slack ID
+    const managerCoworker = coworkers.find(c => c.role === "manager");
+    const managerSlackId = managerCoworker?.slackUserId ?? "";
 
-Step 1: Use mcp__claude_ai_Slack__slack_search_public_and_private with query "<@U02PKBZSB9Q> after:${slackAfter}"
-Step 2: Use mcp__claude_ai_Slack__slack_search_public_and_private with query "to:U02PKBZSB9Q after:${slackAfter}"
-Step 3: Use mcp__claude_ai_Slack__slack_search_public_and_private with query "from:<@U043ENDKV4Y> after:${slackAfter}" to find messages from Kieran's manager Yael
-Step 4: Use mcp__claude_ai_Slack__slack_read_channel with channel_id "C0AMSV2SK4Z"
-Step 5: Use mcp__claude_ai_Slack__slack_read_channel with channel_id "C0AMT1AGN7K"
-Step 6: Use mcp__claude_ai_Slack__slack_read_channel with channel_id "C054VQW7EGG"
+    // Build coworker priority rules for triage
+    const coworkerRules = [
+      ...(managerName ? [`- ${managerName} (manager) direct ask = critical priority, confidence 10`] : []),
+      ...coworkers
+        .filter(c => c.role !== "manager")
+        .map(c => `- ${c.name} (${c.role}) direct ask = ${c.role === "lead" ? "critical" : c.role === "pm" ? "high" : "high"} priority`),
+    ].join("\n");
 
-CRITICAL RULES:
-- Only include messages from AFTER ${cutoffStr}. DISCARD anything older.
-- For each message/thread: who said it, exact quote, channel name, timestamp
-- HIGHEST PRIORITY: Flag any thread or DM where someone messaged Kieran (U02PKBZSB9Q) and Kieran has NOT replied yet. Mark as "NEEDS RESPONSE".
-- For #agentic-engineering (C054VQW7EGG): flag actionable tips, tools, or scripts as "ACTIONABLE TIP".
-- Be thorough — Slack is the most important data source. Include everything relevant.
-Return ALL results as plain text.`
-      },
-      {
-        name: "Linear",
-        timeoutMs: 180000, // 3 min (60s init + 2 min fetch)
-        prompt: `Use mcp__claude_ai_Linear__list_issues with assignee "kwilliams" and limit 20.
+    // PASS 1: Fetch ALL sources in a SINGLE prompt.
+    // Claude Code parallelizes tool calls within a turn — one prompt fires off
+    // Slack, Linear, Calendar, Gmail, Notion calls simultaneously.
+    logPoll("Pass 1: Fetching all sources (single prompt, model parallelizes tools)");
 
-From the results, ONLY include issues where status is NOT "Done" and NOT "Canceled".
+    // Build the combined fetch prompt from enabled integrations
+    const fetchSections: string[] = [];
+    const enabledSourceNames: string[] = [];
 
-For each open issue, return: identifier (e.g. VEC-10), title, status, priority. Keep it concise — one line per issue. Return as plain text.`
-      },
-      {
-        name: "Calendar",
-        timeoutMs: 150000, // 2.5 min (60s init + 1.5 min fetch)
-        prompt: `You MUST execute this Google Calendar API call.
+    if (integrations.slack && userSlackId) {
+      enabledSourceNames.push("Slack");
+      const slackLimit = 100;
+      const channelList = channels.map(ch => `- slack_read_channel: channel_id "${ch.id}" (${ch.name}), limit ${slackLimit}`).join("\n");
+      const slackSearches = [
+        `- slack_search_public_and_private: query "<@${userSlackId}> after:${slackAfter}"`,
+        `- slack_search_public_and_private: query "to:${userSlackId} after:${slackAfter}"`,
+        ...(managerSlackId ? [`- slack_search_public_and_private: query "from:<@${managerSlackId}> after:${slackAfter}" (messages from ${managerName || "manager"})`] : []),
+      ].join("\n");
+      const slackSkill = loadSkillTemplate("fetch-slack", {
+        SLACK_LIMIT: String(slackLimit),
+        USER_NAME: userName,
+        USER_SLACK_ID: userSlackId,
+        CHANNEL_LIST: channelList,
+        SLACK_BASE_URL: getSlackBaseUrl(),
+      });
+      fetchSections.push(`## SLACK\n${slackSearches}\n${channelList}\n${slackSkill}`);
+    }
 
-Step 1: Use mcp__claude_ai_Google_Calendar__gcal_list_events to get events for the next 24 hours
+    if (integrations.linear && linearUser) {
+      enabledSourceNames.push("Linear");
+      const linearLimit = hours > 48 ? 250 : 100;
+      const linearSkill = loadSkillTemplate("fetch-linear", {
+        LINEAR_USER: linearUser,
+        LINEAR_LIMIT: String(linearLimit),
+        TEAM_NAME: config?.teamName ?? "Vector",
+        LINEAR_TEAM_LIMIT: String(Math.round(linearLimit / 2)),
+      });
+      fetchSections.push(`## LINEAR\n${linearSkill}`);
+    }
 
-Return for each event: title, start time, end time, attendees, location or video link. Flag any meetings in the next 2 hours. Return as plain text.`
-      },
-      {
-        name: "Gmail",
-        timeoutMs: 150000, // 2.5 min (60s init + 1.5 min fetch)
-        prompt: `You MUST execute this Gmail API call.
+    if (integrations.calendar) {
+      enabledSourceNames.push("Calendar");
+      const calSkill = loadSkillTemplate("fetch-calendar", {
+        CURRENT_TIME: new Date().toISOString(),
+      });
+      fetchSections.push(`## CALENDAR\n${calSkill}`);
+    }
 
-Step 1: Use mcp__claude_ai_Gmail__gmail_search_messages with query "is:unread newer_than:${hours <= 24 ? "1d" : hours <= 48 ? "2d" : "7d"}" and limit 20
+    if (integrations.gmail) {
+      enabledSourceNames.push("Gmail");
+      const gmailLimit = hours > 48 ? 50 : 30;
+      const gmailSkill = loadSkillTemplate("fetch-gmail", {
+        GMAIL_NEWER: hours <= 24 ? "1d" : hours <= 48 ? "2d" : "7d",
+        GMAIL_LIMIT: String(gmailLimit),
+      });
+      fetchSections.push(`## GMAIL\n${gmailSkill}`);
+    }
 
-Return for each email: subject, sender name, and preview/snippet. Skip automated notifications from GitHub, Linear, Slack, Datadog, or other bots. Return as plain text.`
-      },
-      {
-        name: "Notion",
-        timeoutMs: 180000, // 3 min (60s init + 2 min fetch)
-        prompt: `You MUST execute these Notion API calls. Do not skip any.
+    if (integrations.notion) {
+      enabledSourceNames.push("Notion");
+      const notionSkill = loadSkillTemplate("fetch-notion", {
+        USER_NAME: userName,
+      });
+      fetchSections.push(`## NOTION\n${notionSkill}`);
+    }
 
-Step 1: Use mcp__claude_ai_Notion__notion-search with query "Kieran Williams"
-Step 2: Use mcp__claude_ai_Notion__notion-search with query "Vector team" to find recently updated team pages
-
-Only include pages updated after ${cutoffStr}. Return page titles, who edited them, and brief summaries. Return as plain text.`
-      },
-    ];
-
-    // Fetch sources via the shared bridge (reliable MCP access)
-    // Sequential but each source shows progress in the UI
-    const rawResults: string[] = [];
-
-    for (let i = 0; i < sources.length; i++) {
-      const source = sources[i];
-      logPoll(`  Fetching: ${source.name} (${i + 1}/${sources.length})`);
-      addDebugEntry("in", `📤 Fetching ${source.name} (${i + 1}/${sources.length})...`);
-
-      for (const win of BrowserWindow.getAllWindows()) {
-        try {
-          if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", {
-            source: source.name,
-            current: i + 1,
-            total: sources.length + 1,
-          });
-        } catch {}
-      }
-
+    for (const win of BrowserWindow.getAllWindows()) {
       try {
-        const result = await askBridge(source.prompt, source.timeoutMs);
-        rawResults.push(`## ${source.name}\n${result}\n`);
-        logPoll(`  ${source.name}: ${result.length} chars`);
-        addDebugEntry("out", `✅ ${source.name}: ${result.length} chars`);
-      } catch (err) {
-        rawResults.push(`## ${source.name}\nError: ${String(err).slice(0, 100)}\n`);
-        logPoll(`  ${source.name}: ERROR ${String(err).slice(0, 60)}`);
-        addDebugEntry("out", `❌ ${source.name}: ERROR`);
-      }
+        if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", {
+          source: `Fetching ${enabledSourceNames.join(", ")}`,
+          current: 1,
+          total: 2, // fetch + triage
+        });
+      } catch {}
     }
 
-    const rawData = rawResults.join("\n---\n\n");
-    logPoll(`Pass 1 complete: ${rawData.length} total chars from ${rawResults.length} sources`);
+    const fetchPrompt = `Fetch data from ALL of these sources. Execute all API calls — do not skip any. Call tools in parallel where possible.
 
-    // Restart bridge before triage to clear accumulated conversation context
-    restartBridge();
-    logPoll("Waiting for bridge restart before triage...");
-    const triageWaitStart = Date.now();
-    while (!isBridgeReady() && Date.now() - triageWaitStart < 90000) {
-      await new Promise(r => setTimeout(r, 1000));
+${fetchSections.join("\n\n")}
+
+RULES:
+- Only include data from after ${cutoffStr}
+- Return ALL results as plain text, organized by source with ## headers
+- Be thorough and complete — include everything relevant
+- NEVER add commentary like "Let me compile..." or "I have enough data..." — return ONLY the data itself`;
+
+    const fetchStart = Date.now();
+    logPoll(`  Sending combined fetch prompt for: ${enabledSourceNames.join(", ")}`);
+    addDebugEntry("in", `📤 Fetching all: ${enabledSourceNames.join(", ")}`, "fetch");
+
+    let rawData = "";
+    try {
+      rawData = await askBridge(fetchPrompt); // no timeout — let the agent finish
+      logPoll(`  Fetch complete: ${rawData.length} chars`);
+      addDebugEntry("out", `✅ All sources: ${rawData.length} chars`, "fetch");
+    } catch (err) {
+      logPoll(`  Fetch ERROR: ${String(err).slice(0, 100)}`);
+      addDebugEntry("out", `❌ Fetch error: ${String(err).slice(0, 100)}`, "fetch");
     }
 
-    // PASS 2: Triage the raw data (fresh bridge, clean context)
+    const fetchElapsed = Date.now() - fetchStart;
+    logPoll(`Pass 1 complete: ${rawData.length} chars in ${(fetchElapsed / 1000).toFixed(1)}s`);
+
+    // No bridge restart needed — triage prompt includes all raw data explicitly.
+    // Removing the restart saves 60s per poll cycle.
+
     logPoll("Pass 2: Triaging raw data");
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", {
         source: "Triaging",
-        current: sources.length + 1,
-        total: sources.length + 1,
+        current: 2,
+        total: 2,
       });
     }
+
+    // Build existing tasks summary for dedup — include IDs, URLs, and links so the AI can match
+    const existingOpen = notifications.filter(n => n.stage !== "skipped" && n.stage !== "done");
+    const existingTasksSummary = existingOpen
+      .slice(0, 30) // Cap at 30 to avoid token overflow
+      .map(n => {
+        const urls: string[] = [];
+        if (n.url) urls.push(n.url);
+        if (n.links) for (const l of n.links) { if (l.url && !urls.includes(l.url)) urls.push(l.url); }
+        const urlStr = urls.length > 0 ? ` urls=[${urls.join(", ")}]` : "";
+        const lastTimeline = n.timeline?.length ? ` last_update="${n.timeline[n.timeline.length - 1].event}"` : "";
+        return `- ID="${n.id}" [${n.source}] "${n.title}" (${n.priority}, stage: ${n.stage ?? "new"})${urlStr}${lastTimeline}`;
+      })
+      .join("\n");
+
     const now = new Date();
-    const israelTime = now.toLocaleString("en-US", { timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hour12: false });
-    const triagePrompt = `You are Kieran Williams's personal assistant. Current time: ${now.toISOString()} (${israelTime} Israel Time / Asia/Jerusalem).
+    const localTime = now.toLocaleString("en-US", { timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false });
+    // Load triage skills from .claude/skills/
+    const triageSkills = loadSkills(["triage-rules", "triage-output-format", "triage-linking"]);
 
-Kieran is based in ISRAEL (Asia/Jerusalem timezone, UTC+2 or UTC+3). All meeting times must be evaluated relative to Israel time. A meeting at "9am Pacific" is 7pm Israel time. If a meeting has ALREADY PASSED in Israel time, do NOT flag it as needing prep.
+    const triagePrompt = `You are ${userName}'s personal assistant. Current time: ${now.toISOString()} (${localTime} ${tz}).
 
-Here is everything from his Slack, Linear, GitHub, Gmail, Calendar, and Notion:
+${userName}'s timezone is ${tz}. All meeting times must be evaluated relative to this timezone. If a meeting has ALREADY PASSED in ${tz}, do NOT flag it as needing prep.
+${managerName ? `${userName}'s manager is ${managerName}. Direct asks from ${managerName} = critical priority.` : ""}
+
+Here is everything from ${enabledSourceNames.join(", ")}:
 
 ---
 ${rawData}
 ---
+${existingTasksSummary ? `
+## EXISTING TASKS (already tracked)
+${existingTasksSummary}
+` : ""}
+${(() => {
+      const projects = getAllProjects().filter(p => p.tasks.length > 0);
+      if (projects.length === 0) return "";
+      const projectsSummary = projects.map(p => `- "${p.name}" (${p.source}, ${p.tasks.length} tasks)`).join("\n");
+      return `## EXISTING PROJECTS
+${projectsSummary}
 
-Process this like Kieran would going through his inbox.
+IMPORTANT: Assign tasks to these existing projects by name. Do NOT create duplicate projects. If a task fits an existing project, use that project's exact name in the "project" field.
+`;
+    })()}
+Process this like ${userName} would going through their inbox.
 
-## CRITICAL RULES
+${triageSkills}
 
-1. **TIME FILTER — MOST IMPORTANT**: The current time in Israel is ${israelTime}. ANY event, meeting, or deadline that has ALREADY PASSED must go to "skipped" with reason "Already passed". Do NOT include past meetings as actionable. A meeting at "7 PM Israel time yesterday" is OVER — skip it.
+## Context-Specific Rules
+${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
+- Unread thread where ${userName} was tagged = high priority, confidence 8+
+- The user's Slack user ID is ${userSlackId ?? "unknown"}.
+- ${userName}'s manager is ${managerName || "unknown"}.
 
-2. **AGGRESSIVE CROSS-SOURCE DEDUP**: A Linear ticket and a Slack thread about the SAME deliverable = ONE item. A PR review request in GitHub AND a Slack message about the same PR = ONE item. When merging, keep the item with the most context and add ALL links from both sources. If a Slack thread is just discussing a Linear ticket, the ticket is the item — include the Slack thread as a link.
+## CRITICAL: Task Type Classification
+- **response**: Any DM, thread, or message where someone asked ${userName} something and they haven't replied. ANY unanswered message directed at ${userName} = response type. This includes: DMs, @mentions, "could you look at", "when can you", "thoughts on", thread replies asking for input.
+- **meeting_prep**: Calendar events happening in the future that ${userName} is attending.
+- **review**: PR reviews assigned to or requested from ${userName}. Code review requests.
+- **implementation**: Linear tickets assigned to ${userName} that require building/coding.
+- **investigation**: Tasks that need research/analysis before building.
+- DO NOT classify everything as implementation. A DM asking "can you take a look?" is a RESPONSE, not an implementation task.`;
 
-3. **Done/merged/closed/resolved → skip.** Don't include completed work.
-
-4. **Direct asks from managers/leads = highest priority**: Yael Chemla (manager) or team lead asks = confidence 10.
-
-5. **UNREAD THREADS ARE HIGH PRIORITY**: If someone tagged/messaged Kieran in a thread and he hasn't replied, that is an actionable "response" item. Don't skip these.
-
-6. **Classify task type**:
-   - "implementation" — code work needed
-   - "review" — PR needs review
-   - "response" — someone messaged Kieran and expects a reply
-   - "investigation" — "look into this" type request
-   - "planning" — needs a plan/RFC
-   - "meeting_prep" — upcoming meeting that HASN'T happened yet
-   - "follow_up" — Kieran already responded but needs to check back later
-
-7. **#agentic-engineering tips**: Actionable suggestions (scripts, tools, configs to try) = include as task_type "investigation".
-
-## DEDUP EXAMPLES
-- Linear VEC-10 "Add Fig Intelligence UI" + Slack thread from Yael about FIG → ONE item titled "VEC-10: Add Fig Intelligence UI" with links to both
-- Slack DM about PR #12441 + GitHub PR #12441 review request → ONE item "Review PR #12441" with both links
-- Calendar "Team Sync at 7PM" but it's now 12:28AM the next day → SKIP (already happened)
-
-Return a JSON object with THREE arrays:
-{
-  "actionable": [... items needing immediate action ...],
-  "follow_up": [... items to recheck later ...],
-  "skipped": [... reviewed and not relevant ...]
-}
-
-Each actionable/follow_up item:
-{"source": "slack", "priority": "urgent|today|low", "confidence": 1-10, "task_type": "...", "title": "...", "summary": "...", "links": [{"type": "...", "label": "...", "url": "..."}], "author": "...", "action_needed": "..."}
-
-Each skipped item:
-{"source": "slack", "title": "Short description", "reason": "Why skipped", "url": "https://..."}
-
-Rules:
-- Manager/lead asks = confidence 10, PM (Mor Ofir) = confidence 9
-- Unread thread where Kieran was tagged = confidence 8+
-- Include ALL related links per item
-- Sort by confidence (highest first)
-- EVERY raw item must appear in exactly ONE of the three arrays. Nothing silently dropped.
-- When in doubt about dedup, MERGE into one item with all links rather than showing duplicates.`;
-
-    const response = await askBridge(triagePrompt, 180000); // 3 min — single combined request
+    const response = await askBridge(triagePrompt); // no timeout — let the agent finish
     logPoll(`Poll complete: ${response.length} chars`);
     logPoll(`Response (first 300): ${response.slice(0, 300)}`);
 
@@ -558,16 +594,20 @@ Rules:
     // Try to parse as {actionable, skipped} object first, then fall back to array
     let actionableItems: unknown[] = [];
     let followUpItems: unknown[] = [];
+    let updateItems: Array<{ existing_id: string; changes: Record<string, unknown>; timeline_event?: string }> = [];
     let skippedItems: Array<{ source?: string; title?: string; reason?: string; url?: string }> = [];
+    let triageProjects: Array<{ name: string; source: string; source_id?: string; reason?: string; related_channels?: string[]; related_tickets?: string[] }> = [];
 
     const objMatch = cleanResponse.match(/\{[\s\S]*"actionable"[\s\S]*\}/);
     if (objMatch) {
       try {
         const parsed = JSON.parse(objMatch[0]);
         actionableItems = parsed.actionable ?? [];
+        updateItems = parsed.updates ?? [];
         followUpItems = parsed.follow_up ?? [];
         skippedItems = parsed.skipped ?? [];
-        logPoll(`Parsed: ${actionableItems.length} actionable, ${followUpItems.length} follow-up, ${skippedItems.length} skipped`);
+        triageProjects = parsed.projects ?? [];
+        logPoll(`Parsed: ${actionableItems.length} new, ${updateItems.length} updates, ${followUpItems.length} follow-up, ${skippedItems.length} skipped, ${triageProjects.length} projects`);
         for (const s of skippedItems) {
           logPoll(`  SKIPPED: [${s.source}] ${s.title} — ${s.reason}`);
         }
@@ -595,6 +635,8 @@ Rules:
       source: string; priority: string; title: string; summary: string;
       url?: string; links?: Array<{ type: string; label: string; url: string }>;
       task_type?: string; author?: string; confidence?: number; action_needed?: string;
+      project?: string; project_source?: string; project_source_id?: string;
+      parent_task?: boolean; subtasks?: Array<{ title: string; repo_hint?: string; summary?: string }>;
     }>;
 
     // Also parse follow-up items with same shape
@@ -603,77 +645,181 @@ Rules:
     lastSkippedItems = skippedItems;
     saveCachedSkipped();
 
-    // NEVER delete existing notifications — only add new ones
-    // Build a set of existing keys to deduplicate
-    const existingKeys = new Set(notifications.map(n => extractKey(n)));
-
-    // Dedup within this batch by extracting a stable resource key
-    function extractKey(n: { source: string; title: string; url?: string }): string {
-      // Extract IDs from URLs
-      if (n.url) {
-        const prMatch = n.url.match(/\/pull\/(\d+)/);
-        if (prMatch) return `github:pr:${prMatch[1]}`;
-        const linearMatch = n.url.match(/\/issue\/([A-Z]+-\d+)/);
-        if (linearMatch) return `linear:${linearMatch[1]}`;
-        const slackMatch = n.url.match(/archives\/([A-Z0-9]+)/);
-        if (slackMatch) return `slack:${slackMatch[1]}`;
+    // APPLY UPDATES to existing notifications (from the "updates" array)
+    let updated = 0;
+    for (const upd of updateItems) {
+      if (!upd.existing_id || !upd.changes) continue;
+      const existing = notifications.find(n => n.id === upd.existing_id);
+      if (!existing) {
+        logPoll(`  UPDATE: id=${upd.existing_id} not found — skipping`);
+        continue;
       }
-      // Extract IDs from titles
-      const ticketMatch = n.title.match(/([A-Z]+-\d+)/);
-      if (ticketMatch) return `${n.source}:${ticketMatch[1]}`;
-      const prTitleMatch = n.title.match(/PR\s*#?(\d+)/i);
-      if (prTitleMatch) return `github:pr:${prTitleMatch[1]}`;
-      // Fallback to source + normalized title
-      return `${n.source}:${n.title.toLowerCase().replace(/\s+/g, " ").trim()}`;
+      const changes = upd.changes;
+      // Don't downgrade priority when marking done — keep original priority for display
+      if (changes.priority && typeof changes.priority === "string") {
+        const newPri = normalizePriority(changes.priority);
+        const isDoneTransition = changes.stage === "done";
+        if (!isDoneTransition) existing.priority = newPri;
+      }
+      if (changes.stage && typeof changes.stage === "string") {
+        const currentOrder = STAGE_ORDER[existing.stage ?? "new"] ?? 0;
+        const newOrder = STAGE_ORDER[changes.stage] ?? 0;
+        // PROTECT user-initiated stages: triage can only move tasks FORWARD or to done
+        // Never regress a task that's already in-progress (preparing, start_work, hack, etc.)
+        if (newOrder >= currentOrder || changes.stage === "done") {
+          existing.stage = changes.stage;
+        } else {
+          logPoll(`  BLOCKED stage regression: "${existing.title}" ${existing.stage} → ${changes.stage} (order ${currentOrder} → ${newOrder})`);
+        }
+      }
+      if (changes.summary && typeof changes.summary === "string") existing.summary = changes.summary;
+      if (changes.action_needed && typeof changes.action_needed === "string") existing.actionNeeded = changes.action_needed;
+      if (changes.confidence && typeof changes.confidence === "number") existing.confidence = changes.confidence;
+      if (changes.task_type && typeof changes.task_type === "string") existing.taskType = changes.task_type as PollNotification["taskType"];
+      if (changes.url && typeof changes.url === "string") {
+        const sanitized = sanitizeUrl(changes.url);
+        if (sanitized) existing.url = sanitized;
+      }
+      if (Array.isArray(changes.links)) {
+        const newLinks = (changes.links as Array<{ type: string; label: string; url: string }>)
+          .filter(l => l.url && sanitizeUrl(l.url) !== undefined)
+          .map(l => ({ ...l, url: sanitizeUrl(l.url)! }));
+        if (newLinks.length > 0) existing.links = newLinks;
+      }
+      // Append timeline event if provided
+      if (upd.timeline_event && typeof upd.timeline_event === "string") {
+        if (!existing.timeline) existing.timeline = [];
+        // Avoid duplicate events
+        const lastEvent = existing.timeline[existing.timeline.length - 1];
+        if (!lastEvent || lastEvent.event !== upd.timeline_event) {
+          existing.timeline.push({ timestamp: new Date().toISOString(), event: upd.timeline_event });
+        }
+      }
+      existing.pollCycle = currentPollCycle; // Mark as modified this cycle
+      updated++;
+      logPoll(`  UPDATE: "${existing.title}" — ${JSON.stringify(changes)}${upd.timeline_event ? ` | timeline: ${upd.timeline_event}` : ""}`);
     }
+    if (updated > 0) {
+      logPoll(`Applied ${updated} updates to existing tasks`);
+    }
+
+    // Build a set of existing keys to deduplicate new items (using shared extractKey)
+    const existingKeys = new Set(notifications.map(n => extractKeyUtil({
+      source: n.source,
+      title: n.title,
+      url: n.url,
+      links: n.links,
+    })));
 
     let added = 0;
     // Add actionable items (skip if already exists)
     for (const item of items) {
-      const key = extractKey(item);
+      const key = extractKeyUtil(item);
       if (existingKeys.has(key)) continue;
       existingKeys.add(key);
-      if (item.confidence !== undefined && item.confidence < 5) continue;
+      if (item.confidence !== undefined && item.confidence < CONFIDENCE_THRESHOLD) continue;
+
+      // Check for multi-repo parent task with subtasks
+      if (item.parent_task && Array.isArray(item.subtasks) && item.subtasks.length > 0) {
+        const parentId = `poll-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        const subtaskIds: string[] = [];
+
+        // Create subtasks first
+        for (const sub of item.subtasks as Array<{ title: string; repo_hint?: string; summary?: string }>) {
+          const subId = `poll-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          subtaskIds.push(subId);
+          notifications.unshift({
+            id: subId,
+            source: item.source as PollNotification["source"],
+            priority: normalizePriority(item.priority),
+            status: "new",
+            title: sub.title,
+            summary: sub.summary ?? item.summary,
+            url: sanitizeUrl(item.url),
+            links: item.links?.filter(l => sanitizeUrl(l.url) !== undefined).map(l => ({ ...l, url: sanitizeUrl(l.url)! })),
+            taskType: item.task_type as PollNotification["taskType"],
+            author: item.author,
+            confidence: item.confidence,
+            actionNeeded: item.action_needed,
+            createdAt: new Date().toISOString(),
+            timeline: [{ timestamp: new Date().toISOString(), event: `Created as subtask of "${item.title}" (repo: ${sub.repo_hint ?? "unset"})` }],
+            pollCycle: currentPollCycle,
+            parentTaskId: parentId,
+            repoPath: undefined, // user confirms via StartWorkModal
+          });
+          added++;
+        }
+
+        // Create parent task
+        notifications.unshift({
+          id: parentId,
+          source: item.source as PollNotification["source"],
+          priority: normalizePriority(item.priority),
+          status: "new",
+          title: item.title,
+          summary: item.summary,
+          url: sanitizeUrl(item.url ?? item.links?.[0]?.url),
+          links: item.links?.filter(l => sanitizeUrl(l.url) !== undefined).map(l => ({ ...l, url: sanitizeUrl(l.url)! })),
+          taskType: item.task_type as PollNotification["taskType"],
+          author: item.author,
+          confidence: item.confidence,
+          actionNeeded: item.action_needed,
+          createdAt: new Date().toISOString(),
+          timeline: [{ timestamp: new Date().toISOString(), event: `Created from ${item.source} with ${subtaskIds.length} subtasks` }],
+          pollCycle: currentPollCycle,
+          subtaskIds,
+        });
+        added++;
+        logPoll(`  Created parent "${item.title}" with ${subtaskIds.length} subtasks`);
+        continue;
+      }
 
       notifications.unshift({
         id: `poll-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         source: item.source as PollNotification["source"],
-        priority: item.priority as PollNotification["priority"],
+        priority: normalizePriority(item.priority),
         status: "new",
         title: item.title,
         summary: item.summary,
-        url: item.url ?? item.links?.[0]?.url,
-        links: item.links,
+        url: sanitizeUrl(item.url ?? item.links?.[0]?.url),
+        links: item.links?.filter(l => sanitizeUrl(l.url) !== undefined).map(l => ({ ...l, url: sanitizeUrl(l.url)! })),
         taskType: item.task_type as PollNotification["taskType"],
         author: item.author,
         confidence: item.confidence,
         actionNeeded: item.action_needed,
         createdAt: new Date().toISOString(),
+        timeline: [{ timestamp: new Date().toISOString(), event: `Created from ${item.source}: ${item.action_needed ?? item.summary?.slice(0, 80) ?? item.title}` }],
+        pollCycle: currentPollCycle,
       });
       added++;
     }
 
-    // Add follow-up items with "follow_up" stage
+    // Add follow-up items — map to "response" type (follow_up is no longer a valid type/stage)
     for (const item of followItems) {
-      const key = extractKey(item);
+      const key = extractKeyUtil(item);
       if (existingKeys.has(key)) continue;
       existingKeys.add(key);
+
+      // Map follow_up task_type to response (follow_up was merged into response)
+      const taskType = (item.task_type === "follow_up" ? "response" : item.task_type) as PollNotification["taskType"];
 
       notifications.push({
         id: `poll-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         source: item.source as PollNotification["source"],
-        priority: item.priority as PollNotification["priority"],
+        priority: normalizePriority(item.priority),
         status: "new",
         title: item.title,
         summary: item.summary,
-        url: item.url ?? item.links?.[0]?.url,
-        links: item.links,
-        taskType: item.task_type as PollNotification["taskType"],
+        url: sanitizeUrl(item.url ?? item.links?.[0]?.url),
+        links: item.links?.filter(l => sanitizeUrl(l.url) !== undefined).map(l => ({ ...l, url: sanitizeUrl(l.url)! })),
+        taskType: taskType,
         author: item.author,
         confidence: item.confidence,
         actionNeeded: item.action_needed,
         createdAt: new Date().toISOString(),
-        stage: "follow_up",
+        stage: "new", // follow_up stage no longer exists — use "new" so it appears in inbox
+        timeline: [{ timestamp: new Date().toISOString(), event: `Created from ${item.source} (follow-up)` }],
+        pollCycle: currentPollCycle,
       });
       added++;
     }
@@ -699,7 +845,7 @@ Rules:
       notifications.push({
         id: `poll-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         source: (s.source ?? "unknown") as PollNotification["source"],
-        priority: "low" as PollNotification["priority"],
+        priority: "backlog" as PollNotification["priority"],
         status: "new",
         title,
         summary: s.reason ?? "",
@@ -712,11 +858,192 @@ Rules:
       added++;
     }
 
-    if (added > 0) {
-      logPoll(`Added ${added} new notifications (incl. skipped)`);
+    if (added > 0 || updated > 0) {
+      logPoll(`Added ${added} new, updated ${updated} existing`);
+      // Save immediately after adding/updating — don't wait for consolidation/projects
+      // This ensures notifications survive even if later steps fail or the app crashes
       saveCacheToFile();
-      broadcastNotifications();
     }
+
+    // CREATE/UPDATE PROJECTS from triage output
+    if (triageProjects.length > 0) {
+      for (const tp of triageProjects) {
+        // 1. Try exact match by source + sourceId
+        let proj = tp.source_id ? detectProjectFromSource(tp.source as "linear" | "slack" | "ai", tp.source_id) : null;
+        // 2. Try fuzzy name match (catches "Performance Agent" = "Performance Agent Launch" etc.)
+        if (!proj) proj = findProjectByName(tp.name);
+        // 3. Only create if truly new
+        if (!proj) {
+          proj = createProject(tp.name, tp.source as "linear" | "slack" | "ai", tp.source_id, tp.reason);
+          logPoll(`Created project: "${tp.name}" (${tp.source})${tp.reason ? ` — ${tp.reason}` : ""}`);
+        } else {
+          logPoll(`Matched existing project: "${proj.name}" for "${tp.name}"`);
+        }
+
+        // Link ALL notifications that match this project's related tickets or channels
+        const relatedTickets = new Set(tp.related_tickets ?? []);
+        const relatedChannels = new Set(tp.related_channels ?? []);
+        let linked = 0;
+
+        for (const n of notifications) {
+          if (n.projectId) continue; // already assigned
+          if (n.stage === "skipped") continue;
+
+          let matches = false;
+
+          // Match by related ticket IDs in title (e.g., "VEC-24" in "VEC-24: Add chat history")
+          for (const ticket of relatedTickets) {
+            if (n.title.includes(ticket)) { matches = true; break; }
+          }
+
+          // Match by related channel IDs in links
+          if (!matches && relatedChannels.size > 0 && n.links) {
+            for (const link of n.links) {
+              for (const ch of relatedChannels) {
+                if (link.url?.includes(ch)) { matches = true; break; }
+              }
+              if (matches) break;
+            }
+          }
+
+          // Match by project name in triage actionable items (for new items this cycle)
+          if (!matches) {
+            const newItem = [...items, ...followItems].find((it: { title?: string; project?: string }) =>
+              it.title === n.title && (it as { project?: string }).project === tp.name
+            );
+            if (newItem) matches = true;
+          }
+
+          // Match by title keyword overlap with project name
+          if (!matches) {
+            const projWords = tp.name.toLowerCase().split(/\s+/);
+            const titleLower = n.title.toLowerCase();
+            const matchCount = projWords.filter(w => w.length > 3 && titleLower.includes(w)).length;
+            if (matchCount >= 2) matches = true;
+          }
+
+          if (matches) {
+            addTaskToProject(proj.id, n.id);
+            n.projectId = proj.id;
+            linked++;
+          }
+        }
+        logPoll(`  Project "${tp.name}": linked ${linked} tasks (tickets: ${[...relatedTickets].join(",")}, channels: ${[...relatedChannels].join(",")})`);
+      }
+      logPoll(`Processed ${triageProjects.length} projects`);
+    }
+
+    // Also: auto-group existing ungrouped tasks by AI heuristic
+    // Tasks with no projectId that share a Linear ticket prefix get grouped
+    const ungrouped = notifications.filter(n => !n.projectId && n.stage !== "skipped" && n.stage !== "done");
+    const ticketGroups = new Map<string, string[]>();
+    for (const n of ungrouped) {
+      const ticketMatch = n.title.match(/^([A-Z]+-\d+)/);
+      if (ticketMatch) {
+        const ticket = ticketMatch[1];
+        if (!ticketGroups.has(ticket)) ticketGroups.set(ticket, []);
+        ticketGroups.get(ticket)!.push(n.id);
+      }
+    }
+    // If multiple tasks share a ticket prefix, group them
+    for (const [ticket, taskIds] of ticketGroups) {
+      if (taskIds.length >= 2) {
+        let proj = detectProjectFromSource("linear", ticket);
+        if (!proj) {
+          proj = createProject(ticket, "ai", undefined, `Auto-grouped ${taskIds.length} tasks sharing the ${ticket} ticket prefix`);
+          logPoll(`Auto-grouped ${taskIds.length} tasks under "${ticket}"`);
+        }
+        for (const taskId of taskIds) {
+          addTaskToProject(proj.id, taskId);
+          const n = notifications.find(nn => nn.id === taskId);
+          if (n) n.projectId = proj.id;
+        }
+      }
+    }
+
+    // Save projects after processing
+    if (triageProjects.length > 0 || ticketGroups.size > 0) {
+      saveProjects();
+    }
+
+    // POST-TRIAGE CONSOLIDATION: merge duplicate notifications that share the same key
+    // CRITICAL: Never remove a task that's in an active stage (user has started working on it)
+    const PROTECTED_STAGES = new Set(["start_work", "plan_review", "hack", "ship", "code_review", "pr_feedback", "preparing", "ready"]);
+    const keyToFirst = new Map<string, number>();
+    const toRemove = new Set<number>();
+    for (let i = 0; i < notifications.length; i++) {
+      const key = extractKeyUtil({
+        source: notifications[i].source,
+        title: notifications[i].title,
+        url: notifications[i].url,
+        links: notifications[i].links,
+      });
+      const firstIdx = keyToFirst.get(key);
+      if (firstIdx !== undefined) {
+        const first = notifications[firstIdx];
+        const dupe = notifications[i];
+        const firstProtected = PROTECTED_STAGES.has(first.stage ?? "new");
+        const dupeProtected = PROTECTED_STAGES.has(dupe.stage ?? "new");
+
+        // If EITHER task is in a protected stage, keep the protected one, remove the other
+        if (firstProtected && !dupeProtected) {
+          toRemove.add(i); // remove the new dupe, keep the protected first
+          logPoll(`  Consolidation: keeping protected "${first.title}" (${first.stage}), removing dupe`);
+          continue;
+        }
+        if (dupeProtected && !firstProtected) {
+          toRemove.add(firstIdx); // remove the old unprotected, keep the protected dupe
+          keyToFirst.set(key, i);
+          logPoll(`  Consolidation: keeping protected "${dupe.title}" (${dupe.stage}), removing old`);
+          continue;
+        }
+        if (firstProtected && dupeProtected) {
+          // Both protected — don't merge, keep both
+          logPoll(`  Consolidation: BOTH protected, keeping both: "${first.title}" (${first.stage}) + "${dupe.title}" (${dupe.stage})`);
+          continue;
+        }
+
+        // Neither protected — safe to merge (existing logic)
+        const firstStage = STAGE_ORDER[first.stage ?? "new"] ?? 1;
+        const dupeStage = STAGE_ORDER[dupe.stage ?? "new"] ?? 1;
+        const [keeper, removed] = dupeStage > firstStage ? [dupe, first] : [first, dupe];
+        if (!keeper.links) keeper.links = removed.links;
+        else if (removed.links) {
+          for (const l of removed.links) {
+            if (!keeper.links.some(k => k.url === l.url)) keeper.links.push(l);
+          }
+        }
+        if (!keeper.url && removed.url) keeper.url = removed.url;
+        if (!keeper.timeline) keeper.timeline = removed.timeline;
+        else if (removed.timeline) {
+          for (const t of removed.timeline) {
+            if (!keeper.timeline.some(k => k.event === t.event)) keeper.timeline.push(t);
+          }
+        }
+        if (!keeper.confidence && removed.confidence) keeper.confidence = removed.confidence;
+        if (!keeper.author && removed.author) keeper.author = removed.author;
+        if (dupeStage > firstStage) {
+          toRemove.add(firstIdx);
+          keyToFirst.set(key, i);
+        } else {
+          toRemove.add(i);
+        }
+      } else {
+        keyToFirst.set(key, i);
+      }
+    }
+    if (toRemove.size > 0) {
+      logPoll(`Consolidation: merged ${toRemove.size} duplicate notifications`);
+      // Remove duplicates in reverse order to preserve indices
+      const indices = [...toRemove].sort((a, b) => b - a);
+      for (const idx of indices) {
+        notifications.splice(idx, 1);
+      }
+    }
+
+    lastPollTimestamp = new Date().toISOString();
+    saveCacheToFile();
+    broadcastNotifications();
   } catch (err) {
     logPoll(`poll ERROR: ${String(err)}`);
   } finally {
@@ -730,7 +1057,7 @@ Rules:
     }
 
     // Restart the bridge to clear conversation context for next poll
-    restartBridge();
+    await restartBridge();
 
     // If a refresh was queued while we were polling, run again
     if (pendingRefresh) {
@@ -740,3 +1067,5 @@ Rules:
     }
   }
 }
+
+export function getLastPollTimestamp(): string | null { return lastPollTimestamp; }

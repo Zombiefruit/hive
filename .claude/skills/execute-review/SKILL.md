@@ -20,10 +20,10 @@ You are reviewing a pull request. The review plan and PR details are in `$ARGUME
    - Missing tests
    - Missing error handling
 5. **Write review**: Compose clear, actionable review comments
-6. **Present to Kieran**: Show the review summary and comments for approval BEFORE posting
+6. **Present to the user**: Show the review summary and comments for approval BEFORE posting
 
 ## Rules
-- NEVER post review comments without Kieran's explicit approval
+- NEVER post review comments without the user's explicit approval
 - Be constructive, not pedantic
 - Focus on things that matter, not nitpicks
 - If the PR looks good, say so

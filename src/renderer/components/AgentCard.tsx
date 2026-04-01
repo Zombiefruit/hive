@@ -39,7 +39,7 @@ export function AgentCard({ agent }: { agent: Agent }) {
         padding: 20,
         borderRadius: 8,
         border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
-        backgroundColor: "var(--mantine-color-dark-7)",
+        backgroundColor: "var(--mantine-color-default)",
         cursor: "pointer",
         transition: "border-color 0.15s ease, box-shadow 0.15s ease",
         height: "100%",
@@ -80,9 +80,14 @@ export function AgentCard({ agent }: { agent: Agent }) {
         </Group>
 
         {/* Task description */}
-        <Text size="sm" c="dimmed" lineClamp={2} style={{ lineHeight: 1.5 }}>
+        <Text size="sm" c="dimmed" lineClamp={1} style={{ lineHeight: 1.5 }}>
           {agent.task}
         </Text>
+        {agent.summary && (
+          <Text size="xs" c="dimmed" lineClamp={2} style={{ lineHeight: 1.4, fontSize: "0.7rem" }}>
+            {agent.summary}
+          </Text>
+        )}
 
         {/* Metadata row */}
         <Group gap="md">

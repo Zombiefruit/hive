@@ -1,0 +1,456 @@
+/**
+ * Skill Runner — spawns Claude Code processes to execute MC engineering skills.
+ *
+ * Unlike the MCP bridge (read-only, stateless), the skill runner:
+ * - Runs skills like /start-work, /hack, /ship, /code-review
+ * - Preserves sessions (no --no-session-persistence) for multi-turn work
+ * - Supports --resume to continue existing sessions
+ * - Sets CLAUDE_HIVE=1 so skills know they're running under orchestration
+ * - Streams PlanningEvents for real-time UI updates
+ */
+
+import { spawn, ChildProcess, execSync } from "node:child_process";
+import { getClaudeCodePath } from "./claude-path";
+import { trackProcess, untrackProcess } from "./process-monitor";
+import { type PlanningEvent } from "./mcp-bridge";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
+import { randomUUID } from "node:crypto";
+
+const LOG_PATH = path.join(
+  os.homedir(),
+  "Library",
+  "Application Support",
+  "claude-deck",
+  "skill-runner.log",
+);
+
+function log(msg: string): void {
+  try {
+    const dir = path.dirname(LOG_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.appendFileSync(LOG_PATH, `${new Date().toISOString()} ${msg}\n`);
+  } catch {}
+}
+
+// ── Types ──
+
+export interface SkillInvocation {
+  skill: string;
+  args: string;
+  repoPath: string;
+  sessionId: string | null;
+  notificationId: string;
+  timeoutMs?: number;
+}
+
+export interface SkillResult {
+  success: boolean;
+  sessionId: string | null;
+  events: PlanningEvent[];
+  resultText: string;
+  error: string | null;
+}
+
+// ── Pure helpers (easily testable) ──
+
+/**
+ * Build CLI args for Claude Code.
+ * Includes stream-json I/O, verbose, no-chrome.
+ * Adds --resume <sessionId> when continuing an existing session.
+ * Does NOT include --no-session-persistence — skills need persistent sessions.
+ */
+export function buildSkillArgs(sessionId: string | null): string[] {
+  const args = [
+    "--output-format",
+    "stream-json",
+    "--input-format",
+    "stream-json",
+    "--verbose",
+    "--no-chrome",
+    // Auto-approve all tools — skills run non-interactively under CLAUDE_HIVE
+    "--allowedTools",
+    "*",
+  ];
+
+  if (sessionId) {
+    args.push("--resume", sessionId);
+  }
+
+  return args;
+}
+
+/**
+ * Build environment variables for skill processes.
+ * Sets CLAUDE_HIVE=1 so skills know they're running under orchestration.
+ */
+export function buildSkillEnv(): Record<string, string> {
+  return {
+    ...(process.env as Record<string, string>),
+    CLAUDE_HIVE: "1",
+  };
+}
+
+/**
+ * Extract session_id from a Claude Code init message.
+ * Returns null if the message is not an init message or session_id is absent.
+ */
+export function extractSessionId(msg: Record<string, unknown>): string | null {
+  if (msg.type === "system" && msg.subtype === "init" && typeof msg.session_id === "string") {
+    return msg.session_id;
+  }
+  return null;
+}
+
+// ── Required skills check ──
+
+const REQUIRED_SKILLS = ["start-work", "hack", "ship", "code-review"];
+
+/**
+ * Check that required MC engineering skills are installed.
+ * Looks for ~/.claude/skills/{name}/SKILL.md for each required skill.
+ */
+export function checkRequiredSkills(): { installed: boolean; missing: string[] } {
+  const skillsDir = path.join(os.homedir(), ".claude", "skills");
+  const missing: string[] = [];
+
+  for (const skill of REQUIRED_SKILLS) {
+    const skillPath = path.join(skillsDir, skill, "SKILL.md");
+    if (!fs.existsSync(skillPath)) {
+      missing.push(skill);
+    }
+  }
+
+  return { installed: missing.length === 0, missing };
+}
+
+// ── Running process registry (for sending messages to running agents) ──
+
+const runningSkills = new Map<string, { proc: ChildProcess; sessionId: string | null }>();
+
+/**
+ * Send a follow-up message to a running skill process.
+ * Returns true if the message was sent, false if no process found.
+ */
+export function sendToSkill(notificationId: string, message: string): boolean {
+  const entry = runningSkills.get(notificationId);
+  if (!entry?.proc?.stdin?.writable) return false;
+
+  entry.proc.stdin.write(
+    JSON.stringify({
+      type: "user",
+      message: { role: "user", content: message },
+      parent_tool_use_id: null,
+      uuid: randomUUID(),
+      session_id: entry.sessionId ?? "",
+    }) + "\n",
+  );
+  log(`[skill] Sent message to ${notificationId}: ${message.slice(0, 100)}`);
+  return true;
+}
+
+/** Check if a skill process is currently running for a notification. */
+export function isSkillRunning(notificationId: string): boolean {
+  return runningSkills.has(notificationId);
+}
+
+// ── Worktree helpers ──
+
+/** Skills that modify code and should run in an isolated worktree. */
+const WORKTREE_SKILLS = new Set(["/hack", "/ship", "/code-review", "/handle-pr-feedback"]);
+
+/**
+ * Create a git worktree for a branch. Returns the worktree path.
+ * If the branch already has a worktree, returns its path.
+ */
+export function createWorktree(repoPath: string, branch: string): string {
+  const worktreeName = branch.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const worktreeBase = path.join(repoPath, "..", `.worktrees`);
+  const worktreePath = path.join(worktreeBase, worktreeName);
+
+  if (fs.existsSync(worktreePath)) {
+    log(`[worktree] Reusing existing: ${worktreePath}`);
+    return worktreePath;
+  }
+
+  try {
+    fs.mkdirSync(worktreeBase, { recursive: true });
+    execSync(`git worktree add "${worktreePath}" "${branch}"`, { cwd: repoPath, timeout: 30000 });
+    log(`[worktree] Created: ${worktreePath} (branch: ${branch})`);
+  } catch (err) {
+    // Branch might not exist yet — create from HEAD
+    try {
+      execSync(`git worktree add -b "${branch}" "${worktreePath}" HEAD`, { cwd: repoPath, timeout: 30000 });
+      log(`[worktree] Created with new branch: ${worktreePath}`);
+    } catch (err2) {
+      log(`[worktree] Failed: ${err2}`);
+      return repoPath; // Fallback to original repo
+    }
+  }
+  return worktreePath;
+}
+
+/** Remove a git worktree if it exists. */
+export function cleanupWorktree(repoPath: string, worktreePath: string): void {
+  if (worktreePath === repoPath) return; // Not a worktree
+  try {
+    execSync(`git worktree remove "${worktreePath}" --force`, { cwd: repoPath, timeout: 15000 });
+    log(`[worktree] Cleaned up: ${worktreePath}`);
+  } catch {
+    log(`[worktree] Cleanup failed (may already be removed): ${worktreePath}`);
+  }
+}
+
+// ── Main runner ──
+
+/**
+ * Spawn a Claude Code process to execute a skill.
+ *
+ * 1. Spawns claude with buildSkillArgs, cwd=invocation.repoPath, env=buildSkillEnv()
+ * 2. Tracks process via trackProcess
+ * 3. Sends skill command as user message via stdin
+ * 4. Parses stdout for init, assistant/text, assistant/tool_use, result messages
+ * 5. Handles premature results (< 200 chars without "---" markers)
+ * 6. On timeout: kills process, resolves with error
+ * 7. On exit: resolves with accumulated text
+ */
+export function runSkill(
+  invocation: SkillInvocation,
+  onEvent?: (event: PlanningEvent) => void,
+): Promise<SkillResult> {
+  const timeoutMs = invocation.timeoutMs ?? 300000;
+
+  return new Promise((resolve) => {
+    const claudePath = getClaudeCodePath();
+    const args = buildSkillArgs(invocation.sessionId);
+    const skillLabel = `${invocation.skill} ${invocation.args}`.trim();
+
+    // Create worktree for code-modifying skills
+    let effectiveCwd = invocation.repoPath;
+    const needsWorktree = WORKTREE_SKILLS.has(invocation.skill) && invocation.repoPath;
+    if (needsWorktree) {
+      // Derive branch from notification metadata or current branch
+      try {
+        const branch = execSync("git rev-parse --abbrev-ref HEAD", { cwd: invocation.repoPath, timeout: 5000 }).toString().trim();
+        if (branch && branch !== "HEAD" && branch !== "main" && branch !== "master") {
+          effectiveCwd = createWorktree(invocation.repoPath, branch);
+        }
+      } catch {
+        // Can't determine branch — run in repo directly
+      }
+    }
+
+    log(`[skill] Spawning: ${skillLabel} in ${effectiveCwd} (session=${invocation.sessionId ?? "new"})`);
+
+    let proc: ChildProcess;
+    try {
+      proc = spawn(claudePath, args, {
+        cwd: effectiveCwd,
+        env: buildSkillEnv(),
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      log(`[skill] Failed to spawn: ${errorMsg}`);
+      resolve({
+        success: false,
+        sessionId: null,
+        events: [{ type: "error", content: `Failed to spawn: ${errorMsg}`, timestamp: new Date().toISOString() }],
+        resultText: "",
+        error: errorMsg,
+      });
+      return;
+    }
+
+    let outputBuffer = "";
+    let resultText = "";
+    let assistantText = "";
+    let sessionId = invocation.sessionId;
+    let done = false;
+    let bytesReceived = 0;
+    let initialized = false;
+    const events: PlanningEvent[] = [];
+
+    const emit = (type: PlanningEvent["type"], content: string) => {
+      const event: PlanningEvent = { type, content, timestamp: new Date().toISOString() };
+      events.push(event);
+      onEvent?.(event);
+    };
+
+    if (proc.pid) trackProcess(proc.pid, "planning", skillLabel);
+    // Register so we can send follow-up messages
+    runningSkills.set(invocation.notificationId, { proc, sessionId: invocation.sessionId });
+
+    log(`[skill] Spawned PID ${proc.pid}`);
+    emit("status", `Spawned skill runner — loading tools...`);
+
+    // We send the skill command AFTER init (see init handler below)
+    const userMessage = `${invocation.skill} ${invocation.args}`.trim();
+    let messageSent = false;
+
+    const sendUserMessage = () => {
+      if (messageSent || !proc.stdin?.writable) return;
+      messageSent = true;
+      proc.stdin.write(
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: userMessage },
+          parent_tool_use_id: null,
+          uuid: randomUUID(),
+          session_id: sessionId ?? "",
+        }) + "\n",
+      );
+      log(`[skill] Sent command after init: ${userMessage}`);
+    };
+
+    // Periodic status updates during silent init
+    const startTs = Date.now();
+    const initTicker = setInterval(() => {
+      if (!initialized && !done) {
+        const elapsed = Math.round((Date.now() - startTs) / 1000);
+        emit("status", `Loading tools... (${elapsed}s)`);
+        // Safety: if init never comes after 30s, send anyway
+        if (elapsed >= 30 && !messageSent) {
+          log("[skill] Init timeout — sending message anyway");
+          sendUserMessage();
+        }
+      }
+    }, 10000);
+
+    // Timeout handler
+    const timeout = setTimeout(() => {
+      if (!done) {
+        done = true;
+        clearInterval(initTicker);
+        if (proc.pid) untrackProcess(proc.pid);
+        runningSkills.delete(invocation.notificationId);
+        log(`[skill] Timed out after ${Math.round(timeoutMs / 1000)}s (${bytesReceived} bytes received)`);
+        emit("error", `Timed out after ${Math.round(timeoutMs / 1000)}s`);
+        proc.kill();
+        resolve({
+          success: false,
+          sessionId,
+          events,
+          resultText: resultText || assistantText || "",
+          error: `Timed out after ${Math.round(timeoutMs / 1000)}s`,
+        });
+      }
+    }, timeoutMs);
+
+    // Process stdout
+    proc.stdout?.on("data", (chunk: Buffer) => {
+      bytesReceived += chunk.length;
+      outputBuffer += chunk.toString("utf-8");
+      const lines = outputBuffer.split("\n");
+      outputBuffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const msg = JSON.parse(line);
+
+          // System init — extract session ID, tool count
+          if (msg.type === "system" && msg.subtype === "init") {
+            initialized = true;
+            clearInterval(initTicker);
+            const extractedId = extractSessionId(msg);
+            if (extractedId) {
+              sessionId = extractedId;
+              // Update registry with real session ID
+              const entry = runningSkills.get(invocation.notificationId);
+              if (entry) entry.sessionId = extractedId;
+            }
+            const tools: string[] = msg.tools ?? [];
+            log(`[skill] Initialized: ${tools.length} tools, session=${sessionId}`);
+            emit("init", `Agent ready — ${tools.length} tools`);
+            // NOW send the skill command — agent is ready to receive
+            sendUserMessage();
+          }
+
+          // Assistant content — text and tool_use blocks
+          if (msg.type === "assistant" && Array.isArray(msg.message?.content)) {
+            for (const block of msg.message.content as Array<{
+              type: string;
+              name?: string;
+              text?: string;
+              input?: Record<string, unknown>;
+            }>) {
+              if (block.type === "tool_use" && block.name) {
+                const input = block.input ?? {};
+                let detail = block.name;
+                if (block.name.includes("Bash")) detail = `Bash: ${JSON.stringify(input).slice(0, 100)}`;
+                else if (block.name.includes("Edit")) detail = `Edit: ${JSON.stringify(input).slice(0, 100)}`;
+                else if (block.name.includes("Write")) detail = `Write: ${JSON.stringify(input).slice(0, 100)}`;
+                else if (block.name.includes("Read")) detail = `Read: ${JSON.stringify(input).slice(0, 100)}`;
+                emit("tool_use", detail);
+              }
+              if (block.type === "text" && block.text?.trim()) {
+                assistantText += (assistantText ? "\n" : "") + block.text;
+                emit("text", block.text.slice(0, 500));
+              }
+            }
+          }
+
+          // Result message
+          if (msg.type === "result" && !done) {
+            resultText = String(msg.result ?? "");
+            const finalText = resultText.trim() || assistantText.trim();
+
+            // Check for premature result — same logic as askMcpPlanningAgent.
+            // MCP agents do multi-turn tool calling and can emit empty/partial
+            // results before the actual work is done.
+            const hasPlanContent = finalText.includes("---") && finalText.length > 200;
+            if (!hasPlanContent && finalText.length < 200) {
+              log(`[skill] Ignoring premature result (${finalText.length} chars, no plan markers)`);
+              emit("status", `Agent still working... (${finalText.length} chars so far)`);
+              // Don't resolve — wait for process to continue or exit
+              return;
+            }
+
+            log(`[skill] Result: ${finalText.length} chars (result=${resultText.length}, assistant=${assistantText.length})`);
+            emit("result", `Skill complete (${finalText.length} chars)`);
+            done = true;
+            clearInterval(initTicker);
+            clearTimeout(timeout);
+            if (proc.pid) untrackProcess(proc.pid);
+            proc.kill();
+            resolve({
+              success: true,
+              sessionId,
+              events,
+              resultText: finalText,
+              error: null,
+            });
+          }
+        } catch {}
+      }
+    });
+
+    // Stderr — log but don't surface
+    proc.stderr?.on("data", (chunk: Buffer) => {
+      log(`[skill] STDERR: ${chunk.toString("utf-8").slice(0, 200)}`);
+    });
+
+    // Process exit
+    proc.on("exit", (code) => {
+      clearInterval(initTicker);
+      if (proc.pid) untrackProcess(proc.pid);
+      runningSkills.delete(invocation.notificationId);
+      if (!done) {
+        done = true;
+        clearTimeout(timeout);
+        const finalText = resultText.trim() || assistantText.trim();
+        log(`[skill] Exited code=${code}, bytes=${bytesReceived}, text=${finalText.length}`);
+        emit("error", `Agent exited (code ${code})`);
+        resolve({
+          success: !!finalText,
+          sessionId,
+          events,
+          resultText: finalText || "Process exited without result",
+          error: finalText ? null : `Process exited with code ${code}`,
+        });
+      }
+    });
+  });
+}

@@ -97,3 +97,10 @@ out/
 
 # demo from lovable
 demo/
+# Build artifacts
+dist/
+
+# Ephemeral working files
+.superpowers/
+.prompts/working/
+.work/

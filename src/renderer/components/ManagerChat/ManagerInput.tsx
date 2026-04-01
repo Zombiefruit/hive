@@ -61,15 +61,15 @@ export function ManagerInput({ onSend }: ManagerInputProps) {
               radius="sm"
               style={{
                 cursor: "pointer",
-                backgroundColor: "var(--mantine-color-dark-6)",
+                backgroundColor: "var(--mantine-color-default-hover)",
                 border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
               }}
               onClick={() => handleQuickAction(action.command)}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "var(--mantine-color-dark-5)";
+                e.currentTarget.style.backgroundColor = "var(--mantine-color-default-hover)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "var(--mantine-color-dark-6)";
+                e.currentTarget.style.backgroundColor = "var(--mantine-color-default-hover)";
               }}
             >
               <Text size="xs">{action.label}</Text>
@@ -105,7 +105,7 @@ export function ManagerInput({ onSend }: ManagerInputProps) {
             input: {
               fontSize: "0.8rem",
               fontFamily: "var(--mantine-font-family-monospace)",
-              backgroundColor: "var(--mantine-color-dark-6)",
+              backgroundColor: "var(--mantine-color-default-hover)",
               border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
             },
           }}

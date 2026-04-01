@@ -26,7 +26,7 @@ export function SkillsPanel() {
       style={{
         borderRadius: 8,
         border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
-        backgroundColor: "var(--mantine-color-dark-7)",
+        backgroundColor: "var(--mantine-color-default)",
         overflow: "hidden",
       }}
     >

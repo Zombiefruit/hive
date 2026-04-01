@@ -1,6 +1,7 @@
 import { addContextRef, addEvent } from "../db/database";
 import { broadcastStoreUpdate } from "../ipc/bridge";
 import type { ContextRefType } from "../../shared/types";
+import { buildSlackArchiveUrl } from "../../shared/task-utils";
 
 /**
  * MCP tool name patterns mapped to context ref types and extraction logic.
@@ -35,9 +36,7 @@ const MCP_PATTERNS: Array<{
       return {
         resourceId: threadTs ? `${channel}/${threadTs}` : channel,
         title: String(input.channel_name ?? input.channel ?? channel),
-        url: threadTs
-          ? `https://slack.com/archives/${channel}/p${threadTs.replace(".", "")}`
-          : `https://slack.com/archives/${channel}`,
+        url: buildSlackArchiveUrl(channel, threadTs),
       };
     },
   },

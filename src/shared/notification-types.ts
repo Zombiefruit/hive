@@ -1,4 +1,4 @@
-export type NotificationPriority = "actionable" | "fyi" | "noise";
+export type NotificationPriority = "critical" | "high" | "medium" | "low" | "backlog";
 export type NotificationSource = "slack" | "linear" | "github" | "notion" | "email";
 export type NotificationStatus = "new" | "in_progress" | "done" | "dismissed";
 

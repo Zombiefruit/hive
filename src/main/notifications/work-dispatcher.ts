@@ -8,11 +8,15 @@
  * - Composes the work agent prompt when approved
  */
 
-import { askBridge, isBridgeReady } from "../mcp-bridge";
+import { addDebugEntry, askEphemeralProcess, askMcpPlanningAgent, type PlanningEvent } from "../mcp-bridge";
+import { buildMcpPlanningPrompt, buildResponsePrompt, buildMeetingPrepPrompt } from "../../shared/planning-contract";
 import { spawn, ChildProcess, execFile } from "node:child_process";
 import { getClaudeCodePath } from "../claude-path";
+import { trackProcess, untrackProcess } from "../process-monitor";
 import { BrowserWindow } from "electron";
 import { registerAgent, recordAgentEvent, unregisterAgent } from "./agent-monitor";
+import { buildSlackArchiveUrl } from "../../shared/task-utils";
+import { hasConfig, getConfig } from "../config";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -77,6 +81,8 @@ export interface WorkPlan {
   estimatedModel: string;
   estimatedCost: string;
   conversationHistory: Array<{ role: "user" | "assistant"; content: string }>;
+  /** Raw context fetched by the planning agent — Slack messages, Linear details, etc. */
+  fetchedContext?: Array<{ type: string; content: string; timestamp: string }>;
 }
 
 // Persist plans so they survive page refreshes
@@ -132,153 +138,146 @@ export async function prepareWorkPlan(notification: {
 }): Promise<WorkPlan> {
   log(`prepareWorkPlan: ${notification.title}`);
 
-  if (!isBridgeReady()) {
-    return {
-      notificationId: notification.id,
-      title: notification.title,
-      context: notification.summary,
-      plan: "MCP Bridge not ready — try again in a few seconds.",
-      estimatedModel: "",
-      estimatedCost: "",
-      conversationHistory: [],
-    };
-  }
+  // ═══ SINGLE MCP AGENT — fetches context and produces plan ═══
+  // One agent with full MCP tool access. No intermediate steps.
+  // ~60s MCP init is expected — agent fetches Slack/Linear/Notion directly.
 
-  const taskType = notification.taskType ?? "implementation";
-  const linksText = notification.links?.map(l => `- [${l.type}] ${l.label}: ${l.url}`).join("\n") ?? "";
+  addDebugEntry("in", `📋 [PLANNING] Starting MCP planning agent: ${notification.title}`, "planning");
 
-  // Load the relevant skill prompt
-  let skillPrompt = "";
-  try {
-    const skillPath = path.join(process.cwd(), ".claude", "skills", `parse-${taskType}`, "SKILL.md");
-    if (fs.existsSync(skillPath)) {
-      const raw = fs.readFileSync(skillPath, "utf-8");
-      // Strip frontmatter
-      const bodyMatch = raw.match(/---[\s\S]*?---\s*([\s\S]*)/);
-      skillPrompt = bodyMatch ? bodyMatch[1].trim() : raw;
+  // Collect all events for context storage + broadcast to renderer + persist to disk
+  const collectedEvents: Array<{ type: string; content: string; timestamp: string }> = [];
+  const eventCachePath = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "planning-events-cache.json");
+
+  // Load any existing events for this notification (in case of resume)
+  const loadEventCache = (): Record<string, Array<{ type: string; content: string; timestamp: string }>> => {
+    try { return JSON.parse(fs.readFileSync(eventCachePath, "utf-8")); } catch { return {}; }
+  };
+  const saveEventCache = (cache: Record<string, unknown>) => {
+    try { fs.writeFileSync(eventCachePath, JSON.stringify(cache)); } catch {}
+  };
+
+  const broadcastEvent = (event: PlanningEvent) => {
+    const entry = { type: event.type, content: event.content, timestamp: event.timestamp };
+    collectedEvents.push(entry);
+    // Persist to disk immediately so events survive page navigation
+    const cache = loadEventCache();
+    if (!cache[notification.id]) cache[notification.id] = [];
+    cache[notification.id].push(entry);
+    // Keep only last 100 events per notification
+    if (cache[notification.id].length > 100) cache[notification.id] = cache[notification.id].slice(-100);
+    saveEventCache(cache);
+
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send("planning:event", { notificationId: notification.id, event });
+      }
     }
-  } catch {}
+  };
 
-  // Pre-fetch GitHub context (gh CLI) before sending to bridge
+  // Pre-fetch GitHub context via gh CLI (faster than MCP agent for GH)
   const ghContext = await fetchGitHubContext(notification.links);
 
-  // Build explicit MCP fetch instructions based on available links
-  const fetchSteps: string[] = [];
-  for (const link of (notification.links ?? [])) {
-    if (link.type === "linear" || link.url?.includes("linear.app")) {
-      const idMatch = link.url?.match(/([A-Z]+-\d+)/) ?? link.label.match(/([A-Z]+-\d+)/);
-      if (idMatch) fetchSteps.push(`Use mcp__claude_ai_Linear__get_issue to fetch full details for ${idMatch[1]}`);
-    }
-    if (link.type === "slack" || link.url?.includes("slack.com")) {
-      const chanMatch = link.url?.match(/archives\/([A-Z0-9]+)/);
-      if (chanMatch) fetchSteps.push(`Use mcp__claude_ai_Slack__slack_read_channel with channel_id "${chanMatch[1]}" limit 20 to get the conversation`);
-      const threadMatch = link.url?.match(/archives\/([A-Z0-9]+)\/p(\d+)/);
-      if (threadMatch) fetchSteps.push(`Use mcp__claude_ai_Slack__slack_read_thread with channel_id "${threadMatch[1]}" and thread_ts derived from "${threadMatch[2]}" to get the full thread`);
-    }
-    if (link.type === "notion" || link.url?.includes("notion.so")) {
-      fetchSteps.push(`Use mcp__claude_ai_Notion__notion-fetch to get the Notion page at ${link.url}`);
-    }
-  }
-
-  const fetchInstructions = fetchSteps.length > 0
-    ? `## MANDATORY: Fetch Context First\nYou MUST execute these MCP calls before creating a plan. Do NOT skip any.\n${fetchSteps.map((s, i) => `${i + 1}. ${s}`).join("\n")}\n`
-    : "";
-
-  // Different prompts for agent-actionable vs human-only tasks
-  const isHumanOnly = taskType === "meeting_prep" || taskType === "response" || taskType === "follow_up";
-
-  const fetchSection = `## STEP 1: FETCH ALL CONTEXT (do this FIRST)
-
-${fetchSteps.length > 0 ? fetchSteps.map((s, i) => `${i + 1}. ${s}`).join("\n") : "No specific links — use the summary below."}
-${notification.source === "linear" ? `\nAlso: Search Linear for related issues.` : ""}
-${notification.source === "slack" ? `\nAlso: Read the full Slack thread.` : ""}`;
-
-  const workItem = `## Work Item
-- **Type**: ${taskType}
-- **Title**: ${notification.title}
-- **Summary**: ${notification.summary}
-${notification.url ? `- **URL**: ${notification.url}` : ""}
-${linksText ? `\n**Links:**\n${linksText}` : ""}
-${ghContext ? `\n**GitHub:**\n${ghContext}` : ""}`;
-
-  // All prompts use a two-part format: TL;DR (always visible) + Details (expandable)
-  const formatInstruction = `
-## OUTPUT FORMAT — MANDATORY
-
-Structure your response in EXACTLY two sections separated by "---":
-
-**SECTION 1 (TL;DR)** — max 3-4 lines. The executive summary. What this is, what needs to happen, complexity.
-
----
-
-**SECTION 2 (Details)** — the full breakdown. This section will be collapsed by default.
-
-The "---" separator on its own line is REQUIRED. Everything above it is the summary. Everything below is details.`;
-
+  // Build task-type-specific prompt
+  const taskType = notification.taskType ?? "implementation";
   let prompt: string;
-
-  if (isHumanOnly && taskType === "meeting_prep") {
-    prompt = `You are briefing Kieran Williams for a meeting. Fetch all available context, then prepare a briefing.
-
-${fetchSection}
-
-${workItem}
-
-## STEP 2: MEETING BRIEFING
-${formatInstruction}
-
-**TL;DR section**: What the meeting is about, when, key attendees, 1-line prep note.
-**Details section**: Talking points, recent context from Slack/Linear, decisions expected, relevant threads.
-
-Do NOT ask questions.`;
-  } else if (isHumanOnly && taskType === "response") {
-    prompt = `You are helping Kieran Williams draft a response. Fetch all available context, then prepare a draft.
-
-${fetchSection}
-
-${workItem}
-
-## STEP 2: DRAFT RESPONSE
-${formatInstruction}
-
-**TL;DR section**: Who's asking, what they want, suggested 1-2 sentence reply.
-**Details section**: Full context, longer draft if needed, key points to address.
-
-Keep drafts in Kieran's voice (direct, technical). Do NOT ask questions.`;
+  if (taskType === "response") {
+    const cfg = hasConfig() ? getConfig() : null;
+    prompt = buildResponsePrompt({
+      title: notification.title,
+      summary: notification.summary,
+      url: notification.url,
+      links: notification.links,
+      userSlackId: cfg?.slackUserId,
+    });
+  } else if (taskType === "meeting_prep") {
+    prompt = buildMeetingPrepPrompt({
+      title: notification.title,
+      summary: notification.summary,
+      url: notification.url,
+      links: notification.links,
+    });
   } else {
-    prompt = `You are planning work for Kieran Williams, Senior Frontend Engineer at Monte Carlo Data (Vector team).
-
-${fetchSection}
-
-${workItem}
-
-## STEP 2: WORK PLAN
-${formatInstruction}
-
-**TL;DR section**: What needs to be done (1-2 sentences), estimated complexity (simple/moderate/complex), any blockers.
-**Details section**: Specific files/components, approach, risks, related tickets/PRs.
-
-Do NOT ask questions. Use what you can fetch via MCP tools.`;
+    prompt = buildMcpPlanningPrompt({
+      title: notification.title,
+      summary: notification.summary,
+      taskType,
+      url: notification.url,
+      links: notification.links,
+    });
   }
 
-  const response = await askBridge(prompt, 90000);
-  log(`Plan response: ${response.length} chars`);
+  // Append pre-fetched GitHub context if available
+  if (ghContext) {
+    prompt += `\n\n## Pre-fetched GitHub Context\n${ghContext}\n\n(This GitHub data was already fetched — do not re-fetch it.)`;
+  }
+
+  const startTime = Date.now();
+  let response = await askMcpPlanningAgent(prompt, 300000, broadcastEvent); // 5 min timeout
+  const elapsed = Math.round((Date.now() - startTime) / 1000);
+
+  // Auto-retry once on timeout
+  if (response.includes("timed out") || response.includes("not ready")) {
+    log(`Plan timed out after ${elapsed}s — retrying once`);
+    addDebugEntry("out", `⏱️ [PLANNING] Timed out after ${elapsed}s, retrying...`, "planning");
+    response = await askMcpPlanningAgent(prompt, 300000, broadcastEvent);
+  }
+
+  addDebugEntry("out", `📋 [PLANNING] Plan ready: ${response.length} chars (${elapsed}s)`, "planning");
+  log(`Plan ready — ${response.length} chars (${elapsed}s)`);
 
   const plan: WorkPlan = {
     notificationId: notification.id,
     title: notification.title,
-    context: response,
+    context: ghContext ? `GitHub context: ${ghContext.slice(0, 200)}` : "",
     plan: response,
-    estimatedModel: "", // Let the AI decide in its response
+    estimatedModel: "",
     estimatedCost: "",
     conversationHistory: [
-      { role: "user", content: `Prepare a plan for: ${notification.title}` },
+      { role: "user", content: `**${notification.title}**\n\n${notification.summary}${notification.url ? `\n\n[Source](${notification.url})` : ""}${notification.links?.length ? `\n\nLinks:\n${notification.links.map(l => `- ${l.label}: ${l.url}`).join("\n")}` : ""}` },
       { role: "assistant", content: response },
     ],
+    fetchedContext: collectedEvents.filter(e => e.type === "text" || e.type === "tool_use" || e.type === "init"),
   };
 
   plans.set(notification.id, plan);
   savePlans();
+
+  // Extract resource links from tool_use events and update notification links
+  const discoveredLinks: Array<{ type: string; label: string; url: string }> = [];
+  for (const evt of collectedEvents.filter(e => e.type === "tool_use")) {
+    const c = evt.content;
+    const slackChMatch = c.match(/channel_id["\s:]+([CDG][A-Z0-9]{8,})/i);
+    const slackTsMatch = c.match(/thread_ts["\s:]+(\d+\.\d+)/);
+    if (slackChMatch) {
+      const chId = slackChMatch[1];
+      // Resolve channel ID to human name from existing links
+      const knownLink = (notification.links ?? []).find(l => l.url?.includes(chId));
+      const chName = knownLink?.label || `#${chId}`;
+      if (slackTsMatch) {
+        discoveredLinks.push({ type: "slack_thread", label: `Thread in ${chName}`, url: buildSlackArchiveUrl(chId, slackTsMatch[1]) });
+      }
+      // Don't add bare channel links — they're noise and cause duplicates
+    }
+    const linearMatch = c.match(/get_issue.*?([A-Z]+-\d+)/i) || c.match(/issue["\s:]+([A-Z]+-\d+)/i);
+    if (linearMatch) {
+      discoveredLinks.push({ type: "linear", label: linearMatch[1], url: `https://linear.app/issue/${linearMatch[1]}` });
+    }
+  }
+  // Merge with existing links (dedup by URL)
+  if (discoveredLinks.length > 0) {
+    const existingUrls = new Set((notification.links ?? []).map(l => l.url));
+    const newLinks = discoveredLinks.filter(l => !existingUrls.has(l.url));
+    if (newLinks.length > 0) {
+      const mergedLinks = [...(notification.links ?? []), ...newLinks];
+      // Update notification via IPC-style direct import
+      try {
+        const { updateNotificationById } = await import("./poll-service");
+        updateNotificationById(notification.id, { links: mergedLinks });
+        log(`Added ${newLinks.length} discovered links to notification`);
+      } catch {}
+    }
+  }
+
   return plan;
 }
 
@@ -307,7 +306,8 @@ User's feedback: ${userFeedback}
 
 Please update your plan based on this feedback. Address the user's concerns and provide a revised plan.`;
 
-  const response = await askBridge(prompt, 90000);
+  // Ephemeral process — isolated from fetch bridge, full conversation in prompt
+  const response = await askEphemeralProcess(prompt, 180000);
 
   existing.plan = response;
   existing.context = response;
@@ -360,7 +360,8 @@ ${executeSkill ? `## Execution skill instructions:\n${executeSkill}\n` : ""}
 
 Write the prompt as if you're giving instructions to a skilled developer. Be thorough but clear.`;
 
-  const workPrompt = await askBridge(promptComposition, 60000);
+  // Ephemeral process — self-contained prompt, no bridge context needed
+  const workPrompt = await askEphemeralProcess(promptComposition, 120000);
   log(`Work prompt composed: ${workPrompt.length} chars`);
 
   // Spawn the work agent
@@ -379,6 +380,8 @@ Write the prompt as if you're giving instructions to a skilled developer. Be tho
     env: { ...process.env },
     stdio: ["pipe", "pipe", "pipe"],
   });
+
+  if (proc.pid) trackProcess(proc.pid, "work", plan.title.slice(0, 40));
 
   // Send the composed prompt
   const message = JSON.stringify({
@@ -421,6 +424,7 @@ Write the prompt as if you're giving instructions to a skilled developer. Be tho
   });
 
   proc.on("exit", (code) => {
+    if (proc.pid) untrackProcess(proc.pid);
     log(`Work agent ${agentId} exited: ${code}`);
     activeWorkAgents.delete(agentId);
     unregisterAgent(agentId);

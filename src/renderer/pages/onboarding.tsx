@@ -246,7 +246,7 @@ export function Onboarding() {
           borderBottom:
             "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
           backgroundColor:
-            "color-mix(in srgb, var(--mantine-color-dark-8) 80%, transparent)",
+            "color-mix(in srgb, var(--mantine-color-body) 80%, transparent)",
           backdropFilter: "blur(8px)",
           WebkitAppRegion: "drag",
           flexShrink: 0,
@@ -433,7 +433,7 @@ export function Onboarding() {
                             border: `2px solid ${
                               selected
                                 ? "var(--mantine-color-blue-5)"
-                                : "var(--mantine-color-dark-4)"
+                                : "var(--mantine-color-default-border)"
                             }`,
                             backgroundColor: selected
                               ? "var(--mantine-color-blue-5)"
@@ -610,7 +610,7 @@ export function Onboarding() {
                     padding: "12px 16px",
                     borderRadius: 8,
                     backgroundColor:
-                      "color-mix(in srgb, var(--mantine-color-dark-6) 60%, transparent)",
+                      "color-mix(in srgb, var(--mantine-color-default-hover) 60%, transparent)",
                     border:
                       "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
                   }}

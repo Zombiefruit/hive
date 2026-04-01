@@ -1,29 +1,15 @@
 ---
 name: fetch-gmail
-description: Fetch recent emails for Kieran Williams. Use when gathering email notifications.
-allowed-tools: mcp__claude_ai_Gmail__gmail_search_messages, mcp__claude_ai_Gmail__gmail_read_message, mcp__claude_ai_Gmail__gmail_list_labels, ToolSearch
+description: Instructions for fetching Gmail messages during the poll cycle.
 user-invocable: false
 ---
 
-# Fetch Gmail
+# Fetch Gmail Data
 
-Fetch recent emails for Kieran Williams from the specified timeframe.
+Use `mcp__claude_ai_Gmail__gmail_search_messages` with:
+- query: "is:unread newer_than:{{GMAIL_NEWER}}"
+- limit: {{GMAIL_LIMIT}}
 
-## What to fetch
+Return for each message: subject, sender, preview, date.
 
-1. **Unread emails**: Search for unread messages
-2. **Important emails**: Check messages marked important
-3. For each email, capture:
-   - Subject
-   - Sender (name and email)
-   - Preview/snippet
-   - When received
-   - Labels (inbox, important, etc.)
-
-## Skip
-- Automated notifications (GitHub, Linear, Slack email notifications)
-- Marketing/promotional emails
-- Calendar invitations (those are in Google Calendar)
-
-## Output
-Return a structured text report with all findings.
+Skip bot notifications: GitHub, Linear, Slack, Datadog, PagerDuty, CI/CD alerts.
