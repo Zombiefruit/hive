@@ -17,13 +17,6 @@ const config: ForgeConfig = {
       name: "@electron-forge/maker-zip",
       platforms: ["darwin"],
     },
-    {
-      name: "@electron-forge/maker-dmg",
-      config: {
-        name: "Claude Deck",
-        format: "ULFO",
-      },
-    },
   ],
   plugins: [
     new VitePlugin({
