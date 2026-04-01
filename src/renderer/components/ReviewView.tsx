@@ -109,7 +109,7 @@ export function ReviewView({ review, onFixSelected, onPostToPR }: ReviewViewProp
               {finding.suggestion && (
                 <div style={{
                   padding: "6px 10px", borderRadius: 4, marginTop: 4,
-                  backgroundColor: "var(--mantine-color-dark-6)",
+                  backgroundColor: "var(--mantine-color-default-hover)",
                   borderLeft: `3px solid ${config.color}`,
                   fontSize: "0.7rem",
                 }}>
@@ -130,7 +130,7 @@ export function ReviewView({ review, onFixSelected, onPostToPR }: ReviewViewProp
               onClick={() => onFixSelected(Array.from(selectedIds))}
               style={{
                 padding: "8px 16px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 600,
-                backgroundColor: selectedIds.size > 0 ? "var(--mantine-color-blue-6)" : "var(--mantine-color-dark-5)",
+                backgroundColor: selectedIds.size > 0 ? "var(--mantine-color-blue-6)" : "var(--mantine-color-default-hover)",
                 color: "white", display: "flex", alignItems: "center", gap: 6,
                 opacity: selectedIds.size > 0 ? 1 : 0.5,
               }}

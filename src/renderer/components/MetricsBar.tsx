@@ -30,7 +30,7 @@ export function MetricsBar() {
             padding: "12px 16px",
             borderRadius: 8,
             border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
-            backgroundColor: "var(--mantine-color-dark-7)",
+            backgroundColor: "var(--mantine-color-default)",
           }}
         >
           <item.icon size={16} color={item.color} stroke={1.5} />

@@ -45,7 +45,7 @@ export function AppHeader({ rightContent }: AppHeaderProps) {
         paddingLeft: 90,
         gap: 12,
         borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-        backgroundColor: "color-mix(in srgb, var(--mantine-color-dark-8) 80%, transparent)",
+        backgroundColor: "color-mix(in srgb, var(--mantine-color-body) 80%, transparent)",
         backdropFilter: "blur(8px)",
         WebkitAppRegion: "drag",
         flexShrink: 0,
@@ -68,7 +68,7 @@ export function AppHeader({ rightContent }: AppHeaderProps) {
                 borderRadius: 6,
                 fontSize: "0.8rem",
                 fontWeight: 500,
-                backgroundColor: isActive ? "var(--mantine-color-dark-6)" : "transparent",
+                backgroundColor: isActive ? "var(--mantine-color-default-hover)" : "transparent",
                 color: isActive ? "var(--mantine-color-text)" : "var(--mantine-color-dimmed)",
               }}
             >

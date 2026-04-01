@@ -64,7 +64,7 @@ function RecentHistory() {
                 padding: "10px 14px",
                 borderRadius: 8,
                 border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-                backgroundColor: "var(--mantine-color-dark-7)",
+                backgroundColor: "var(--mantine-color-default)",
                 opacity: 0.7,
               }}
             >
@@ -191,7 +191,7 @@ export function Dashboard() {
                   textAlign: "center",
                   borderRadius: 8,
                   border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
-                  backgroundColor: "var(--mantine-color-dark-7)",
+                  backgroundColor: "var(--mantine-color-default)",
                 }}
               >
                 <ThemeIcon variant="light" color="gray" size="xl" radius="xl" mx="auto" mb="sm">
@@ -220,7 +220,7 @@ export function Dashboard() {
               style={{
                 borderRadius: 8,
                 border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
-                backgroundColor: "var(--mantine-color-dark-7)",
+                backgroundColor: "var(--mantine-color-default)",
                 overflow: "hidden",
               }}
             >
@@ -255,7 +255,7 @@ export function Dashboard() {
               style={{
                 borderRadius: 8,
                 border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
-                backgroundColor: "var(--mantine-color-dark-7)",
+                backgroundColor: "var(--mantine-color-default)",
                 overflow: "hidden",
               }}
             >

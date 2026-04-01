@@ -420,7 +420,7 @@ export function Settings() {
                     padding: "8px 12px",
                     borderRadius: 8,
                     border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 50%, transparent)",
-                    backgroundColor: "color-mix(in srgb, var(--mantine-color-dark-7) 50%, transparent)",
+                    backgroundColor: "color-mix(in srgb, var(--mantine-color-default) 50%, transparent)",
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -481,8 +481,8 @@ export function Settings() {
                   style={{ flex: 1 }}
                   allowDeselect={false}
                   styles={{
-                    input: { backgroundColor: "var(--mantine-color-dark-6)" },
-                    dropdown: { backgroundColor: "var(--mantine-color-dark-6)" },
+                    input: { backgroundColor: "var(--mantine-color-default-hover)" },
+                    dropdown: { backgroundColor: "var(--mantine-color-default-hover)" },
                   }}
                 />
                 <TextInput
@@ -536,7 +536,7 @@ export function Settings() {
                     padding: "8px 12px",
                     borderRadius: 8,
                     border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 50%, transparent)",
-                    backgroundColor: "color-mix(in srgb, var(--mantine-color-dark-7) 50%, transparent)",
+                    backgroundColor: "color-mix(in srgb, var(--mantine-color-default) 50%, transparent)",
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -718,7 +718,7 @@ export function Settings() {
                     <Text size="sm" fw={500} c="yellow.4">MC Engineering Skills Missing</Text>
                     <Text size="xs" c="dimmed" mt={4}>
                       Required skills not found: <strong>{skillStatus.missing.join(", ")}</strong>.
-                      Run <code style={{ backgroundColor: "var(--mantine-color-dark-5)", padding: "1px 4px", borderRadius: 3 }}>configure-claude</code> to install them.
+                      Run <code style={{ backgroundColor: "var(--mantine-color-default-hover)", padding: "1px 4px", borderRadius: 3 }}>configure-claude</code> to install them.
                     </Text>
                   </div>
                 )}
@@ -791,7 +791,7 @@ export function Settings() {
 
             <Stack gap={6}>
               {(repoMappings ?? []).map((m, i) => (
-                <Group key={i} gap={8} style={{ padding: "6px 10px", borderRadius: 6, backgroundColor: "var(--mantine-color-dark-7)" }}>
+                <Group key={i} gap={8} style={{ padding: "6px 10px", borderRadius: 6, backgroundColor: "var(--mantine-color-default)" }}>
                   <Badge size="xs" variant="light" color="teal">{m.pattern}</Badge>
                   <Text size="xs" style={{ fontFamily: "var(--mantine-font-family-monospace)", fontSize: "0.7rem", flex: 1 }}>{m.repoPath}</Text>
                   <ActionIcon size="sm" variant="subtle" color="red" aria-label="Remove repo mapping" onClick={() => setRepoMappings(prev => (prev ?? []).filter((_, j) => j !== i))}>
@@ -875,7 +875,7 @@ export function Settings() {
           bottom: 0,
           padding: "12px 24px",
           borderTop: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-          backgroundColor: "color-mix(in srgb, var(--mantine-color-dark-8) 90%, transparent)",
+          backgroundColor: "color-mix(in srgb, var(--mantine-color-body) 90%, transparent)",
           backdropFilter: "blur(8px)",
           display: "flex",
           alignItems: "center",

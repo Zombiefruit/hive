@@ -72,7 +72,7 @@ export function History() {
                   padding: "12px 16px",
                   borderRadius: 8,
                   border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
-                  backgroundColor: "var(--mantine-color-dark-7)",
+                  backgroundColor: "var(--mantine-color-default)",
                   transition: "border-color 0.1s ease",
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--mantine-color-default-border)"; }}

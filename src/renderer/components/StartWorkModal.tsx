@@ -77,10 +77,10 @@ export function StartWorkModal({
       centered
       overlayProps={{ backgroundOpacity: 0.4, blur: 4 }}
       styles={{
-        content: { backgroundColor: "var(--mantine-color-dark-7)" },
+        content: { backgroundColor: "var(--mantine-color-default)" },
         header: {
-          backgroundColor: "var(--mantine-color-dark-7)",
-          borderBottom: "1px solid var(--mantine-color-dark-5)",
+          backgroundColor: "var(--mantine-color-default)",
+          borderBottom: "1px solid var(--mantine-color-default-hover)",
         },
       }}
     >
@@ -115,8 +115,8 @@ export function StartWorkModal({
           searchable
           required
           styles={{
-            input: { backgroundColor: "var(--mantine-color-dark-6)" },
-            dropdown: { backgroundColor: "var(--mantine-color-dark-6)" },
+            input: { backgroundColor: "var(--mantine-color-default-hover)" },
+            dropdown: { backgroundColor: "var(--mantine-color-default-hover)" },
           }}
         />
 
@@ -128,7 +128,7 @@ export function StartWorkModal({
           placeholder="kwilliams/vec-24-description"
           styles={{
             input: {
-              backgroundColor: "var(--mantine-color-dark-6)",
+              backgroundColor: "var(--mantine-color-default-hover)",
               fontFamily: "var(--mantine-font-family-monospace)",
               fontSize: "0.85rem",
             },

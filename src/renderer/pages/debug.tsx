@@ -92,7 +92,7 @@ export function Debug() {
           paddingLeft: 80,
           gap: 12,
           borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-          backgroundColor: "color-mix(in srgb, var(--mantine-color-dark-8) 80%, transparent)",
+          backgroundColor: "color-mix(in srgb, var(--mantine-color-body) 80%, transparent)",
           backdropFilter: "blur(8px)",
           WebkitAppRegion: "drag",
         }}
@@ -189,7 +189,7 @@ export function Debug() {
                 style={{
                   padding: "8px 12px",
                   borderRadius: 6,
-                  backgroundColor: entry.direction === "in" ? "color-mix(in srgb, var(--mantine-color-blue-5) 10%, transparent)" : "var(--mantine-color-dark-7)",
+                  backgroundColor: entry.direction === "in" ? "color-mix(in srgb, var(--mantine-color-blue-5) 10%, transparent)" : "var(--mantine-color-default)",
                   border: `1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)`,
                 }}
               >

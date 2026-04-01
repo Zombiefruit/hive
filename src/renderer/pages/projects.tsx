@@ -118,7 +118,7 @@ export default function ProjectsPage() {
             borderRadius: 4,
             fontSize: "0.65rem",
             fontWeight: 500,
-            backgroundColor: "var(--mantine-color-dark-6)",
+            backgroundColor: "var(--mantine-color-default-hover)",
             color: "var(--mantine-color-dimmed)",
             display: "flex",
             alignItems: "center",
@@ -199,7 +199,7 @@ export default function ProjectsPage() {
           <div style={{
             padding: "14px 16px", borderRadius: 8, marginBottom: 20,
             border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-            backgroundColor: "var(--mantine-color-dark-8)",
+            backgroundColor: "var(--mantine-color-body)",
           }}>
             <Text size="sm" fw={600} mb={10}>Context</Text>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -210,7 +210,7 @@ export default function ProjectsPage() {
                   style={{
                     display: "flex", alignItems: "center", gap: 6,
                     padding: "4px 10px", borderRadius: 6,
-                    backgroundColor: "var(--mantine-color-dark-6)",
+                    backgroundColor: "var(--mantine-color-default-hover)",
                     color: "var(--mantine-color-blue-4)", fontSize: "0.75rem",
                   }}
                 >
@@ -226,7 +226,7 @@ export default function ProjectsPage() {
                   style={{
                     display: "flex", alignItems: "center", gap: 6,
                     padding: "4px 10px", borderRadius: 6,
-                    backgroundColor: "var(--mantine-color-dark-6)",
+                    backgroundColor: "var(--mantine-color-default-hover)",
                     color: "var(--mantine-color-blue-4)", fontSize: "0.75rem",
                   }}
                 >
@@ -242,7 +242,7 @@ export default function ProjectsPage() {
                   style={{
                     display: "flex", alignItems: "center", gap: 6,
                     padding: "4px 10px", borderRadius: 6,
-                    backgroundColor: "var(--mantine-color-dark-6)",
+                    backgroundColor: "var(--mantine-color-default-hover)",
                     color: "var(--mantine-color-blue-4)", fontSize: "0.75rem",
                   }}
                 >
@@ -258,7 +258,7 @@ export default function ProjectsPage() {
                   style={{
                     display: "flex", alignItems: "center", gap: 6,
                     padding: "4px 10px", borderRadius: 6,
-                    backgroundColor: "var(--mantine-color-dark-6)",
+                    backgroundColor: "var(--mantine-color-default-hover)",
                     color: "var(--mantine-color-blue-4)", fontSize: "0.75rem",
                   }}
                 >
@@ -298,7 +298,7 @@ export default function ProjectsPage() {
                           style={{
                             padding: "10px 14px", borderRadius: 6,
                             border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-                            backgroundColor: "var(--mantine-color-dark-7)",
+                            backgroundColor: "var(--mantine-color-default)",
                             display: "flex", alignItems: "center", justifyContent: "space-between",
                             transition: "background-color 0.15s",
                           }}
@@ -394,7 +394,7 @@ export default function ProjectsPage() {
                     style={{
                       padding: "14px 16px", borderRadius: 8,
                       border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-                      backgroundColor: "var(--mantine-color-dark-7)",
+                      backgroundColor: "var(--mantine-color-default)",
                       display: "flex", alignItems: "center", justifyContent: "space-between",
                       transition: "background-color 0.15s",
                     }}

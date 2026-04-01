@@ -322,7 +322,7 @@ export function AgentDetail() {
             p="xs"
             style={{
               borderBottom: "1px solid var(--mantine-color-default-border)",
-              backgroundColor: "var(--mantine-color-dark-7)",
+              backgroundColor: "var(--mantine-color-default)",
             }}
           >
             <IconExternalLink size={14} color="var(--mantine-color-dimmed)" />

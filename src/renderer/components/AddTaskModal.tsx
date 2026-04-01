@@ -76,10 +76,10 @@ export function AddTaskModal({ opened, onClose }: AddTaskModalProps) {
       centered
       overlayProps={{ backgroundOpacity: 0.4, blur: 4 }}
       styles={{
-        content: { backgroundColor: "var(--mantine-color-dark-7)" },
+        content: { backgroundColor: "var(--mantine-color-default)" },
         header: {
-          backgroundColor: "var(--mantine-color-dark-7)",
-          borderBottom: "1px solid var(--mantine-color-dark-5)",
+          backgroundColor: "var(--mantine-color-default)",
+          borderBottom: "1px solid var(--mantine-color-default-hover)",
         },
       }}
     >
@@ -92,7 +92,7 @@ export function AddTaskModal({ opened, onClose }: AddTaskModalProps) {
           onChange={(e) => setTitle(e.currentTarget.value)}
           autoFocus
           styles={{
-            input: { backgroundColor: "var(--mantine-color-dark-6)" },
+            input: { backgroundColor: "var(--mantine-color-default-hover)" },
           }}
         />
 
@@ -105,7 +105,7 @@ export function AddTaskModal({ opened, onClose }: AddTaskModalProps) {
           maxRows={6}
           autosize
           styles={{
-            input: { backgroundColor: "var(--mantine-color-dark-6)" },
+            input: { backgroundColor: "var(--mantine-color-default-hover)" },
           }}
         />
 
@@ -117,8 +117,8 @@ export function AddTaskModal({ opened, onClose }: AddTaskModalProps) {
             onChange={(val) => val && setTaskType(val)}
             allowDeselect={false}
             styles={{
-              input: { backgroundColor: "var(--mantine-color-dark-6)" },
-              dropdown: { backgroundColor: "var(--mantine-color-dark-6)" },
+              input: { backgroundColor: "var(--mantine-color-default-hover)" },
+              dropdown: { backgroundColor: "var(--mantine-color-default-hover)" },
             }}
           />
 
@@ -129,8 +129,8 @@ export function AddTaskModal({ opened, onClose }: AddTaskModalProps) {
             onChange={(val) => val && setPriority(val)}
             allowDeselect={false}
             styles={{
-              input: { backgroundColor: "var(--mantine-color-dark-6)" },
-              dropdown: { backgroundColor: "var(--mantine-color-dark-6)" },
+              input: { backgroundColor: "var(--mantine-color-default-hover)" },
+              dropdown: { backgroundColor: "var(--mantine-color-default-hover)" },
             }}
           />
         </Group>
@@ -144,7 +144,7 @@ export function AddTaskModal({ opened, onClose }: AddTaskModalProps) {
           step={5}
           w={200}
           styles={{
-            input: { backgroundColor: "var(--mantine-color-dark-6)" },
+            input: { backgroundColor: "var(--mantine-color-default-hover)" },
           }}
         />
 

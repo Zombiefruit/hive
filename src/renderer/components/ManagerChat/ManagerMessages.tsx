@@ -25,7 +25,7 @@ function ToolCallBlock({ call }: { call: { name: string; input: Record<string, u
       p="xs"
       radius="sm"
       style={{
-        backgroundColor: "var(--mantine-color-dark-7)",
+        backgroundColor: "var(--mantine-color-default)",
         borderLeft: "3px solid var(--mantine-color-blue-5)",
       }}
     >
@@ -53,7 +53,7 @@ function MessageBubble({ message }: { message: ManagerMessage }) {
         style={{
           backgroundColor: isUser
             ? "var(--mantine-color-blue-light)"
-            : "var(--mantine-color-dark-7)",
+            : "var(--mantine-color-default)",
           alignSelf: isUser ? "flex-end" : "flex-start",
           maxWidth: "90%",
         }}
@@ -122,7 +122,7 @@ export function ManagerMessages({ onSuggestedPrompt }: ManagerMessagesProps) {
             p="sm"
             radius="sm"
             style={{
-              backgroundColor: "var(--mantine-color-dark-7)",
+              backgroundColor: "var(--mantine-color-default)",
               alignSelf: "flex-start",
               maxWidth: "90%",
             }}

@@ -81,7 +81,7 @@ export function ConversationSidebar() {
                     borderRadius: 6,
                     backgroundColor:
                       conv.id === activeId
-                        ? "var(--mantine-color-dark-5)"
+                        ? "var(--mantine-color-default-hover)"
                         : "transparent",
                   }}
                 >

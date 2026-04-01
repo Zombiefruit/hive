@@ -47,6 +47,11 @@ user-invocable: false
    - **investigation**: Research or analysis task before building
    - DO NOT default everything to implementation. Unanswered messages = response.
 
+9. **DUAL-ACTION ITEMS**: When a message BOTH requires a reply AND requests implementation work (e.g., manager asks "can you add tracking?" — needs a reply AND a code change), create TWO separate items:
+   - One `response` item: "Reply to [person] about [topic]"
+   - One `implementation` item: "[Ticket]: [description of work]"
+   This is common when a manager assigns work via Slack. The reply is urgent (acknowledge), the implementation is the actual work. Don't merge them into one item.
+
 ## Dedup with Existing Tasks
 
 When existing tasks are provided:

@@ -26,7 +26,7 @@ export function ChatBubble({ role, content }: ChatBubbleProps) {
       marginBottom: 8,
       backgroundColor: isUser
         ? "color-mix(in srgb, var(--mantine-color-blue-5) 15%, transparent)"
-        : "var(--mantine-color-dark-7)",
+        : "var(--mantine-color-default)",
       border: question
         ? "1px solid color-mix(in srgb, var(--mantine-color-yellow-5) 40%, transparent)"
         : isUser ? "none" : "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",

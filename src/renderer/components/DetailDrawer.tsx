@@ -305,7 +305,7 @@ export function DetailDrawer({
                   style={{
                     display: "flex", alignItems: "center", gap: 4,
                     padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem",
-                    backgroundColor: "var(--mantine-color-dark-6)",
+                    backgroundColor: "var(--mantine-color-default-hover)",
                     color: "var(--mantine-color-blue-4)",
                   }}
                 >
@@ -320,7 +320,7 @@ export function DetailDrawer({
                 style={{
                   display: "flex", alignItems: "center", gap: 4,
                   padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem",
-                  backgroundColor: "var(--mantine-color-dark-6)",
+                  backgroundColor: "var(--mantine-color-default-hover)",
                   color: "var(--mantine-color-blue-4)",
                 }}
               >

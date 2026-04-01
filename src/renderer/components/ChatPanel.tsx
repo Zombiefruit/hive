@@ -41,7 +41,7 @@ function ToolGroupMessage({ message }: { message: Message }) {
           borderRadius: 6,
           fontSize: "0.75rem",
           color: "var(--mantine-color-dimmed)",
-          backgroundColor: "var(--mantine-color-dark-6)",
+          backgroundColor: "var(--mantine-color-default-hover)",
           border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
         }}
       >
@@ -109,7 +109,7 @@ function ChatMessage({ message }: { message: Message }) {
     ? "color-mix(in srgb, var(--mantine-color-violet-5) 15%, transparent)"
     : isUser
       ? "color-mix(in srgb, var(--mantine-color-blue-5) 15%, transparent)"
-      : "var(--mantine-color-dark-6)";
+      : "var(--mantine-color-default-hover)";
 
   return (
     <Paper

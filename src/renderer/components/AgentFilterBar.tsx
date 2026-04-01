@@ -35,7 +35,7 @@ export function AgentFilterBar({ activeFilters, onToggle, totalCount }: AgentFil
               border: isActive
                 ? "1px solid var(--mantine-color-default-border)"
                 : "1px solid transparent",
-              backgroundColor: isActive ? "var(--mantine-color-dark-6)" : "transparent",
+              backgroundColor: isActive ? "var(--mantine-color-default-hover)" : "transparent",
               color: isActive ? "var(--mantine-color-text)" : "var(--mantine-color-dimmed)",
               cursor: "pointer",
               transition: "all 0.15s ease",

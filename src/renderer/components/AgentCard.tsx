@@ -39,7 +39,7 @@ export function AgentCard({ agent }: { agent: Agent }) {
         padding: 20,
         borderRadius: 8,
         border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
-        backgroundColor: "var(--mantine-color-dark-7)",
+        backgroundColor: "var(--mantine-color-default)",
         cursor: "pointer",
         transition: "border-color 0.15s ease, box-shadow 0.15s ease",
         height: "100%",

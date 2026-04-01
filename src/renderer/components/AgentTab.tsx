@@ -128,7 +128,7 @@ export function AgentTab({
             return (
               <div key={i} style={{
                 padding: "10px 14px", borderRadius: 8, marginBottom: 8,
-                backgroundColor: "var(--mantine-color-dark-7)",
+                backgroundColor: "var(--mantine-color-default)",
                 border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
               }}>
                 <Markdown content={tldr} />
@@ -149,7 +149,7 @@ export function AgentTab({
           return (
             <div key={i} style={{
               padding: "10px 14px", borderRadius: 8, marginBottom: 8,
-              backgroundColor: "var(--mantine-color-dark-7)",
+              backgroundColor: "var(--mantine-color-default)",
               border: isQuestion(content)
                 ? "1px solid color-mix(in srgb, var(--mantine-color-yellow-5) 40%, transparent)"
                 : "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
@@ -233,7 +233,7 @@ export function AgentTab({
             disabled={inputDisabled || loading}
             style={{
               flex: 1, padding: "8px 12px", borderRadius: 6, fontSize: "0.8rem",
-              backgroundColor: "var(--mantine-color-dark-6)",
+              backgroundColor: "var(--mantine-color-default-hover)",
               border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
               color: "var(--mantine-color-text)", outline: "none",
               fontFamily: "inherit",
@@ -246,7 +246,7 @@ export function AgentTab({
             aria-label="Send message"
             style={{
               padding: "8px", borderRadius: 6,
-              backgroundColor: feedback.trim() && !inputDisabled ? "var(--mantine-color-blue-5)" : "var(--mantine-color-dark-5)",
+              backgroundColor: feedback.trim() && !inputDisabled ? "var(--mantine-color-blue-5)" : "var(--mantine-color-default-hover)",
               color: feedback.trim() && !inputDisabled ? "white" : "var(--mantine-color-dimmed)",
             }}
           >

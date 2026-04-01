@@ -1,0 +1,150 @@
+<h2>Detail View by Task Type</h2>
+<p class="subtitle">Each task type gets a different detail pane. Click the one you want to explore first.</p>
+
+<div class="options">
+  <div class="option" data-choice="implementation" onclick="toggleSelect(this)">
+    <div class="letter">1</div>
+    <div class="content">
+      <h3>Implementation / Investigation</h3>
+      <p>The full MC skills workflow: start_work → plan_review → hack → ship → code_review</p>
+      <div style="margin-top: 8px;">
+        <div class="mockup" style="margin: 0;">
+          <div class="mockup-header">Stage: start_work (Planning)</div>
+          <div class="mockup-body" style="font-size: 12px; padding: 12px;">
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+              <span style="background: #7c3aed; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">VEC-24</span>
+              <span style="background: #eab308; color: black; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Medium scope</span>
+            </div>
+            <div style="font-family: monospace; font-size: 11px; color: #94a3b8; margin-bottom: 8px;">kwilliams/vec-24-chat-rendering</div>
+            <div style="background: #1e293b; border-radius: 4px; padding: 8px; margin-bottom: 8px;">
+              <div style="font-size: 11px; color: #64748b; margin-bottom: 4px;">Progress: 1/3 tasks</div>
+              <div style="height: 4px; background: #334155; border-radius: 2px;"><div style="height: 100%; width: 33%; background: #3b82f6; border-radius: 2px;"></div></div>
+            </div>
+            <div style="border: 1px solid #334155; border-radius: 4px; padding: 8px; margin-bottom: 6px;">
+              <div style="font-weight: 600; font-size: 12px;">Phase 1: Add conversation history</div>
+              <div style="font-size: 11px; color: #22c55e;">✓ feat: add conversation history store</div>
+              <div style="font-size: 11px; color: #94a3b8;">○ feat: persist history to localStorage</div>
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+              <div style="background: #22c55e; color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;">▶ Start Hack</div>
+              <div style="border: 1px solid #475569; padding: 6px 12px; border-radius: 6px; font-size: 12px;">Review Plan</div>
+            </div>
+            <div style="font-size: 10px; color: #64748b; margin-top: 8px;">This will run <b>/hack</b> in monolith-django — implements the plan phases, runs tests, commits per task. No PRs created yet.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="response" onclick="toggleSelect(this)">
+    <div class="letter">2</div>
+    <div class="content">
+      <h3>Response</h3>
+      <p>Context summary → suggested replies → custom compose → send via Slack</p>
+      <div style="margin-top: 8px;">
+        <div class="mockup" style="margin: 0;">
+          <div class="mockup-header">Stage: ready</div>
+          <div class="mockup-body" style="font-size: 12px; padding: 12px;">
+            <div style="font-weight: 600; margin-bottom: 4px;">Respond to Yael: make agent chat pretty</div>
+            <div style="font-size: 11px; color: #64748b; margin-bottom: 8px;">Context from Slack DM + Linear VEC-24</div>
+            <div style="background: #1e293b; border-radius: 4px; padding: 8px; margin-bottom: 8px; font-size: 11px;">
+              <div style="color: #f59e0b; font-weight: 600; margin-bottom: 4px;">Key points to address:</div>
+              <div>• Yael wants chat text presentation polished</div>
+              <div>• Links to product-releases post for reference</div>
+              <div>• Ties into VEC-24 scope</div>
+            </div>
+            <div style="font-size: 11px; color: #64748b; margin-bottom: 4px;">Suggested replies:</div>
+            <div style="border: 1px solid #3b82f6; border-radius: 4px; padding: 8px; margin-bottom: 4px; font-size: 11px; cursor: pointer;">
+              "On it! Already working on VEC-24 which covers this. History + tests done locally, porting the UI now."
+            </div>
+            <div style="border: 1px solid #475569; border-radius: 4px; padding: 8px; margin-bottom: 8px; font-size: 11px; cursor: pointer;">
+              "Good timing — this is my top priority. Should have something to show by EOD."
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+              <div style="background: #3b82f6; color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;">Send via Slack</div>
+              <div style="border: 1px solid #475569; padding: 6px 12px; border-radius: 6px; font-size: 12px;">Edit reply...</div>
+            </div>
+            <div style="font-size: 10px; color: #64748b; margin-top: 8px;">Posts a message to the Slack thread via MCP. You can edit before sending.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="meeting_prep" onclick="toggleSelect(this)">
+    <div class="letter">3</div>
+    <div class="content">
+      <h3>Meeting Prep</h3>
+      <p>Talking points + attendee context + relevant docs + notes area</p>
+      <div style="margin-top: 8px;">
+        <div class="mockup" style="margin: 0;">
+          <div class="mockup-header">Stage: ready</div>
+          <div class="mockup-body" style="font-size: 12px; padding: 12px;">
+            <div style="font-weight: 600; margin-bottom: 4px;">Sync with Yael — Thu 2:00 PM IST</div>
+            <div style="font-size: 11px; color: #64748b; margin-bottom: 8px;">Attendees: Yael Chemla (manager), Kieran Williams</div>
+            <div style="font-size: 11px; color: #f59e0b; font-weight: 600; margin-bottom: 4px;">Talking Points</div>
+            <div style="background: #1e293b; border-radius: 4px; padding: 8px; margin-bottom: 6px; font-size: 11px;">
+              <div>1. VEC-24 progress — history + tests done, UI porting in progress</div>
+              <div style="color: #64748b; font-size: 10px; margin-left: 12px;">↳ From: VEC-24 Linear ticket + Yael DM</div>
+            </div>
+            <div style="background: #1e293b; border-radius: 4px; padding: 8px; margin-bottom: 6px; font-size: 11px;">
+              <div>2. Mor's perf agent feedback — 3 interested accounts (Yelp, Toast, checkout.com)</div>
+              <div style="color: #64748b; font-size: 10px; margin-left: 12px;">↳ From: #team-vector thread</div>
+            </div>
+            <div style="background: #1e293b; border-radius: 4px; padding: 8px; margin-bottom: 8px; font-size: 11px;">
+              <div>3. Fig Intelligence UI (VEC-10) — in progress per Linear</div>
+              <div style="color: #64748b; font-size: 10px; margin-left: 12px;">↳ From: VEC-10 status change</div>
+            </div>
+            <div style="font-size: 11px; color: #64748b; margin-bottom: 4px;">Related docs:</div>
+            <div style="font-size: 11px; color: #3b82f6; cursor: pointer;">📋 VEC-24 → | 📋 VEC-10 → | 💬 Yael DM → | 💬 #team-vector →</div>
+            <div style="margin-top: 8px;">
+              <div style="background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 8px; font-size: 11px; color: #64748b; min-height: 40px;">Meeting notes... (type here during the meeting)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="review" onclick="toggleSelect(this)">
+    <div class="letter">4</div>
+    <div class="content">
+      <h3>Review (PR)</h3>
+      <p>PR context → /code-review findings → fix/approve actions</p>
+      <div style="margin-top: 8px;">
+        <div class="mockup" style="margin: 0;">
+          <div class="mockup-header">Stage: code_review</div>
+          <div class="mockup-body" style="font-size: 12px; padding: 12px;">
+            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+              <span style="background: #22c55e; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">PR #42</span>
+              <span style="font-size: 11px; color: #94a3b8;">monolith-django</span>
+            </div>
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+              <span style="background: #ef4444; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px;">1 Blocker</span>
+              <span style="background: #f97316; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px;">2 Issues</span>
+              <span style="background: #6b7280; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px;">1 Nit</span>
+            </div>
+            <div style="border-left: 3px solid #ef4444; padding: 6px 8px; background: rgba(239,68,68,0.05); border-radius: 0 4px 4px 0; margin-bottom: 4px; font-size: 11px;">
+              <div><b>F1 BLOCKER</b> — src/api/auth.ts:45</div>
+              <div style="color: #94a3b8;">SQL injection in query parameter</div>
+            </div>
+            <div style="border-left: 3px solid #f97316; padding: 6px 8px; background: rgba(249,115,22,0.05); border-radius: 0 4px 4px 0; margin-bottom: 8px; font-size: 11px;">
+              <div><b>F2 ISSUE</b> — src/utils/parse.ts:12</div>
+              <div style="color: #94a3b8;">Off-by-one in pagination</div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <div style="background: #3b82f6; color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;">Fix Selected (3)</div>
+              <div style="border: 1px solid #475569; padding: 6px 12px; border-radius: 6px; font-size: 12px;">Post to PR</div>
+            </div>
+            <div style="font-size: 10px; color: #64748b; margin-top: 8px;">Fix Selected runs <b>/handle-pr-feedback</b> — applies fixes for checked findings, runs tests, commits. You review before push.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 20px; padding: 16px; background: rgba(59,130,246,0.08); border-radius: 8px; border-left: 3px solid #3b82f6;">
+  <h3 style="margin-top: 0;">Key principle: every action button explains what it does</h3>
+  <p style="font-size: 13px; margin: 0;">Each CTA has a small gray description underneath: what skill runs, in which repo, what it will and won't do. No more "Approve plan & start agent" — instead "Start Hack" with "This will run /hack in monolith-django — implements plan phases, runs tests, commits per task. No PRs created yet."</p>
+</div>

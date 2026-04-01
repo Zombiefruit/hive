@@ -20,14 +20,14 @@ const MARKDOWN_STYLES = `
   margin-bottom: 0;
 }
 .md-content code {
-  background: var(--mantine-color-dark-5);
+  background: var(--mantine-color-default-hover);
   padding: 2px 5px;
   border-radius: 3px;
   font-size: 0.8em;
   font-family: var(--mantine-font-family-monospace);
 }
 .md-content pre {
-  background: var(--mantine-color-dark-5);
+  background: var(--mantine-color-default-hover);
   padding: 10px 12px;
   border-radius: 6px;
   overflow-x: auto;
@@ -73,12 +73,12 @@ const MARKDOWN_STYLES = `
   width: 100%;
 }
 .md-content th, .md-content td {
-  border: 1px solid var(--mantine-color-dark-4);
+  border: 1px solid var(--mantine-color-default-border);
   padding: 4px 8px;
   text-align: left;
 }
 .md-content th {
-  background: var(--mantine-color-dark-5);
+  background: var(--mantine-color-default-hover);
   font-weight: 600;
 }
 .md-content strong {
@@ -86,7 +86,7 @@ const MARKDOWN_STYLES = `
 }
 .md-content hr {
   border: none;
-  border-top: 1px solid var(--mantine-color-dark-4);
+  border-top: 1px solid var(--mantine-color-default-border);
   margin: 12px 0;
 }
 `;

@@ -402,7 +402,7 @@ export function Notifications() {
               onChange={(e) => setLookbackHours(Number(e.target.value))}
               style={{
                 padding: "2px 6px", borderRadius: 4, fontSize: "0.65rem",
-                backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-dimmed)",
+                backgroundColor: "var(--mantine-color-default-hover)", color: "var(--mantine-color-dimmed)",
                 border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
                 outline: "none", cursor: "pointer",
               }}
@@ -416,7 +416,7 @@ export function Notifications() {
             </select>
             <UnstyledButton
               onClick={() => { setFetching(true); setPollProgress(null); window.deck.refreshNotifications?.(lookbackHours); }}
-              style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-dimmed)" }}
+              style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, backgroundColor: "var(--mantine-color-default-hover)", color: "var(--mantine-color-dimmed)" }}
             >
               Refresh
             </UnstyledButton>
@@ -535,7 +535,7 @@ export function Notifications() {
                                   n.id === selectedId ? "var(--mantine-color-blue-5)"
                                   : "color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)"
                                 }`,
-                                backgroundColor: (n.stage === "done" || n.stage === "backlog") ? "var(--mantine-color-dark-8)" : "var(--mantine-color-dark-7)",
+                                backgroundColor: (n.stage === "done" || n.stage === "backlog") ? "var(--mantine-color-body)" : "var(--mantine-color-default)",
                                 opacity: isDragging ? 0.4 : (n.stage === "done" || n.stage === "backlog") ? 0.5 : 1,
                                 transition: "opacity 0.15s ease, background-color 0.15s ease",
                               }}
@@ -701,7 +701,7 @@ export function Notifications() {
                               style={{
                                 padding: "10px 12px", borderRadius: 6, cursor: "grab", userSelect: "none",
                                 border: `1px solid ${n.id === selectedId ? "var(--mantine-color-blue-5)" : "color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)"}`,
-                                backgroundColor: (n.stage === "done" || n.stage === "backlog") ? "var(--mantine-color-dark-8)" : "var(--mantine-color-dark-7)",
+                                backgroundColor: (n.stage === "done" || n.stage === "backlog") ? "var(--mantine-color-body)" : "var(--mantine-color-default)",
                                 opacity: draggingId === n.id ? 0.4 : (n.stage === "done" || n.stage === "backlog") ? 0.5 : 1,
                               }}
                             >
@@ -805,7 +805,7 @@ export function Notifications() {
                           style={{
                             padding: "6px 10px", borderRadius: 6, cursor: "grab",
                             border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
-                            backgroundColor: "var(--mantine-color-dark-8)",
+                            backgroundColor: "var(--mantine-color-body)",
                             opacity: 0.6, maxWidth: 250,
                           }}
                         >
@@ -859,7 +859,7 @@ export function Notifications() {
       {showDebug && (
         <div style={{
           position: "fixed", top: 42, right: 0, bottom: 0, width: 400,
-          backgroundColor: "var(--mantine-color-dark-9)",
+          backgroundColor: "var(--mantine-color-body)",
           borderLeft: "1px solid var(--mantine-color-default-border)",
           zIndex: 50, display: "flex", flexDirection: "column",
           fontSize: "0.7rem", fontFamily: "var(--mantine-font-family-monospace)",
@@ -883,7 +883,7 @@ export function Notifications() {
                   padding: "4px 8px", marginBottom: 4, borderRadius: 4,
                   backgroundColor: entry.direction === "in"
                     ? "color-mix(in srgb, var(--mantine-color-blue-5) 10%, transparent)"
-                    : "var(--mantine-color-dark-7)",
+                    : "var(--mantine-color-default)",
                   borderLeft: `2px solid ${entry.direction === "in" ? "var(--mantine-color-blue-5)" : "var(--mantine-color-green-5)"}`,
                 }}>
                   <Group gap={4} mb={2}>

@@ -94,7 +94,7 @@ export function ContextPicker({ onSelect, onClose }: ContextPickerProps) {
       <div onClick={e => e.stopPropagation()} style={{
         width: 520, maxHeight: "70vh", display: "flex", flexDirection: "column",
         borderRadius: 12, overflow: "hidden",
-        backgroundColor: "var(--mantine-color-dark-7)",
+        backgroundColor: "var(--mantine-color-default)",
         border: "1px solid var(--mantine-color-default-border)",
         boxShadow: "0 16px 48px rgba(0,0,0,0.4)",
       }}>
@@ -112,7 +112,7 @@ export function ContextPicker({ onSelect, onClose }: ContextPickerProps) {
                 style={{
                   padding: "4px 12px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 500,
                   display: "flex", alignItems: "center", gap: 6,
-                  backgroundColor: activeTab === c.key ? "var(--mantine-color-dark-5)" : "transparent",
+                  backgroundColor: activeTab === c.key ? "var(--mantine-color-default-hover)" : "transparent",
                   color: activeTab === c.key ? "var(--mantine-color-text)" : "var(--mantine-color-dimmed)",
                 }}
               >
@@ -125,7 +125,7 @@ export function ContextPicker({ onSelect, onClose }: ContextPickerProps) {
 
         {/* Search input */}
         <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--mantine-color-default-border)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 6, backgroundColor: "var(--mantine-color-dark-6)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 6, backgroundColor: "var(--mantine-color-default-hover)" }}>
             <IconSearch size={14} color="var(--mantine-color-dimmed)" />
             <input
               type="text"
@@ -159,7 +159,7 @@ export function ContextPicker({ onSelect, onClose }: ContextPickerProps) {
                 style={{
                   display: "flex", alignItems: "center", gap: 10,
                   padding: "8px 10px", borderRadius: 6,
-                  backgroundColor: selected.has(r.id) ? `color-mix(in srgb, ${connector.color} 15%, transparent)` : "var(--mantine-color-dark-6)",
+                  backgroundColor: selected.has(r.id) ? `color-mix(in srgb, ${connector.color} 15%, transparent)` : "var(--mantine-color-default-hover)",
                   border: `1px solid ${selected.has(r.id) ? connector.color : "transparent"}`,
                 }}
               >

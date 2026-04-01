@@ -95,7 +95,7 @@ export function PlanView({ plan, onStartHack, onReviewPlan }: PlanViewProps) {
                 marginTop: 6,
                 padding: "8px 12px",
                 borderRadius: 6,
-                backgroundColor: "var(--mantine-color-dark-7)",
+                backgroundColor: "var(--mantine-color-default)",
                 fontSize: "0.7rem",
               }}
             >

@@ -387,7 +387,7 @@ export function Schedule() {
                 onClick={() => setFocusMode(f => !f)}
                 style={{
                   padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500,
-                  backgroundColor: focusMode ? "var(--mantine-color-blue-9)" : "var(--mantine-color-dark-6)",
+                  backgroundColor: focusMode ? "var(--mantine-color-blue-9)" : "var(--mantine-color-default-hover)",
                   color: focusMode ? "var(--mantine-color-blue-4)" : "var(--mantine-color-dimmed)",
                   display: "flex", alignItems: "center", gap: 4,
                   transition: "background-color 0.15s ease, color 0.15s ease",
@@ -398,7 +398,7 @@ export function Schedule() {
               </UnstyledButton>
             </Tooltip>
             <UnstyledButton onClick={() => generateSchedule(true)} disabled={generating}
-              style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-dimmed)", display: "flex", alignItems: "center", gap: 4 }}>
+              style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, backgroundColor: "var(--mantine-color-default-hover)", color: "var(--mantine-color-dimmed)", display: "flex", alignItems: "center", gap: 4 }}>
               {generating ? <Loader size={10} /> : <IconRefresh size={12} />}
               {generating ? "Generating..." : "Regenerate"}
             </UnstyledButton>
@@ -590,8 +590,8 @@ export function Schedule() {
                   justifyContent: cardHeight <= 50 ? "center" : "flex-start",
                   zIndex: isDragOver ? 15 : 1,
                   background: isDone
-                    ? "color-mix(in srgb, var(--mantine-color-dark-6) 50%, transparent)"
-                    : `linear-gradient(135deg, ${bgTint}, var(--mantine-color-dark-7))`,
+                    ? "color-mix(in srgb, var(--mantine-color-default-hover) 50%, transparent)"
+                    : `linear-gradient(135deg, ${bgTint}, var(--mantine-color-default))`,
                   border: isDragOver
                     ? "1px solid var(--mantine-color-blue-5)"
                     : `1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)`,
@@ -719,7 +719,7 @@ export function Schedule() {
                         style={{
                           padding: "6px 8px",
                           borderRadius: 4,
-                          backgroundColor: "color-mix(in srgb, var(--mantine-color-dark-6) 50%, transparent)",
+                          backgroundColor: "color-mix(in srgb, var(--mantine-color-default-hover) 50%, transparent)",
                           display: "block",
                         }}
                       >
@@ -761,8 +761,8 @@ export function Schedule() {
             <div onClick={() => setSelectedId(null)} style={{ position: "fixed", inset: 0, top: 42, zIndex: 99, backgroundColor: "rgba(0,0,0,0.2)" }} />
             <div style={{
               position: "fixed", top: 42, right: 0, bottom: 0, width: 380, zIndex: 100,
-              backgroundColor: "var(--mantine-color-dark-7)",
-              borderLeft: "1px solid var(--mantine-color-dark-5)",
+              backgroundColor: "var(--mantine-color-default)",
+              borderLeft: "1px solid var(--mantine-color-default-hover)",
               overflowY: "auto", padding: 20,
             }}>
               <Group justify="space-between" mb={12}>
@@ -796,7 +796,7 @@ export function Schedule() {
                     {item.url && (
                       <UnstyledButton
                         onClick={() => window.deck?.openExternal?.(item.url!)}
-                        style={{ padding: "6px 8px", borderRadius: 4, backgroundColor: "color-mix(in srgb, var(--mantine-color-dark-6) 50%, transparent)" }}
+                        style={{ padding: "6px 8px", borderRadius: 4, backgroundColor: "color-mix(in srgb, var(--mantine-color-default-hover) 50%, transparent)" }}
                       >
                         <Text size="xs" c="blue.4" lineClamp={1}>{item.url}</Text>
                       </UnstyledButton>
@@ -805,7 +805,7 @@ export function Schedule() {
                       <UnstyledButton
                         key={i}
                         onClick={() => window.deck?.openExternal?.(link.url)}
-                        style={{ padding: "6px 8px", borderRadius: 4, backgroundColor: "color-mix(in srgb, var(--mantine-color-dark-6) 50%, transparent)" }}
+                        style={{ padding: "6px 8px", borderRadius: 4, backgroundColor: "color-mix(in srgb, var(--mantine-color-default-hover) 50%, transparent)" }}
                       >
                         <Group gap={6}>
                           <Badge size="xs" variant="light" color="gray">{link.type}</Badge>
@@ -823,7 +823,7 @@ export function Schedule() {
               <Group gap={8} mt={16}>
                 <UnstyledButton
                   onClick={() => { markDone(item.id); setSelectedId(null); }}
-                  style={{ padding: "6px 12px", borderRadius: 6, fontSize: "0.7rem", fontWeight: 600, backgroundColor: "var(--mantine-color-dark-6)", color: "var(--mantine-color-green-5)" }}
+                  style={{ padding: "6px 12px", borderRadius: 6, fontSize: "0.7rem", fontWeight: 600, backgroundColor: "var(--mantine-color-default-hover)", color: "var(--mantine-color-green-5)" }}
                 >
                   Mark done
                 </UnstyledButton>

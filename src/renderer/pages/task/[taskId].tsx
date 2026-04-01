@@ -55,7 +55,7 @@ export function TaskDetail() {
       <div style={{
         padding: "8px 24px", paddingLeft: 80,
         borderBottom: "1px solid var(--mantine-color-default-border)",
-        backgroundColor: "color-mix(in srgb, var(--mantine-color-dark-8) 80%, transparent)",
+        backgroundColor: "color-mix(in srgb, var(--mantine-color-body) 80%, transparent)",
         backdropFilter: "blur(8px)",
         WebkitAppRegion: "drag",
         flexShrink: 0,
@@ -124,7 +124,7 @@ export function TaskDetail() {
             {textEvents.map((event, i) => (
               <div key={i} style={{
                 padding: "12px 16px", borderRadius: 8,
-                backgroundColor: "var(--mantine-color-dark-7)",
+                backgroundColor: "var(--mantine-color-default)",
                 border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
               }}>
                 <Markdown content={event.content} />
