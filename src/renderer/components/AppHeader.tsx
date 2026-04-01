@@ -1,6 +1,7 @@
 import { Group, Text, UnstyledButton, useMantineColorScheme } from "@mantine/core";
 import { IconSettings, IconSun, IconMoon, IconDeviceDesktop } from "@tabler/icons-react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
 
 const TABS = [
   { path: "/", label: "Agents" },
@@ -32,9 +33,21 @@ function ThemeToggle() {
   );
 }
 
+function useIsFullscreen(): boolean {
+  const [fs, setFs] = useState(false);
+  useEffect(() => {
+    const check = () => setFs(!!document.fullscreenElement || (window.innerHeight === screen.height));
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return fs;
+}
+
 export function AppHeader({ rightContent }: AppHeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const isFullscreen = useIsFullscreen();
 
   return (
     <div
@@ -42,7 +55,8 @@ export function AppHeader({ rightContent }: AppHeaderProps) {
         display: "flex",
         alignItems: "center",
         padding: "8px 24px",
-        paddingLeft: 90,
+        paddingLeft: isFullscreen ? 24 : 90,
+        transition: "padding-left 0.2s ease",
         gap: 12,
         borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
         backgroundColor: "color-mix(in srgb, var(--mantine-color-body) 80%, transparent)",

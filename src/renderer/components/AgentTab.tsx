@@ -85,7 +85,13 @@ export function AgentTab({
   // Parse actions from last assistant message
   const lastAssistant = [...conversation].reverse().find(m => m.role === "assistant");
   const rawActions = lastAssistant ? parseActions(lastAssistant.content) : [];
-  const actions = deriveActions(rawActions, stage);
+  // If no structured actions but assistant says "no action needed", synthesize a no_action + dismiss
+  const noActionText = lastAssistant && rawActions.length === 0 &&
+    /no action needed|already responded|already replied/i.test(lastAssistant.content);
+  const effectiveActions = noActionText
+    ? [{ type: "no_action" as const, label: "No action needed" }]
+    : rawActions;
+  const actions = deriveActions(effectiveActions, stage);
 
   const hasConversation = conversation.length > 0;
   const inputDisabled = !skillRunning && !hasConversation;
