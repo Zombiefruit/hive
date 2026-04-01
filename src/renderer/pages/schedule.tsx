@@ -154,8 +154,7 @@ export function Schedule() {
     // Scroll so current time is roughly centered
     const now = new Date();
     const nowMins = now.getHours() * 60 + now.getMinutes();
-    const startMins = timeToMinutes(workingHours.start);
-    const offsetPx = ((nowMins - startMins) / 60) * HOUR_HEIGHT;
+    const offsetPx = (nowMins / 60) * HOUR_HEIGHT;
     const container = scrollContainerRef.current;
     if (container) {
       const centerOffset = Math.max(0, offsetPx - container.clientHeight / 2);
@@ -548,10 +547,10 @@ export function Schedule() {
             }
 
             return layout.map(({ item, col, totalCols }) => {
-            const itemStart = timeToMinutes(item.startTime) - dayStartMinutes;
+            const itemStartMinutes = timeToMinutes(item.startTime) - startHour * 60;
             const baseHeight = (item.estimatedMinutes / 60) * HOUR_HEIGHT;
             const cardHeight = Math.max(baseHeight - 2, MIN_CARD_HEIGHT);
-            const topOffset = (itemStart / 60) * HOUR_HEIGHT;
+            const topOffset = (itemStartMinutes / 60) * HOUR_HEIGHT;
             const color = priorityColors[item.priority] ?? "#3b82f6";
             const bgTint = priorityBgTints[item.priority] ?? "transparent";
             const isDone = item.status === "done";
