@@ -72,7 +72,12 @@ export function AgentTab({
 
   // Parse actions from last assistant message
   const lastAssistant = [...conversation].reverse().find(m => m.role === "assistant");
-  const actions = lastAssistant ? parseActions(lastAssistant.content) : [];
+  const rawActions = lastAssistant ? parseActions(lastAssistant.content) : [];
+  // If the only actions are no_action, add a dismiss button so the user can mark done
+  const allNoAction = rawActions.length > 0 && rawActions.every(a => a.type === "no_action");
+  const actions = allNoAction
+    ? [...rawActions, { type: "dismiss" as const, label: "Mark Done", reason: "No action needed", risk: "low" as const }]
+    : rawActions;
 
   const hasConversation = conversation.length > 0;
   const inputDisabled = !skillRunning && !hasConversation;

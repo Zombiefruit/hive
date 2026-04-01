@@ -147,14 +147,21 @@ function ActionRow({
               disabled={disabled}
               style={{
                 padding: "4px 12px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 500,
-                backgroundColor: disabled ? "var(--mantine-color-dark-6)" : risk === "high" ? "var(--mantine-color-dark-5)" : "var(--mantine-color-blue-9)",
-                color: disabled ? "var(--mantine-color-dimmed)" : "var(--mantine-color-text)",
+                backgroundColor: disabled ? "var(--mantine-color-dark-6)"
+                  : action.type === "dismiss" ? "#22c55e"
+                  : risk === "high" ? "var(--mantine-color-dark-5)"
+                  : "var(--mantine-color-blue-9)",
+                color: disabled ? "var(--mantine-color-dimmed)" : action.type === "dismiss" ? "white" : "var(--mantine-color-text)",
                 opacity: disabled ? 0.5 : 1,
                 cursor: disabled ? "not-allowed" : "pointer",
                 flexShrink: 0,
               }}
             >
-              {risk === "high" ? "Edit & Send" : risk === "medium" ? "Run" : "Go"}
+              {action.type === "dismiss" ? "Mark Done"
+                : risk === "high" ? "Edit & Send"
+                : risk === "medium" ? "Run"
+                : action.type === "open_url" || action.type === "join_meeting" || action.type === "review_pr" ? "Open"
+                : "Go"}
             </UnstyledButton>
           )
         )}

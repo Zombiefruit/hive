@@ -5,7 +5,7 @@
  */
 
 import { Badge, Group, Loader, Tabs, Text, UnstyledButton } from "@mantine/core";
-import { IconMessageCircle, IconFileText, IconDatabase, IconTimeline, IconExternalLink, IconHash, IconBrandGithub, IconMail } from "@tabler/icons-react";
+import { IconMessageCircle, IconFileText, IconDatabase, IconTimeline, IconExternalLink, IconBrandSlack, IconBrandGithub, IconMail } from "@tabler/icons-react";
 import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AgentTab } from "./AgentTab";
@@ -282,7 +282,11 @@ export function DetailDrawer({
             <Text size="xs" c="dimmed">Close</Text>
           </UnstyledButton>
         </Group>
-        <Text size="sm" fw={600} mb={4}>{n.title}</Text>
+        <Text size="sm" fw={600} mb={2}>{n.title}</Text>
+        <Group gap={6} mb={4}>
+          {n.author && <Text size="xs" c="dimmed">{n.author}</Text>}
+          <Text size="xs" c="dimmed" style={{ fontSize: "0.55rem", fontFamily: "var(--mantine-font-family-monospace)", opacity: 0.5 }}>{n.id}</Text>
+        </Group>
         {n.summary && <Text size="xs" c="dimmed" mb={4} lineClamp={2}>{n.summary}</Text>}
 
         {/* Quick context links */}
@@ -290,7 +294,7 @@ export function DetailDrawer({
           <Group gap={6} mb={8} wrap="wrap">
             {(n.links ?? []).map((link, i) => {
               const Icon = link.type === "linear" ? SiLinear as React.FC<{ size?: number }>
-                : link.type === "slack_thread" || link.type === "slack_dm" ? IconHash
+                : link.type === "slack_thread" || link.type === "slack_dm" ? IconBrandSlack
                 : link.type === "github_pr" ? IconBrandGithub
                 : link.type === "notion" ? SiNotion as React.FC<{ size?: number }>
                 : IconExternalLink;
@@ -347,7 +351,7 @@ export function DetailDrawer({
           <Tabs.Tab value="plan" leftSection={<IconFileText size={14} />} rightSection={planText ? <Badge size="xs" color="green" variant="filled" circle>✓</Badge> : undefined}>
             Plan
           </Tabs.Tab>
-          <Tabs.Tab value="context" leftSection={<IconDatabase size={14} />} rightSection={fetchedContext.length > 0 ? <Badge size="xs" variant="light" color="gray">{fetchedContext.length}</Badge> : undefined}>
+          <Tabs.Tab value="context" leftSection={<IconDatabase size={14} />} rightSection={(n.links?.length ?? 0) + fetchedContext.filter(i => i.type === "tool_use").length > 0 ? <Badge size="xs" variant="light" color="gray">{(n.links?.length ?? 0) + fetchedContext.filter(i => i.type === "tool_use").length}</Badge> : undefined}>
             Context
           </Tabs.Tab>
           <Tabs.Tab value="timeline" leftSection={<IconTimeline size={14} />}>

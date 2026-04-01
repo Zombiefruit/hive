@@ -1,5 +1,5 @@
 import { Stack, Text, UnstyledButton } from "@mantine/core";
-import { IconExternalLink, IconHash, IconBrandGithub, IconFileText } from "@tabler/icons-react";
+import { IconExternalLink, IconBrandSlack, IconBrandGithub, IconFileText } from "@tabler/icons-react";
 import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
 import { EmptyState } from "./shared";
 
@@ -22,7 +22,7 @@ interface ContextTabProps {
 }
 
 const typeIcons: Record<string, React.FC<{ size?: number }>> = {
-  slack: IconHash,
+  slack: IconBrandSlack,
   linear: SiLinear as React.FC<{ size?: number }>,
   github: IconBrandGithub,
   notion: SiNotion as React.FC<{ size?: number }>,
@@ -34,7 +34,7 @@ export function ContextTab({ items, notificationLinks, onOpenUrl }: ContextTabPr
     return <EmptyState icon={IconFileText} message="No context fetched yet." />;
   }
 
-  const textItems = items.filter(i => i.type === "text");
+  // Only show tool_use items (extracted links from MCP calls) — not raw agent text
   const toolItems = items.filter(i => i.type === "tool_use");
 
   const links: Array<{ type: string; label: string; url: string }> = [];
@@ -78,16 +78,6 @@ export function ContextTab({ items, notificationLinks, onOpenUrl }: ContextTabPr
             </UnstyledButton>
           );
         })}
-        {textItems.map((item, i) => (
-          <div key={`t-${i}`} style={{
-            padding: "8px 12px", borderRadius: 8,
-            backgroundColor: "var(--mantine-color-dark-8)",
-            border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 20%, transparent)",
-          }}>
-            <Text size="xs" c="dimmed" mb={2} style={{ fontSize: "0.6rem" }}>{item.timestamp}</Text>
-            <Text size="xs" style={{ whiteSpace: "pre-wrap", maxHeight: 200, overflowY: "auto" }}>{item.content.slice(0, 500)}</Text>
-          </div>
-        ))}
       </Stack>
     </div>
   );
