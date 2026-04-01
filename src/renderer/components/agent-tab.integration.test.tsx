@@ -1,6 +1,26 @@
 /**
  * @vitest-environment jsdom
  */
+
+// Mantine's MantineProvider calls window.matchMedia during render.
+// Must be set before any imports touch React/Mantine.
+Object.defineProperty(window, "matchMedia", {
+  writable: true,
+  value: (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  }),
+});
+
+// jsdom doesn't implement Element.scrollTo
+Element.prototype.scrollTo = () => {};
+
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MantineProvider } from "@mantine/core";
@@ -74,7 +94,7 @@ describe("AgentTab integration", () => {
         content: "Already responded.\n\n```actions\n[{\"type\":\"no_action\",\"label\":\"Already responded\"}]\n```",
       }],
     });
-    expect(screen.getByText("Mark Done")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Mark Done" })).toBeTruthy();
   });
 
   it("does NOT show Mark Done when stage is done", () => {
