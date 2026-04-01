@@ -374,7 +374,7 @@ export function Onboarding() {
                 </div>
                 <TextInput
                   label="Manager name"
-                  placeholder="e.g. Yael Chemla"
+                  placeholder="e.g. Jane Smith"
                   value={managerName}
                   onChange={(e) => setManagerName(e.currentTarget.value)}
                   size="sm"

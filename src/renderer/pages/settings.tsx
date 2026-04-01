@@ -384,7 +384,7 @@ export function Settings() {
             <Group grow>
               <TextInput
                 label="Manager name"
-                placeholder="e.g. Yael Chemla"
+                placeholder="e.g. Jane Smith"
                 value={managerName}
                 onChange={(e) => setManagerName(e.currentTarget.value)}
                 size="sm"

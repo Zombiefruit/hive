@@ -97,8 +97,8 @@ describe("Consolidation Protection", () => {
 
   it("should keep BOTH if both are in protected stages", () => {
     const notifications: MockNotification[] = [
-      { id: "preparing", title: "Reply to Yael", stage: "preparing", source: "slack" },
-      { id: "ready", title: "Reply to Yael", stage: "ready", source: "slack" },
+      { id: "preparing", title: "Reply to Jane", stage: "preparing", source: "slack" },
+      { id: "ready", title: "Reply to Jane", stage: "ready", source: "slack" },
     ];
     const result = simulateConsolidation(notifications);
     expect(result.kept).toContain("preparing");

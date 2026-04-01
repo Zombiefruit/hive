@@ -5,7 +5,7 @@ describe("Triage Output — Projects", () => {
   it("should parse projects array from triage response", () => {
     const response = JSON.stringify({
       actionable: [
-        { source: "linear", title: "VEC-24: Chat history", project: "Perf Agent Chat", project_source: "linear", project_source_id: "proj-abc", priority: "high", confidence: 8, task_type: "implementation", summary: "test", links: [], author: "Yael", action_needed: "implement" },
+        { source: "linear", title: "VEC-24: Chat history", project: "Perf Agent Chat", project_source: "linear", project_source_id: "proj-abc", priority: "high", confidence: 8, task_type: "implementation", summary: "test", links: [], author: "Jane", action_needed: "implement" },
       ],
       projects: [
         { name: "Perf Agent Chat", source: "linear", source_id: "proj-abc", related_channels: ["C0ANYETEVDE"], related_tickets: ["VEC-24", "VEC-23"] },
@@ -37,8 +37,8 @@ describe("Triage Output — Projects", () => {
   it("should parse split tasks under same project", () => {
     const response = JSON.stringify({
       actionable: [
-        { source: "linear", title: "VEC-24: Add history", project: "Perf Agent", priority: "high", confidence: 8, task_type: "implementation", summary: "a", links: [], author: "Yael", action_needed: "build" },
-        { source: "linear", title: "VEC-24: Port UI", project: "Perf Agent", priority: "high", confidence: 8, task_type: "implementation", summary: "b", links: [], author: "Yael", action_needed: "build" },
+        { source: "linear", title: "VEC-24: Add history", project: "Perf Agent", priority: "high", confidence: 8, task_type: "implementation", summary: "a", links: [], author: "Jane", action_needed: "build" },
+        { source: "linear", title: "VEC-24: Port UI", project: "Perf Agent", priority: "high", confidence: 8, task_type: "implementation", summary: "b", links: [], author: "Jane", action_needed: "build" },
       ],
       projects: [
         { name: "Perf Agent", source: "linear", source_id: "proj-abc", related_tickets: ["VEC-24"] },

@@ -28,7 +28,7 @@ const MOCK_TRIAGE_RESPONSE = JSON.stringify({
         { type: "linear", label: "VEC-20", url: "https://linear.app/monte-carlo/issue/VEC-20" },
         { type: "github", label: "PR #12632", url: "https://github.com/monte-carlo-data/monolith-django/pull/12632" },
       ],
-      author: "Yael Chemla",
+      author: "Jane Smith",
       action_needed: "Rebase frontend PR, verify alignment with merged backend",
     },
   ],
@@ -193,7 +193,7 @@ describe("E2E Pipeline: Notification → Plan → Approve → Agent → PR", () 
       expect(notification.taskType).toBe("implementation");
       expect(notification.links).toHaveLength(2);
       expect(notification.timeline).toHaveLength(1);
-      expect(notification.author).toBe("Yael Chemla");
+      expect(notification.author).toBe("Jane Smith");
     });
 
     it("should dedup notifications by extractKey", () => {

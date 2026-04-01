@@ -10,11 +10,11 @@ import { describe, it, expect } from "vitest";
 
 describe("User Search via MCP Bridge (direct)", () => {
   it("should build Slack user search prompt", () => {
-    const query = "Yael";
+    const query = "Jane";
     const prompt = `Use mcp__claude_ai_Slack__slack_search_users with query "${query}". Return each user's name, display_name, and ID. Plain text only.`;
 
     expect(prompt).toContain("slack_search_users");
-    expect(prompt).toContain("Yael");
+    expect(prompt).toContain("Jane");
   });
 
   it("should build Linear user search prompt", () => {
@@ -25,7 +25,7 @@ describe("User Search via MCP Bridge (direct)", () => {
 
   it("should parse user search results into structured data", () => {
     const rawResult = `Found 3 users:
-1. Yael Chemla (ychemla) - ID: U043ENDKV4Y
+1. Jane Smith (jsmith) - ID: UEXAMPLE01
 2. Mor Ofir (mofir) - ID: U0ABCDEF
 3. Dan Lev (dlev) - ID: U0123456`;
 
@@ -37,6 +37,6 @@ describe("User Search via MCP Bridge (direct)", () => {
     }).filter(Boolean);
 
     expect(users).toHaveLength(3);
-    expect(users[0]).toEqual({ name: "Yael Chemla", displayName: "ychemla", id: "U043ENDKV4Y" });
+    expect(users[0]).toEqual({ name: "Jane Smith", displayName: "jsmith", id: "UEXAMPLE01" });
   });
 });

@@ -349,7 +349,7 @@ describe("Config-Driven Poll Service", () => {
 
   it("should build Slack search queries from config", () => {
     const userSlackId = "U02PKBZSB9Q";
-    const managerSlackId = "U043ENDKV4Y";
+    const managerSlackId = "UEXAMPLE01";
     const channels = [{ id: "C0AMSV2SK4Z", name: "#team-vector" }];
     const slackAfter = "2026-03-17";
 
@@ -361,13 +361,13 @@ describe("Config-Driven Poll Service", () => {
 
     expect(steps).toHaveLength(4);
     expect(steps[0]).toContain("U02PKBZSB9Q");
-    expect(steps[2]).toContain("U043ENDKV4Y");
+    expect(steps[2]).toContain("UEXAMPLE01");
     expect(steps[3]).toContain("C0AMSV2SK4Z");
   });
 
   it("should build coworker priority rules from config", () => {
     const coworkers = [
-      { name: "Yael Chemla", role: "manager" },
+      { name: "Jane Smith", role: "manager" },
       { name: "Mor Ofir", role: "pm" },
       { name: "Dan Lev", role: "peer" },
     ];
@@ -379,7 +379,7 @@ describe("Config-Driven Poll Service", () => {
       return `${c.name}: high`;
     });
 
-    expect(rules[0]).toBe("Yael Chemla: critical");
+    expect(rules[0]).toBe("Jane Smith: critical");
     expect(rules[1]).toBe("Mor Ofir: high");
     expect(rules[2]).toBe("Dan Lev: high");
   });

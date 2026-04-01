@@ -122,7 +122,7 @@ describe("MCP User Search", () => {
     const mockBridgeResponse = JSON.stringify({
       users: [
         { id: "U02PKBZSB9Q", name: "Kieran Williams", display_name: "kwilliams", avatar: "https://..." },
-        { id: "U043ENDKV4Y", name: "Yael Chemla", display_name: "ychemla", avatar: "https://..." },
+        { id: "UEXAMPLE01", name: "Jane Smith", display_name: "jsmith", avatar: "https://..." },
       ],
     });
 
@@ -170,15 +170,15 @@ describe("MCP User Search", () => {
   });
 
   it("should populate coworker entry from search selection", () => {
-    const selectedUser = { id: "U043ENDKV4Y", name: "Yael Chemla", role: "manager" as const };
+    const selectedUser = { id: "UEXAMPLE01", name: "Jane Smith", role: "manager" as const };
     const coworker = {
       name: selectedUser.name,
       role: selectedUser.role,
       slackUserId: selectedUser.id,
     };
 
-    expect(coworker.name).toBe("Yael Chemla");
-    expect(coworker.slackUserId).toBe("U043ENDKV4Y");
+    expect(coworker.name).toBe("Jane Smith");
+    expect(coworker.slackUserId).toBe("UEXAMPLE01");
     expect(coworker.role).toBe("manager");
   });
 });
@@ -201,11 +201,11 @@ describe("Slack Hook — Real-Time Monitoring", () => {
     };
 
     const config = {
-      managerSlackId: "U043ENDKV4Y",
+      managerSlackId: "UEXAMPLE01",
       coworkerIds: new Set(["U111", "U222"]),
     };
 
-    expect(classify({ author: "U043ENDKV4Y", channel: "DM", text: "Can you look at this?", isDM: true }, config)).toBe("critical");
+    expect(classify({ author: "UEXAMPLE01", channel: "DM", text: "Can you look at this?", isDM: true }, config)).toBe("critical");
     expect(classify({ author: "U111", channel: "DM", text: "Hey", isDM: true }, config)).toBe("high");
     expect(classify({ author: "U999", channel: "C123", text: "general discussion", isDM: false }, config)).toBe("low");
   });
@@ -290,7 +290,7 @@ describe("Smart Refresh — Incremental Updates", () => {
   it("should detect new Slack replies in tracked threads", () => {
     const lastChecked = new Date("2026-03-24T10:00:00Z");
     const replies = [
-      { ts: "2026-03-24T09:00:00Z", author: "Yael" }, // before last check
+      { ts: "2026-03-24T09:00:00Z", author: "Jane" }, // before last check
       { ts: "2026-03-24T11:00:00Z", author: "Mor" },   // new
       { ts: "2026-03-24T12:00:00Z", author: "Dan" },   // new
     ];
@@ -401,7 +401,7 @@ describe("Manager Learning from History", () => {
 
   it("should detect priority patterns from user corrections", () => {
     const corrections = [
-      { from: "medium", to: "critical", author: "Yael Chemla", count: 3 },
+      { from: "medium", to: "critical", author: "Jane Smith", count: 3 },
       { from: "low", to: "high", author: "Mor Ofir", count: 2 },
     ];
 
@@ -411,7 +411,7 @@ describe("Manager Learning from History", () => {
       .map(c => ({ author: c.author, suggestedPriority: c.to }));
 
     expect(escalationPatterns).toHaveLength(2);
-    expect(escalationPatterns[0]).toEqual({ author: "Yael Chemla", suggestedPriority: "critical" });
+    expect(escalationPatterns[0]).toEqual({ author: "Jane Smith", suggestedPriority: "critical" });
   });
 
   it("should include history summary in triage context", () => {
@@ -436,7 +436,7 @@ describe("Proactive Monitoring", () => {
   it("should batch multiple new items into a single desktop notification", () => {
     const newItems = [
       { title: "VEC-30: New ticket", priority: "high" },
-      { title: "Yael DM: Can you check this?", priority: "critical" },
+      { title: "Jane DM: Can you check this?", priority: "critical" },
       { title: "PR #12500 needs review", priority: "high" },
     ];
 
@@ -448,7 +448,7 @@ describe("Proactive Monitoring", () => {
       ? `${critical[0].title} (+${rest.length} more)`
       : `${newItems.length} new items`;
 
-    expect(title).toBe("Yael DM: Can you check this? (+2 more)");
+    expect(title).toBe("Jane DM: Can you check this? (+2 more)");
   });
 
   it("should auto-dismiss stale items on next poll", () => {
