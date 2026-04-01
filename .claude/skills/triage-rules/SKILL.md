@@ -47,6 +47,12 @@ user-invocable: false
    - **investigation**: Research or analysis task before building
    - DO NOT default everything to implementation. Unanswered messages = response.
 
+   **CHECK LINEAR STATUS**: For Linear tickets, the fetched data includes the ticket's current status (Todo, In Progress, In Review, Done, Canceled). Use this to set the right priority and stage:
+   - **Done/Canceled** → skip (do not create a task)
+   - **In Review** → low priority, stage should map to "ship" or "code_review" — the work is done, just needs review/merge
+   - **In Progress** → the user is already working on it, only create if there's new context (e.g., a blocking comment)
+   - **Todo/Backlog** → normal actionable item
+
 9. **DUAL-ACTION ITEMS**: When a message BOTH requires a reply AND requests implementation work (e.g., manager asks "can you add tracking?" — needs a reply AND a code change), create TWO separate items:
    - One `response` item: "Reply to [person] about [topic]"
    - One `implementation` item: "[Ticket]: [description of work]"
