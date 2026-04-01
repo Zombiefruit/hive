@@ -11,14 +11,14 @@ import {
 import { useAgentStore } from "../stores/agent-store";
 
 const eventConfig: Record<string, { color: string; icon: typeof IconPlayerPlay }> = {
-  task_start: { color: "#22c55e", icon: IconPlayerPlay },
-  completed: { color: "#22c55e", icon: IconCheck },
-  error: { color: "#ef4444", icon: IconAlertTriangle },
-  tool_use: { color: "#a855f7", icon: IconTool },
-  interrupted: { color: "#eab308", icon: IconAlertTriangle },
-  killed: { color: "#ef4444", icon: IconAlertTriangle },
-  context_detected: { color: "#06b6d4", icon: IconLink },
-  context_added: { color: "#06b6d4", icon: IconLink },
+  task_start: { color: "var(--mantine-color-green-filled)", icon: IconPlayerPlay },
+  completed: { color: "var(--mantine-color-green-filled)", icon: IconCheck },
+  error: { color: "var(--mantine-color-red-filled)", icon: IconAlertTriangle },
+  tool_use: { color: "var(--mantine-color-violet-filled)", icon: IconTool },
+  interrupted: { color: "var(--mantine-color-yellow-filled)", icon: IconAlertTriangle },
+  killed: { color: "var(--mantine-color-red-filled)", icon: IconAlertTriangle },
+  context_detected: { color: "var(--mantine-color-cyan-filled)", icon: IconLink },
+  context_added: { color: "var(--mantine-color-cyan-filled)", icon: IconLink },
 };
 
 export function ActivityFeed() {

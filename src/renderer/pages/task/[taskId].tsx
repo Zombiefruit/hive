@@ -11,13 +11,13 @@ interface TaskEvent {
 }
 
 const eventConfig: Record<string, { icon: typeof IconRobot; color: string; label: string }> = {
-  started: { icon: IconRobot, color: "#3b82f6", label: "Started" },
-  progress: { icon: IconClock, color: "#22c55e", label: "Progress" },
-  tool_use: { icon: IconTerminal2, color: "#a855f7", label: "Tool" },
-  text: { icon: IconMessage, color: "#94a3b8", label: "Response" },
-  error: { icon: IconAlertTriangle, color: "#ef4444", label: "Error" },
-  completed: { icon: IconCheck, color: "#22c55e", label: "Done" },
-  escalation: { icon: IconAlertTriangle, color: "#eab308", label: "Needs input" },
+  started: { icon: IconRobot, color: "var(--mantine-color-blue-filled)", label: "Started" },
+  progress: { icon: IconClock, color: "var(--mantine-color-green-filled)", label: "Progress" },
+  tool_use: { icon: IconTerminal2, color: "var(--mantine-color-violet-filled)", label: "Tool" },
+  text: { icon: IconMessage, color: "var(--mantine-color-dimmed)", label: "Response" },
+  error: { icon: IconAlertTriangle, color: "var(--mantine-color-red-filled)", label: "Error" },
+  completed: { icon: IconCheck, color: "var(--mantine-color-green-filled)", label: "Done" },
+  escalation: { icon: IconAlertTriangle, color: "var(--mantine-color-yellow-filled)", label: "Needs input" },
 };
 
 export function TaskDetail() {
@@ -142,7 +142,7 @@ export function TaskDetail() {
               border: "1px solid color-mix(in srgb, var(--mantine-color-green-5) 30%, transparent)",
             }}>
               <Group gap={8}>
-                <IconCheck size={16} color="#22c55e" />
+                <IconCheck size={16} color="var(--mantine-color-green-filled)" />
                 <Text size="sm" fw={600} c="green">Task completed</Text>
               </Group>
             </div>

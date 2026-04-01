@@ -16,18 +16,18 @@ export interface StageMeta {
 }
 
 export const STAGE_META: Record<Stage, StageMeta> = {
-  new:          { label: "Inbox",              color: "#3b82f6", tip: "New items from all sources." },
-  start_work:   { label: "Planning",           color: "#a855f7", tip: "Agent creating implementation plan. Drag to Hacking to approve." },
-  plan_review:  { label: "Planning",           color: "#a855f7", tip: "Plan ready — drag to Hacking to approve." },
-  hack:         { label: "Hacking",            color: "#22c55e", tip: "Agent implementing the plan." },
-  ship:         { label: "Shipping",           color: "#06b6d4", tip: "Running tests, pushing branch, opening PR." },
-  code_review:  { label: "Reviewing",          color: "#f97316", tip: "Agent reviewing the pull request." },
-  pr_feedback:  { label: "Fixing Feedback",    color: "#ec4899", tip: "Agent addressing PR reviewer comments." },
-  preparing:    { label: "Preparing",          color: "#a855f7", tip: "Gathering context." },
-  ready:        { label: "Ready",              color: "#22c55e", tip: "Context ready — review and act." },
-  backlog:      { label: "Backlog",            color: "#4b5563", tip: "Low priority — when you have time." },
-  done:         { label: "Done",               color: "#6b7280", tip: "Completed." },
-  skipped:      { label: "Reviewed",           color: "#525252", tip: "AI skipped. Drag to Inbox if wrong." },
+  new:          { label: "Inbox",              color: "var(--mantine-color-blue-filled)", tip: "New items from all sources." },
+  start_work:   { label: "Planning",           color: "var(--mantine-color-violet-filled)", tip: "Agent creating implementation plan. Drag to Hacking to approve." },
+  plan_review:  { label: "Planning",           color: "var(--mantine-color-violet-filled)", tip: "Plan ready — drag to Hacking to approve." },
+  hack:         { label: "Hacking",            color: "var(--mantine-color-green-filled)", tip: "Agent implementing the plan." },
+  ship:         { label: "Shipping",           color: "var(--mantine-color-cyan-filled)", tip: "Running tests, pushing branch, opening PR." },
+  code_review:  { label: "Reviewing",          color: "var(--mantine-color-orange-filled)", tip: "Agent reviewing the pull request." },
+  pr_feedback:  { label: "Fixing Feedback",    color: "var(--mantine-color-pink-filled)", tip: "Agent addressing PR reviewer comments." },
+  preparing:    { label: "Preparing",          color: "var(--mantine-color-violet-filled)", tip: "Gathering context." },
+  ready:        { label: "Ready",              color: "var(--mantine-color-green-filled)", tip: "Context ready — review and act." },
+  backlog:      { label: "Backlog",            color: "var(--mantine-color-gray-6)", tip: "Low priority — when you have time." },
+  done:         { label: "Done",               color: "var(--mantine-color-dimmed)", tip: "Completed." },
+  skipped:      { label: "Reviewed",           color: "var(--mantine-color-gray-6)", tip: "AI skipped. Drag to Inbox if wrong." },
 };
 
 // ── Source colors ──
@@ -44,11 +44,11 @@ export const SOURCE_COLORS: Record<string, string> = {
 // ── Priority colors ──
 
 export const PRIORITY_COLORS: Record<Priority, string> = {
-  critical: "#ef4444",
-  high:     "#f59e0b",
-  medium:   "#3b82f6",
-  low:      "#6b7280",
-  backlog:  "#4b5563",
+  critical: "var(--mantine-color-red-filled)",
+  high:     "var(--mantine-color-yellow-filled)",
+  medium:   "var(--mantine-color-blue-filled)",
+  low:      "var(--mantine-color-dimmed)",
+  backlog:  "var(--mantine-color-gray-6)",
 };
 
 /** Mantine color names for priorities (used by Badge/ThemeIcon). */
@@ -62,9 +62,9 @@ export const PRIORITY_MANTINE: Record<Priority, string> = {
 
 /** Subtle background tints per priority (very low opacity). */
 export const PRIORITY_BG_TINTS: Record<Priority, string> = {
-  critical: "rgba(239, 68, 68, 0.08)",
-  high:     "rgba(245, 158, 11, 0.06)",
-  medium:   "rgba(59, 130, 246, 0.04)",
+  critical: "color-mix(in srgb, var(--mantine-color-red-filled) 8%, transparent)",
+  high:     "color-mix(in srgb, var(--mantine-color-yellow-filled) 6%, transparent)",
+  medium:   "color-mix(in srgb, var(--mantine-color-blue-filled) 4%, transparent)",
   low:      "transparent",
   backlog:  "transparent",
 };

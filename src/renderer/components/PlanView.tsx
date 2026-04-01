@@ -162,7 +162,7 @@ export function PlanView({ plan, onStartHack, onReviewPlan }: PlanViewProps) {
                     {phase.tasks.map((task) => (
                       <Group key={task.id} gap={8} wrap="nowrap" align="flex-start">
                         {task.checked ? (
-                          <IconCheck size={14} color="#22c55e" style={{ flexShrink: 0, marginTop: 2 }} />
+                          <IconCheck size={14} color="var(--mantine-color-green-filled)" style={{ flexShrink: 0, marginTop: 2 }} />
                         ) : (
                           <IconCircle
                             size={14}
@@ -210,8 +210,8 @@ export function PlanView({ plan, onStartHack, onReviewPlan }: PlanViewProps) {
               borderRadius: 6,
               fontSize: "0.8rem",
               fontWeight: 600,
-              backgroundColor: "var(--mantine-color-green-6)",
-              color: "white",
+              backgroundColor: "var(--mantine-color-green-filled)",
+              color: "var(--mantine-color-white)",
               display: "flex",
               alignItems: "center",
               gap: 6,

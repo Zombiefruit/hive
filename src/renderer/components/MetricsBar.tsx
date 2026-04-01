@@ -8,8 +8,8 @@ export function MetricsBar() {
 
   const items = [
     { label: "Total Agents", value: totalAgents, color: "var(--mantine-color-text)", icon: IconRobot },
-    { label: "Running", value: metrics.active, color: "#22c55e", icon: IconPlayerPlay },
-    { label: "Completed", value: metrics.completed, color: "#6b7280", icon: IconCheck },
+    { label: "Running", value: metrics.active, color: "var(--mantine-color-green-filled)", icon: IconPlayerPlay },
+    { label: "Completed", value: metrics.completed, color: "var(--mantine-color-dimmed)", icon: IconCheck },
     {
       label: "Cost",
       value: metrics.totalCostUsd > 0 ? `$${metrics.totalCostUsd.toFixed(2)}` : "$0",

@@ -275,7 +275,7 @@ export function DetailDrawer({
       <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--mantine-color-default-border)", flexShrink: 0 }}>
         <Group justify="space-between" mb={4}>
           <Group gap="xs">
-            <Badge size="xs" style={{ backgroundColor: stageConfig.color, color: "white" }}>{stageConfig.label}</Badge>
+            <Badge size="xs" style={{ backgroundColor: stageConfig.color, color: "var(--mantine-color-white)" }}>{stageConfig.label}</Badge>
             {n.priority && <Badge size="xs" variant="dot" color={n.priority === "critical" ? "red" : n.priority === "high" ? "yellow" : n.priority === "medium" ? "blue" : "gray"}>{n.priority}</Badge>}
           </Group>
           <UnstyledButton onClick={onClose} aria-label="Close detail pane">
@@ -397,7 +397,7 @@ export function DetailDrawer({
             onClick={handlePrepare}
             style={{
               padding: "6px 12px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 600,
-              backgroundColor: "var(--mantine-color-blue-5)", color: "white",
+              backgroundColor: "var(--mantine-color-blue-filled)", color: "var(--mantine-color-white)",
             }}
           >
             Start Work

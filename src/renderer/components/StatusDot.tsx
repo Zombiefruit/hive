@@ -5,16 +5,16 @@ interface StatusDotProps {
 }
 
 const statusColors: Record<string, string> = {
-  active: "#22c55e",
-  running: "#22c55e",
-  idle: "#eab308",
-  errored: "#ef4444",
-  completed: "#6b7280",
-  done: "#6b7280",
+  active: "var(--mantine-color-green-filled)",
+  running: "var(--mantine-color-green-filled)",
+  idle: "var(--mantine-color-yellow-filled)",
+  errored: "var(--mantine-color-red-filled)",
+  completed: "var(--mantine-color-dimmed)",
+  done: "var(--mantine-color-dimmed)",
 };
 
 export function StatusDot({ status, size = 8, pulse }: StatusDotProps) {
-  const color = statusColors[status] ?? "#6b7280";
+  const color = statusColors[status] ?? "var(--mantine-color-dimmed)";
   const shouldPulse = pulse ?? (status === "active" || status === "running");
 
   return (

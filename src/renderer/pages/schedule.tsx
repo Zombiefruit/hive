@@ -506,8 +506,8 @@ export function Schedule() {
               position: "absolute", top: 16 + nowOffset, left: 0, right: 0, zIndex: 10,
               display: "flex", alignItems: "center",
             }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#ef4444", marginLeft: -4 }} />
-              <div style={{ flex: 1, height: 2, backgroundColor: "#ef4444" }} />
+              <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "var(--mantine-color-red-filled)", marginLeft: -4 }} />
+              <div style={{ flex: 1, height: 2, backgroundColor: "var(--mantine-color-red-filled)" }} />
             </div>
           )}
 
@@ -551,7 +551,7 @@ export function Schedule() {
             const baseHeight = (item.estimatedMinutes / 60) * HOUR_HEIGHT;
             const cardHeight = Math.max(baseHeight - 2, MIN_CARD_HEIGHT);
             const topOffset = (itemStartMinutes / 60) * HOUR_HEIGHT;
-            const color = priorityColors[item.priority] ?? "#3b82f6";
+            const color = priorityColors[item.priority] ?? "var(--mantine-color-blue-filled)";
             const bgTint = priorityBgTints[item.priority] ?? "transparent";
             const isDone = item.status === "done";
             const isDragging = draggingId === item.id;
@@ -755,10 +755,10 @@ export function Schedule() {
       {selectedId && (() => {
         const item = items.find(i => i.id === selectedId);
         if (!item) return null;
-        const color = priorityColors[item.priority] ?? "#3b82f6";
+        const color = priorityColors[item.priority] ?? "var(--mantine-color-blue-filled)";
         return (
           <>
-            <div onClick={() => setSelectedId(null)} style={{ position: "fixed", inset: 0, top: 42, zIndex: 99, backgroundColor: "rgba(0,0,0,0.2)" }} />
+            <div onClick={() => setSelectedId(null)} style={{ position: "fixed", inset: 0, top: 42, zIndex: 99, backgroundColor: "color-mix(in srgb, var(--mantine-color-body) 40%, transparent)", backdropFilter: "blur(2px)" }} />
             <div style={{
               position: "fixed", top: 42, right: 0, bottom: 0, width: 380, zIndex: 100,
               backgroundColor: "var(--mantine-color-default)",

@@ -89,14 +89,14 @@ export function ContextPicker({ onSelect, onClose }: ContextPickerProps) {
     <div style={{
       position: "fixed", inset: 0, zIndex: 200,
       display: "flex", alignItems: "center", justifyContent: "center",
-      backgroundColor: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)",
+      backgroundColor: "color-mix(in srgb, var(--mantine-color-body) 50%, transparent)", backdropFilter: "blur(4px)",
     }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{
         width: 520, maxHeight: "70vh", display: "flex", flexDirection: "column",
         borderRadius: 12, overflow: "hidden",
         backgroundColor: "var(--mantine-color-default)",
         border: "1px solid var(--mantine-color-default-border)",
-        boxShadow: "0 16px 48px rgba(0,0,0,0.4)",
+        boxShadow: "0 16px 48px color-mix(in srgb, var(--mantine-color-body) 60%, transparent)",
       }}>
         {/* Header with tabs */}
         <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--mantine-color-default-border)" }}>
@@ -169,7 +169,7 @@ export function ContextPicker({ onSelect, onClose }: ContextPickerProps) {
                   border: `1px solid ${selected.has(r.id) ? connector.color : "var(--mantine-color-dimmed)"}`,
                   backgroundColor: selected.has(r.id) ? connector.color : "transparent",
                 }}>
-                  {selected.has(r.id) && <IconCheck size={12} color="white" />}
+                  {selected.has(r.id) && <IconCheck size={12} color="var(--mantine-color-white)" />}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <Text size="xs" fw={500} truncate>{r.title}</Text>
@@ -188,7 +188,7 @@ export function ContextPicker({ onSelect, onClose }: ContextPickerProps) {
               <Text size="xs" c="dimmed">{selected.size} selected</Text>
               <UnstyledButton onClick={handleAttach} style={{
                 padding: "6px 16px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 600,
-                backgroundColor: "var(--mantine-color-blue-5)", color: "white",
+                backgroundColor: "var(--mantine-color-blue-filled)", color: "var(--mantine-color-white)",
               }}>
                 Attach
               </UnstyledButton>

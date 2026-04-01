@@ -26,9 +26,10 @@ describe("STAGE_META", () => {
     expect(new Set(labels).size).toBe(labels.length);
   });
 
-  it("should have hex colors for all stages", () => {
+  it("should have CSS color values for all stages", () => {
     for (const meta of Object.values(STAGE_META)) {
-      expect(meta.color).toMatch(/^#[0-9a-fA-F]{6}$/);
+      expect(meta.color).toBeTruthy();
+      expect(typeof meta.color).toBe("string");
     }
   });
 });
@@ -42,9 +43,10 @@ describe("SOURCE_COLORS", () => {
     expect(SOURCE_COLORS.email).toBeDefined();
   });
 
-  it("should have hex colors", () => {
+  it("should have color values", () => {
     for (const color of Object.values(SOURCE_COLORS)) {
-      expect(color).toMatch(/^#[0-9a-fA-F]{6}$/);
+      expect(color).toBeTruthy();
+      expect(typeof color).toBe("string");
     }
   });
 });
@@ -58,9 +60,10 @@ describe("PRIORITY_COLORS", () => {
     }
   });
 
-  it("should have hex colors", () => {
+  it("should have color values", () => {
     for (const color of Object.values(PRIORITY_COLORS)) {
-      expect(color).toMatch(/^#[0-9a-fA-F]{6}$/);
+      expect(color).toBeTruthy();
+      expect(typeof color).toBe("string");
     }
   });
 });

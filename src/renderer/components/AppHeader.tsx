@@ -5,8 +5,8 @@ import { useState, useEffect } from "react";
 
 // Shared constants — match HEADER_HEIGHT in src/main/index.ts
 export const TITLEBAR_HEIGHT = 44;
-export const TITLEBAR_PADDING_LEFT = 84; // Clears traffic lights in windowed mode
-export const TITLEBAR_PADDING_LEFT_FULLSCREEN = 24;
+export const TITLEBAR_PADDING_LEFT = 78; // Clears traffic lights in windowed mode
+export const TITLEBAR_PADDING_LEFT_FULLSCREEN = 16;
 
 const TABS = [
   { path: "/", label: "Agents" },

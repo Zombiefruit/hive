@@ -586,7 +586,7 @@ export function Notifications() {
                               </Group>
                               <Group gap={6} mb={4} wrap="nowrap">
                                 {n.pollCycle && (!seenCycle.has(n.id) || (seenCycle.get(n.id) ?? 0) < n.pollCycle) && (
-                                  <div style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, backgroundColor: seenCycle.has(n.id) ? "#f59e0b" : "#3b82f6" }} />
+                                  <div style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, backgroundColor: seenCycle.has(n.id) ? "var(--mantine-color-yellow-filled)" : "var(--mantine-color-blue-filled)" }} />
                                 )}
                                 <Text size="xs" fw={500} lineClamp={2}>{n.title}</Text>
                               </Group>
@@ -606,8 +606,8 @@ export function Notifications() {
                               )}
                               {stage.key === "start_work" && plansReady.has(n.id) && (
                                 <Group gap={4} mt={2}>
-                                  <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#22c55e" }} />
-                                  <Text size="xs" c="#22c55e" fw={500} style={{ fontSize: "0.6rem" }}>Plan ready</Text>
+                                  <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "var(--mantine-color-green-filled)" }} />
+                                  <Text size="xs" c="green" fw={500} style={{ fontSize: "0.6rem" }}>Plan ready</Text>
                                 </Group>
                               )}
                               {stage.key !== "done" && stage.key !== "skipped" && stage.key !== "start_work" && stage.key !== "hack" && (
@@ -743,21 +743,21 @@ export function Notifications() {
                               </Group>
                               <Group gap={6} mb={4} wrap="nowrap">
                                 {n.pollCycle && (!seenCycle.has(n.id) || (seenCycle.get(n.id) ?? 0) < n.pollCycle) && (
-                                  <div style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, backgroundColor: seenCycle.has(n.id) ? "#f59e0b" : "#3b82f6" }} />
+                                  <div style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, backgroundColor: seenCycle.has(n.id) ? "var(--mantine-color-yellow-filled)" : "var(--mantine-color-blue-filled)" }} />
                                 )}
                                 <Text size="xs" fw={500} lineClamp={2}>{n.title}</Text>
                               </Group>
                               {n.actionNeeded && <Text size="xs" c="blue.4" lineClamp={1} mb={4} style={{ fontSize: "0.65rem" }}>→ {n.actionNeeded}</Text>}
                               {stage.key === "preparing" && !plansReady.has(n.id) && (
                                 <Group gap={4} mt={2}>
-                                  <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#06b6d4", animation: "pulse 1.5s infinite" }} />
-                                  <Text size="xs" c="#06b6d4" fw={500} style={{ fontSize: "0.6rem" }}>Preparing...</Text>
+                                  <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "var(--mantine-color-cyan-filled)", animation: "pulse 1.5s infinite" }} />
+                                  <Text size="xs" c="cyan" fw={500} style={{ fontSize: "0.6rem" }}>Preparing...</Text>
                                 </Group>
                               )}
                               {stage.key === "preparing" && plansReady.has(n.id) && (
                                 <Group gap={4} mt={2}>
-                                  <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#22c55e" }} />
-                                  <Text size="xs" c="#22c55e" fw={500} style={{ fontSize: "0.6rem" }}>Ready</Text>
+                                  <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "var(--mantine-color-green-filled)" }} />
+                                  <Text size="xs" c="green" fw={500} style={{ fontSize: "0.6rem" }}>Ready</Text>
                                 </Group>
                               )}
                               {stage.key !== "done" && stage.key !== "ready" && stage.key !== "skipped" && (
@@ -827,7 +827,7 @@ export function Notifications() {
           {/* Backdrop — click to close */}
           <div
             onClick={() => setSelectedId(null)}
-            style={{ position: "fixed", inset: 0, top: 42, zIndex: 99, backgroundColor: "rgba(0,0,0,0.2)" }}
+            style={{ position: "fixed", inset: 0, top: 42, zIndex: 99, backgroundColor: "color-mix(in srgb, var(--mantine-color-body) 40%, transparent)", backdropFilter: "blur(2px)" }}
           />
           <div
             onClick={(e) => e.stopPropagation()}
@@ -838,7 +838,7 @@ export function Notifications() {
               zIndex: 100,
               backgroundColor: "var(--mantine-color-body)",
               borderLeft: "1px solid var(--mantine-color-default-border)",
-              boxShadow: "-4px 0 20px rgba(0,0,0,0.3)",
+              boxShadow: "-4px 0 20px color-mix(in srgb, var(--mantine-color-body) 50%, transparent)",
               animation: "slideInRight 0.2s ease-out",
             }}
           >

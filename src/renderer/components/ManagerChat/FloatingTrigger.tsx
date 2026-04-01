@@ -31,16 +31,16 @@ export function FloatingTrigger() {
             onClick={toggleOpen}
             aria-label="Open Manager"
             style={{
-              boxShadow: "0 4px 16px rgba(0, 0, 0, 0.3)",
+              boxShadow: "0 4px 16px color-mix(in srgb, var(--mantine-color-body) 50%, transparent)",
               transition: "transform 0.15s ease, box-shadow 0.15s ease",
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = "scale(1.06)";
-              e.currentTarget.style.boxShadow = "0 6px 24px rgba(0, 0, 0, 0.4)";
+              e.currentTarget.style.boxShadow = "0 6px 24px color-mix(in srgb, var(--mantine-color-body) 60%, transparent)";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = "scale(1)";
-              e.currentTarget.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.3)";
+              e.currentTarget.style.boxShadow = "0 4px 16px color-mix(in srgb, var(--mantine-color-body) 50%, transparent)";
             }}
           >
             <IconMessageChatbot size={24} stroke={1.5} />

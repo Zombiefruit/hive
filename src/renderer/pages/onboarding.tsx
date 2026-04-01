@@ -83,6 +83,8 @@ export function Onboarding() {
   // Step 1 — Identity
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [slackUserId, setSlackUserId] = useState("");
+  const [linearUsername, setLinearUsername] = useState("");
 
   // Step 2 — Role
   const [role, setRole] = useState<UserRole>("fullstack_dev");
@@ -159,6 +161,8 @@ export function Onboarding() {
       const config: DeckConfig = {
         name: name.trim(),
         email: email.trim(),
+        slackUserId: slackUserId.trim() || undefined,
+        linearUsername: linearUsername.trim() || undefined,
         role,
         managerName: managerName.trim(),
         teamName: teamName.trim(),
@@ -332,6 +336,23 @@ export function Onboarding() {
                   onChange={(e) => setEmail(e.currentTarget.value)}
                   size="sm"
                 />
+                <Group grow>
+                  <TextInput
+                    label="Slack User ID"
+                    placeholder="e.g. U02PKBZSB9Q"
+                    description="Find in Slack profile > More > Copy member ID"
+                    value={slackUserId}
+                    onChange={(e) => setSlackUserId(e.currentTarget.value)}
+                    size="sm"
+                  />
+                  <TextInput
+                    label="Linear username"
+                    placeholder="e.g. kwilliams"
+                    value={linearUsername}
+                    onChange={(e) => setLinearUsername(e.currentTarget.value)}
+                    size="sm"
+                  />
+                </Group>
               </Stack>
             )}
 
@@ -451,7 +472,7 @@ export function Onboarding() {
                           }}
                         >
                           {selected && (
-                            <IconCheck size={10} color="white" stroke={3} />
+                            <IconCheck size={10} color="var(--mantine-color-white)" stroke={3} />
                           )}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
