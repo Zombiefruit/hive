@@ -1,10 +1,10 @@
-# Claude Deck — Product Specification
+# Hive — Product Specification
 
-> Last updated: 2026-03-24
+> Last updated: 2026-04-01
 
 ## Vision
 
-Claude Deck is an autonomous engineering assistant — a native desktop app that monitors your work channels (Slack, Linear, Gmail, Calendar, Notion, GitHub), intelligently triages incoming work, and executes approved tasks through Claude Code agents all the way to PR.
+Hive is an autonomous engineering assistant — a native desktop app that monitors your work channels (Slack, Linear, Gmail, Calendar, Notion, GitHub), intelligently triages incoming work, and executes approved tasks through Claude Code agents all the way to PR.
 
 The goal is to replace the manual inbox-checking → context-gathering → task-planning → coding loop with an AI-driven pipeline where the engineer reviews and approves rather than executes.
 
@@ -39,11 +39,11 @@ The goal is to replace the manual inbox-checking → context-gathering → task-
 - **Auto-restart** on unexpected exit (5s delay)
 
 #### Notification System (Poll Service)
-- **Single combined prompt** — one `askBridge` call fetches ALL sources; the model parallelizes tool calls internally
+- **Parallel per-source fetching** — each source gets its own `askBridge` call with source-specific prompts, running sequentially per bridge but isolated per source for reliability
 - **Config-driven** — all queries built from `DeckConfig` (no hardcoded IDs, names, or channels)
 - **Sources:** Slack (searches + channel reads), Linear (assigned issues), Calendar (next 24h), Gmail (unread), Notion (mentions + team pages)
 - **Two-pass architecture:**
-  1. **Fetch** — single prompt, model calls all source tools in parallel (~2-5 min)
+  1. **Fetch** — per-source prompts with isolated bridge calls, results merged before triage
   2. **Triage** — fresh bridge context, AI classifies items with priority/confidence/taskType
 - **Bridge restart between passes** to clear accumulated conversation context
 - **Existing task dedup** — up to 30 open tasks included in triage prompt to prevent duplicates
@@ -96,7 +96,7 @@ Priority assignment is context-aware: who asked matters (manager → critical, l
 - **Native HTML5 drag-and-drop** with stage transitions triggering actions:
   - → Planning: triggers `prepareWorkPlan()`
   - → Working: triggers `startWorkAgent()`
-- **Detail drawer** — plan view with TL;DR/details, activity feed, links, regenerate button
+- **Tabbed detail drawer** — four tabs (Agent, Plan, Context, Timeline) with live agent chat, structured plan view, fetched context items, and chronological event timeline
 - **Add Task modal** — manual task creation (title, description, type, priority, estimated time)
 - **Refresh** fetches new items without clearing existing
 - **Debug log panel** with clear button
@@ -139,6 +139,7 @@ Priority assignment is context-aware: who asked matters (manager → critical, l
 - **Parse:** parse-implementation, parse-review, parse-response, parse-meeting-prep
 - **Execute:** execute-implementation, execute-review
 - **Manage:** manage-agent, update-task
+- **Structured Agent Actions** — agents return typed JSON action blocks (run skill, update Linear, send Slack, open URL, dismiss, snooze) rendered as risk-tiered CTAs in the detail drawer
 
 ### Configuration System
 - **DeckConfig type** in `src/shared/config-types.ts`
@@ -203,7 +204,7 @@ Shared
 | Decision | Rationale |
 |----------|-----------|
 | **Bridge model: Sonnet 4.6** | Better multi-tool orchestration than Haiku for combined fetch prompts |
-| **Single combined fetch prompt** | One askBridge call; model parallelizes tool calls internally. Eliminated need for multiple bridge processes. |
+| **Per-source fetch isolation** | Each source gets its own askBridge call with a focused prompt, improving reliability and debuggability over a single combined prompt. |
 | **No parallel spawn for MCP** | Fresh Claude Code processes need ~60s for MCP connectors to load, making per-source spawning impractical. The persistent bridge is pre-warmed. |
 | **stream-json stdin-first** | Claude Code won't emit init until a message is sent on stdin. Discovered via `scripts/test-parallel-spawn.mjs`. |
 | **Native HTML5 DnD** | @hello-pangea/dnd was buggy in Electron; native works reliably |

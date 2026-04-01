@@ -148,24 +148,42 @@ export async function prepareWorkPlan(notification: {
   const collectedEvents: Array<{ type: string; content: string; timestamp: string }> = [];
   const eventCachePath = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "planning-events-cache.json");
 
-  // Load any existing events for this notification (in case of resume)
+  // ── Batched event cache I/O ──
+  // Instead of reading+parsing+writing the full cache file on every event (~200+ per session),
+  // keep an in-memory cache and debounce disk writes to at most once every 500ms.
+  let inMemoryEventCache: Record<string, Array<{ type: string; content: string; timestamp: string }>> | null = null;
+  let eventCacheDirty = false;
+  let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
   const loadEventCache = (): Record<string, Array<{ type: string; content: string; timestamp: string }>> => {
-    try { return JSON.parse(fs.readFileSync(eventCachePath, "utf-8")); } catch { return {}; }
+    if (inMemoryEventCache) return inMemoryEventCache;
+    try { inMemoryEventCache = JSON.parse(fs.readFileSync(eventCachePath, "utf-8")); } catch { inMemoryEventCache = {}; }
+    return inMemoryEventCache!;
   };
-  const saveEventCache = (cache: Record<string, unknown>) => {
-    try { fs.writeFileSync(eventCachePath, JSON.stringify(cache)); } catch {}
+
+  const flushEventCache = () => {
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+    if (!eventCacheDirty || !inMemoryEventCache) return;
+    eventCacheDirty = false;
+    fs.writeFile(eventCachePath, JSON.stringify(inMemoryEventCache), () => {});
+  };
+
+  const scheduleFlush = () => {
+    if (flushTimer) return; // already scheduled
+    eventCacheDirty = true;
+    flushTimer = setTimeout(flushEventCache, 500);
   };
 
   const broadcastEvent = (event: PlanningEvent) => {
     const entry = { type: event.type, content: event.content, timestamp: event.timestamp };
     collectedEvents.push(entry);
-    // Persist to disk immediately so events survive page navigation
+    // Update in-memory cache (no disk I/O here)
     const cache = loadEventCache();
     if (!cache[notification.id]) cache[notification.id] = [];
     cache[notification.id].push(entry);
     // Keep only last 100 events per notification
     if (cache[notification.id].length > 100) cache[notification.id] = cache[notification.id].slice(-100);
-    saveEventCache(cache);
+    scheduleFlush();
 
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) {
@@ -221,6 +239,9 @@ export async function prepareWorkPlan(notification: {
     addDebugEntry("out", `⏱️ [PLANNING] Timed out after ${elapsed}s, retrying...`, "planning");
     response = await askMcpPlanningAgent(prompt, 300000, broadcastEvent);
   }
+
+  // Flush any remaining buffered events to disk now that the agent is done
+  flushEventCache();
 
   addDebugEntry("out", `📋 [PLANNING] Plan ready: ${response.length} chars (${elapsed}s)`, "planning");
   log(`Plan ready — ${response.length} chars (${elapsed}s)`);

@@ -8,8 +8,7 @@ import os from "node:os";
 import type { DeckConfig } from "../../shared/config-types";
 import { normalizePriority, extractKey as extractKeyUtil, STAGE_ORDER, CONFIDENCE_THRESHOLD, sanitizeUrl, cadenceToMs, setSlackWorkspace, getSlackBaseUrl } from "../../shared/task-utils";
 import { initSlackChannels } from "../agents/message-parser";
-import { loadSkills } from "../../shared/skill-loader";
-import { buildSourcePrompt, fetchSourcesParallel, type SourceName, type SourceFetchConfig } from "./parallel-fetch";
+import { loadSkills, loadSkillTemplate } from "../../shared/skill-loader";
 import { computeLookbackHours, migrateCacheFormat, buildCachePayload } from "../../shared/poll-cache";
 import { createProject, addTaskToProject, detectProjectFromSource, findProjectByName, getAllProjects, loadProjects, saveProjects } from "../../shared/project-model";
 
@@ -381,6 +380,8 @@ async function poll(): Promise<void> {
     // Compute date cutoff for search queries
     const cutoffDate = new Date(Date.now() - hours * 60 * 60 * 1000);
     const cutoffStr = cutoffDate.toISOString().split("T")[0]; // YYYY-MM-DD
+    const slackAfter = cutoffStr; // Slack search supports "after:YYYY-MM-DD"
+
     // Load user config — all source prompts are built from this
     const config = getConfig() as DeckConfig | null;
     const userName = config?.name ?? "User";
@@ -405,19 +406,71 @@ async function poll(): Promise<void> {
         .map(c => `- ${c.name} (${c.role}) direct ask = ${c.role === "lead" ? "critical" : c.role === "pm" ? "high" : "high"} priority`),
     ].join("\n");
 
-    // PASS 1: Fetch each source independently via parallel bridge calls.
-    // Each source gets its own prompt → independent error handling + per-source progress.
-    logPoll("Pass 1: Fetching sources in parallel");
+    // PASS 1: Fetch ALL sources in a SINGLE prompt.
+    // Claude Code parallelizes tool calls within a turn — one prompt fires off
+    // Slack, Linear, Calendar, Gmail, Notion calls simultaneously.
+    logPoll("Pass 1: Fetching all sources (single prompt, model parallelizes tools)");
 
-    // Determine which sources are enabled
-    const enabledSources: SourceName[] = [];
-    if (integrations.slack && userSlackId) enabledSources.push("slack");
-    if (integrations.linear && linearUser) enabledSources.push("linear");
-    if (integrations.calendar) enabledSources.push("calendar");
-    if (integrations.gmail) enabledSources.push("gmail");
-    if (integrations.notion) enabledSources.push("notion");
+    // Build the combined fetch prompt from enabled integrations
+    const fetchSections: string[] = [];
+    const enabledSourceNames: string[] = [];
 
-    const enabledSourceNames = enabledSources.map(s => s.charAt(0).toUpperCase() + s.slice(1));
+    if (integrations.slack && userSlackId) {
+      enabledSourceNames.push("Slack");
+      const slackLimit = 100;
+      const channelList = channels.map(ch => `- slack_read_channel: channel_id "${ch.id}" (${ch.name}), limit ${slackLimit}`).join("\n");
+      const slackSearches = [
+        `- slack_search_public_and_private: query "<@${userSlackId}> after:${slackAfter}"`,
+        `- slack_search_public_and_private: query "to:${userSlackId} after:${slackAfter}"`,
+        ...(managerSlackId ? [`- slack_search_public_and_private: query "from:<@${managerSlackId}> after:${slackAfter}" (messages from ${managerName || "manager"})`] : []),
+      ].join("\n");
+      const slackSkill = loadSkillTemplate("fetch-slack", {
+        SLACK_LIMIT: String(slackLimit),
+        USER_NAME: userName,
+        USER_SLACK_ID: userSlackId,
+        CHANNEL_LIST: channelList,
+        SLACK_BASE_URL: getSlackBaseUrl(),
+      });
+      fetchSections.push(`## SLACK\n${slackSearches}\n${channelList}\n${slackSkill}`);
+    }
+
+    if (integrations.linear && linearUser) {
+      enabledSourceNames.push("Linear");
+      const linearLimit = hours > 48 ? 250 : 100;
+      const linearSkill = loadSkillTemplate("fetch-linear", {
+        LINEAR_USER: linearUser,
+        LINEAR_LIMIT: String(linearLimit),
+        TEAM_NAME: config?.teamName ?? "Vector",
+        LINEAR_TEAM_LIMIT: String(Math.round(linearLimit / 2)),
+      });
+      fetchSections.push(`## LINEAR\n${linearSkill}`);
+    }
+
+    if (integrations.calendar) {
+      enabledSourceNames.push("Calendar");
+      const calSkill = loadSkillTemplate("fetch-calendar", {
+        CURRENT_TIME: new Date().toISOString(),
+      });
+      fetchSections.push(`## CALENDAR\n${calSkill}`);
+    }
+
+    if (integrations.gmail) {
+      enabledSourceNames.push("Gmail");
+      const gmailLimit = hours > 48 ? 50 : 30;
+      const gmailSkill = loadSkillTemplate("fetch-gmail", {
+        GMAIL_NEWER: hours <= 24 ? "1d" : hours <= 48 ? "2d" : "7d",
+        GMAIL_LIMIT: String(gmailLimit),
+      });
+      fetchSections.push(`## GMAIL\n${gmailSkill}`);
+    }
+
+    if (integrations.notion) {
+      enabledSourceNames.push("Notion");
+      const notionSkill = loadSkillTemplate("fetch-notion", {
+        USER_NAME: userName,
+      });
+      fetchSections.push(`## NOTION\n${notionSkill}`);
+    }
 
     for (const win of BrowserWindow.getAllWindows()) {
       try {
@@ -429,66 +482,32 @@ async function poll(): Promise<void> {
       } catch {}
     }
 
-    const fetchConfig: SourceFetchConfig = {
-      userName,
-      userSlackId,
-      linearUser,
-      teamName,
-      slackBaseUrl: getSlackBaseUrl(),
-      channels,
-      managerSlackId,
-      managerName,
-      hours,
-      cutoffStr,
-    };
+    const fetchPrompt = `Fetch data from ALL of these sources. Execute all API calls — do not skip any. Call tools in parallel where possible.
 
-    // Build per-source prompts and fetch via bridge
-    const sourcePrompts = new Map<SourceName, string>();
-    for (const source of enabledSources) {
-      sourcePrompts.set(source, buildSourcePrompt(source, fetchConfig));
-    }
+${fetchSections.join("\n\n")}
+
+RULES:
+- Only include data from after ${cutoffStr}
+- Return ALL results as plain text, organized by source with ## headers
+- Be thorough and complete — include everything relevant
+- NEVER add commentary like "Let me compile..." or "I have enough data..." — return ONLY the data itself`;
 
     const fetchStart = Date.now();
-    logPoll(`  Fetching ${enabledSources.length} sources: ${enabledSourceNames.join(", ")}`);
-    addDebugEntry("in", `📤 Fetching: ${enabledSourceNames.join(", ")}`, "fetch");
+    logPoll(`  Sending combined fetch prompt for: ${enabledSourceNames.join(", ")}`);
+    addDebugEntry("in", `📤 Fetching all: ${enabledSourceNames.join(", ")}`, "fetch");
 
-    const fetchResult = await fetchSourcesParallel(
-      enabledSources,
-      async (source: string) => {
-        const prompt = sourcePrompts.get(source as SourceName) ?? "";
-        addDebugEntry("in", `📤 Fetching ${source}`, "fetch");
-        const data = await askBridge(prompt);
-        addDebugEntry("out", `✅ ${source}: ${data.length} chars`, "fetch");
-        return data;
-      },
-      (progress) => {
-        const label = progress.source.charAt(0).toUpperCase() + progress.source.slice(1);
-        const done = progress.status === "done"
-          ? `✅ ${label}: ${progress.chars ?? 0} chars`
-          : `❌ ${label}: ${progress.error ?? "unknown error"}`;
-        logPoll(`  ${done}`);
-        for (const win of BrowserWindow.getAllWindows()) {
-          try {
-            if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", {
-              source: done,
-              current: 1,
-              total: 2,
-            });
-          } catch {}
-        }
-      },
-    );
-
-    let rawData = fetchResult.mergedData;
-    if (fetchResult.errors.length > 0) {
-      for (const { source, error } of fetchResult.errors) {
-        logPoll(`  Source ${source} failed: ${error.slice(0, 100)}`);
-        addDebugEntry("out", `❌ ${source}: ${error.slice(0, 100)}`, "fetch");
-      }
+    let rawData = "";
+    try {
+      rawData = await askBridge(fetchPrompt); // no timeout — let the agent finish
+      logPoll(`  Fetch complete: ${rawData.length} chars`);
+      addDebugEntry("out", `✅ All sources: ${rawData.length} chars`, "fetch");
+    } catch (err) {
+      logPoll(`  Fetch ERROR: ${String(err).slice(0, 100)}`);
+      addDebugEntry("out", `❌ Fetch error: ${String(err).slice(0, 100)}`, "fetch");
     }
 
     const fetchElapsed = Date.now() - fetchStart;
-    logPoll(`Pass 1 complete: ${rawData.length} chars in ${(fetchElapsed / 1000).toFixed(1)}s (${fetchResult.succeeded.length}/${enabledSources.length} sources)`);
+    logPoll(`Pass 1 complete: ${rawData.length} chars in ${(fetchElapsed / 1000).toFixed(1)}s`);
 
     // No bridge restart needed — triage prompt includes all raw data explicitly.
     // Removing the restart saves 60s per poll cycle.
@@ -844,6 +863,39 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
       // Save immediately after adding/updating — don't wait for consolidation/projects
       // This ensures notifications survive even if later steps fail or the app crashes
       saveCacheToFile();
+    }
+
+    // Dedup triage projects: merge entries that normalize to the same name
+    if (triageProjects.length > 1) {
+      const normalizeProjectName = (s: string) =>
+        s.toLowerCase()
+          .replace(/\b(project|launch|improvements|updates|epic|phase\s*\d+|work|follow.?up|chat|extension|v\d+|initiative)\b/gi, "")
+          .replace(/\s+/g, " ")
+          .trim();
+      const seen = new Map<string, number>(); // normalized name → index in deduped array
+      const deduped: typeof triageProjects = [];
+      for (const tp of triageProjects) {
+        const key = normalizeProjectName(tp.name);
+        const existingIdx = seen.get(key);
+        if (existingIdx !== undefined) {
+          // Merge related_channels and related_tickets into existing entry
+          const existing = deduped[existingIdx];
+          const mergedChannels = new Set([...(existing.related_channels ?? []), ...(tp.related_channels ?? [])]);
+          const mergedTickets = new Set([...(existing.related_tickets ?? []), ...(tp.related_tickets ?? [])]);
+          existing.related_channels = [...mergedChannels];
+          existing.related_tickets = [...mergedTickets];
+          // Prefer the entry with a source_id if current one lacks it
+          if (!existing.source_id && tp.source_id) existing.source_id = tp.source_id;
+          logPoll(`Dedup project: merged "${tp.name}" into "${existing.name}"`);
+        } else {
+          seen.set(key, deduped.length);
+          deduped.push(tp);
+        }
+      }
+      if (deduped.length < triageProjects.length) {
+        logPoll(`Deduped projects: ${triageProjects.length} → ${deduped.length}`);
+        triageProjects = deduped;
+      }
     }
 
     // CREATE/UPDATE PROJECTS from triage output

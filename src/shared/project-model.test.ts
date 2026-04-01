@@ -7,6 +7,7 @@ import {
   getAllProjects,
   updateProjectContext,
   detectProjectFromSource,
+  findProjectByName,
   setProjectReasoning,
   getProjectReasoning,
   _resetForTest,
@@ -105,5 +106,74 @@ describe("Project creation reasoning (#116)", () => {
 
   it("should return null for unknown project reasoning", () => {
     expect(getProjectReasoning("nonexistent")).toBeNull();
+  });
+});
+
+describe("findProjectByName — fuzzy matching (#duplicate-consolidation)", () => {
+  beforeEach(() => _resetForTest());
+
+  it("should match 'Performance Agent Chat' to existing 'Performance Agent'", () => {
+    createProject("Performance Agent", "linear");
+    const found = findProjectByName("Performance Agent Chat");
+    expect(found).not.toBeNull();
+    expect(found!.name).toBe("Performance Agent");
+  });
+
+  it("should match 'VEC Dashboard Improvements' to existing 'VEC Dashboard'", () => {
+    createProject("VEC Dashboard", "linear");
+    const found = findProjectByName("VEC Dashboard Improvements");
+    expect(found).not.toBeNull();
+    expect(found!.name).toBe("VEC Dashboard");
+  });
+
+  it("should return best match: 'Performance Agent' over 'Agent' for query 'Performance Agent Chat'", () => {
+    createProject("Agent", "ai");
+    createProject("Performance Agent", "linear");
+    const found = findProjectByName("Performance Agent Chat");
+    expect(found).not.toBeNull();
+    expect(found!.name).toBe("Performance Agent");
+  });
+
+  it("should use exact word matching, not substring matching in word overlap", () => {
+    // "testing" should NOT match "test" via substring — they are different words
+    createProject("Test Dashboard", "ai");
+    const found = findProjectByName("Testing Dashboard Phase");
+    // After normalization: "testing dashboard phase" vs "test dashboard"
+    // Neither contains the other, and word overlap is only 1 ("dashboard") — not 2
+    // With the old substring logic, "testing".includes("test") would inflate overlap to 2
+    // With exact word matching, this correctly returns null (no sufficient match)
+    expect(found).toBeNull();
+  });
+
+  it("should not conflate substring words in overlap scoring", () => {
+    // Given two projects, substring matching could pick the wrong one
+    createProject("API Testing Framework", "ai");
+    createProject("API Test Runner", "ai");
+    // Search for "API Test" — should match "API Test Runner" (exact words) over "API Testing Framework" (substring)
+    const found = findProjectByName("API Test");
+    expect(found).not.toBeNull();
+    expect(found!.name).toBe("API Test Runner");
+  });
+
+  it("should strip extended noise words during normalization", () => {
+    createProject("Dashboard", "ai");
+    // "Dashboard Epic Phase 2 Work" normalizes to "dashboard" after stripping
+    const found = findProjectByName("Dashboard Epic Phase 2 Work");
+    expect(found).not.toBeNull();
+    expect(found!.name).toBe("Dashboard");
+  });
+
+  it("should return null when no project matches", () => {
+    createProject("Performance Agent", "linear");
+    const found = findProjectByName("Totally Unrelated Thing");
+    expect(found).toBeNull();
+  });
+
+  it("should prefer exact normalized match over contains match", () => {
+    createProject("VEC Dashboard Overview", "ai");
+    createProject("VEC Dashboard", "linear");
+    const found = findProjectByName("VEC Dashboard");
+    expect(found).not.toBeNull();
+    expect(found!.name).toBe("VEC Dashboard");
   });
 });

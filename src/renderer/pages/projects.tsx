@@ -284,7 +284,7 @@ export default function ProjectsPage() {
         ) : (
           <Stack gap={16}>
             {[...tasksByStage.entries()].map(([stage, items]) => {
-              const cfg = STAGE_LABELS[stage] ?? { label: stage, color: "#6b7280" };
+              const cfg = STAGE_LABELS[stage] ?? { label: stage, color: "var(--mantine-color-gray-6)" };
               return (
                 <div key={stage}>
                   <Group gap={8} mb={8}>
@@ -295,8 +295,8 @@ export default function ProjectsPage() {
                   <Stack gap={6}>
                     {items.map(n => {
                       const SrcIcon = sourceIcons[n.source] ?? IconFileText;
-                      const srcColor = sourceColors[n.source] ?? "#6b7280";
-                      const stageCfg = STAGE_LABELS[n.stage ?? "new"] ?? { label: n.stage ?? "new", color: "#6b7280" };
+                      const srcColor = sourceColors[n.source] ?? "var(--mantine-color-gray-6)";
+                      const stageCfg = STAGE_LABELS[n.stage ?? "new"] ?? { label: n.stage ?? "new", color: "var(--mantine-color-gray-6)" };
                       return (
                         <UnstyledButton
                           key={n.id}
@@ -453,7 +453,7 @@ export default function ProjectsPage() {
                                   width: `${((taskCount - doneCount) / taskCount) * 100}%`,
                                 }}>
                                   {activeStages.map(([stage, count]) => {
-                                    const cfg = STAGE_LABELS[stage] ?? { label: stage, color: "#6b7280" };
+                                    const cfg = STAGE_LABELS[stage] ?? { label: stage, color: "var(--mantine-color-gray-6)" };
                                     const pct = (count / (taskCount - doneCount)) * 100;
                                     return (
                                       <Tooltip key={stage} label={`${cfg.label}: ${count}`} withArrow position="top">
