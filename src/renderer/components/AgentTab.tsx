@@ -63,13 +63,13 @@ export function AgentTab({
   actionHandlers,
 }: AgentTabProps) {
   const [feedback, setFeedback] = useState("");
-  const [showActivity, setShowActivity] = useState(false);
+  const [showActivity, setShowActivity] = useState(activity.length > 0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto-expand activity while loading, keep expanded if there's activity
+  // Auto-expand activity when events arrive
   useEffect(() => {
-    if (shouldAutoExpand(loading, activity.length)) setShowActivity(true);
-  }, [loading, activity.length]);
+    if (activity.length > 0 && !showActivity) setShowActivity(true);
+  }, [activity.length]);
 
   // Auto-scroll conversation
   useEffect(() => {
