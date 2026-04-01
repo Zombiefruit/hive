@@ -37,6 +37,13 @@ const api = {
     return () => ipcRenderer.removeListener("task:event", listener);
   },
 
+  // Fullscreen detection (macOS native fullscreen via IPC)
+  onFullscreenChange: (callback: (isFullscreen: boolean) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, isFullscreen: boolean) => callback(isFullscreen);
+    ipcRenderer.on("window:fullscreen-changed", listener);
+    return () => ipcRenderer.removeListener("window:fullscreen-changed", listener);
+  },
+
   // Planning events (real-time stream from MCP planning agent)
   onPlanningEvent: (callback: (data: { notificationId: string; event: { type: string; content: string; timestamp: string } }) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, data: { notificationId: string; event: { type: string; content: string; timestamp: string } }) => callback(data);

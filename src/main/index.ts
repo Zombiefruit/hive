@@ -76,6 +76,10 @@ function buildStoreState(): StoreState {
   return { agents, messages, approvals, contextRefs, events, metrics };
 }
 
+// macOS title bar constants
+const HEADER_HEIGHT = 44;
+const MACOS_TRAFFIC_LIGHT_HEIGHT = 14;
+
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 1400,
@@ -83,12 +87,23 @@ const createWindow = () => {
     minWidth: 1000,
     minHeight: 700,
     titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 16, y: 12 },
+    trafficLightPosition: {
+      x: 16,
+      y: Math.round(HEADER_HEIGHT / 2 - MACOS_TRAFFIC_LIGHT_HEIGHT / 2),
+    },
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
     },
+  });
+
+  // Fullscreen detection via IPC (reliable on macOS, unlike DOM APIs)
+  mainWindow.on("enter-full-screen", () => {
+    mainWindow.webContents.send("window:fullscreen-changed", true);
+  });
+  mainWindow.on("leave-full-screen", () => {
+    mainWindow.webContents.send("window:fullscreen-changed", false);
   });
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {

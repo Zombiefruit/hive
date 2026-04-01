@@ -3,6 +3,11 @@ import { IconSettings, IconSun, IconMoon, IconDeviceDesktop } from "@tabler/icon
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 
+// Shared constants — match HEADER_HEIGHT in src/main/index.ts
+export const TITLEBAR_HEIGHT = 44;
+export const TITLEBAR_PADDING_LEFT = 84; // Clears traffic lights in windowed mode
+export const TITLEBAR_PADDING_LEFT_FULLSCREEN = 24;
+
 const TABS = [
   { path: "/", label: "Agents" },
   { path: "/notifications", label: "Inbox" },
@@ -33,13 +38,11 @@ function ThemeToggle() {
   );
 }
 
-function useIsFullscreen(): boolean {
+export function useIsFullscreen(): boolean {
   const [fs, setFs] = useState(false);
   useEffect(() => {
-    const check = () => setFs(!!document.fullscreenElement || (window.innerHeight === screen.height));
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
+    const unsub = window.deck?.onFullscreenChange?.((isFullscreen: boolean) => setFs(isFullscreen));
+    return () => { unsub?.(); };
   }, []);
   return fs;
 }
@@ -54,8 +57,9 @@ export function AppHeader({ rightContent }: AppHeaderProps) {
       style={{
         display: "flex",
         alignItems: "center",
-        padding: "8px 24px",
-        paddingLeft: isFullscreen ? 24 : 90,
+        height: TITLEBAR_HEIGHT,
+        padding: "0 24px",
+        paddingLeft: isFullscreen ? TITLEBAR_PADDING_LEFT_FULLSCREEN : TITLEBAR_PADDING_LEFT,
         transition: "padding-left 0.2s ease",
         gap: 12,
         borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
