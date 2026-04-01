@@ -8,6 +8,7 @@ import { executeManagerTool } from "./manager-tools";
 import { getAllAgents, getPendingApprovals } from "../db/database";
 import { broadcastStoreUpdate } from "../ipc/bridge";
 import { getMonitorSummary } from "../notifications/agent-monitor";
+import { hasConfig, getConfig } from "../config";
 
 const MODEL = "claude-sonnet-4-6"; // Sonnet for fast responses — bridge uses Opus for heavy MCP work
 const CALL_DIR = path.join(os.tmpdir(), "claude-deck-mcp");
@@ -151,19 +152,25 @@ function buildSystemPrompt(): string {
     ? pending.map((a) => `- [${a.riskLevel}] ${a.description}`).join("\n")
     : "No pending approvals.";
 
+  const cfg = hasConfig() ? getConfig() : null;
+  const userName = cfg?.name ?? "the user";
+  const identity = cfg
+    ? `${cfg.name} (${cfg.role?.replace(/_/g, " ")} on the ${cfg.teamName} team)`
+    : "the user";
+
   return `You are the Manager AI for Claude Deck, an orchestration dashboard for Claude Code agents.
 
 ## Your Role
-You manage a fleet of Claude Code agents for Kieran Williams (Senior Engineer at Monte Carlo Data, Vector team).
+You manage a fleet of Claude Code agents for ${identity}.
 
 ## Capabilities
-You manage Kieran's notification inbox and agent fleet. You can:
+You manage ${userName}'s notification inbox and agent fleet. You can:
 - Discuss tasks and help prioritize
 - Update task state by including action blocks in your response
 - Spawn agents when work is approved
 
 ## Updating tasks
-When Kieran asks you to change a task's priority, mark it done, or change its stage,
+When ${userName} asks you to change a task's priority, mark it done, or change its stage,
 include a JSON action block in your response (on its own line):
 {"action": "update_task", "task_title": "partial title match", "changes": {"priority": "low", "stage": "done", "confidence": 3}}
 

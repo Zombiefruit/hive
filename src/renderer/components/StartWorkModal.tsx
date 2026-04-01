@@ -125,7 +125,7 @@ export function StartWorkModal({
           description="Will be created by /start-work if it doesn't exist"
           value={branch}
           onChange={(e) => setBranch(e.currentTarget.value)}
-          placeholder="kwilliams/vec-24-description"
+          placeholder="username/ticket-description"
           styles={{
             input: {
               backgroundColor: "var(--mantine-color-default-hover)",

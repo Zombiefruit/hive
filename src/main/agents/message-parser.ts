@@ -163,12 +163,15 @@ export function parseSessionToDisplayMessages(lines: string[], limit = 150): Dis
  * Detect context references (Linear/Slack/Notion/GitHub) from JSONL lines.
  * Scans MCP tool calls for service-specific patterns.
  */
-// Known Slack channels from Kieran's workspace
-const KNOWN_SLACK_CHANNELS: Record<string, string> = {
-  "C0AMSV2SK4Z": "team-vector",
-  "C0AMT1AGN7K": "team-vector-standup",
-  "C0ALAC5N91S": "kieran-task-bot",
-};
+// Slack channel names — resolved from config at runtime
+const KNOWN_SLACK_CHANNELS: Record<string, string> = {};
+
+/** Populate known channels from config (call at startup). */
+export function initSlackChannels(channels: Array<{ id: string; name: string }>): void {
+  for (const ch of channels) {
+    KNOWN_SLACK_CHANNELS[ch.id] = ch.name;
+  }
+}
 
 function resolveSlackChannelName(channelId: string): string {
   if (KNOWN_SLACK_CHANNELS[channelId]) return KNOWN_SLACK_CHANNELS[channelId];

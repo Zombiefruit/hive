@@ -106,8 +106,8 @@ export function cadenceToMs(cadence: string): number | null {
 
 // ── Slack workspace helpers ──
 
-/** Default Slack workspace — can be overridden by config.slackWorkspace */
-let _slackWorkspace = "montecarloai";
+/** Default Slack workspace — overridden by config.slackWorkspace at startup */
+let _slackWorkspace = "workspace";
 
 /** Set the Slack workspace from config (call at startup). */
 export function setSlackWorkspace(workspace: string): void {

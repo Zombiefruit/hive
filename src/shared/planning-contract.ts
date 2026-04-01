@@ -223,8 +223,8 @@ Return a JSON object listing the context you need. Use this EXACT format:
 {
   "context_requests": [
     {"type": "linear-issue", "id": "VEC-20"},
-    {"type": "slack-thread", "channel": "C0AMSV2SK4Z", "thread_ts": "1711234567.890"},
-    {"type": "slack-channel", "channel": "C0AMSV2SK4Z", "limit": 20},
+    {"type": "slack-thread", "channel": "C0EXAMPLE1", "thread_ts": "1711234567.890"},
+    {"type": "slack-channel", "channel": "C0EXAMPLE1", "limit": 20},
     {"type": "notion-page", "url": "https://notion.so/..."},
     {"type": "github-pr", "repo": "owner/repo", "number": "123"}
   ]

@@ -8,7 +8,7 @@ const config: ForgeConfig = {
     asar: true,
     name: "Claude Deck",
     executableName: "claude-deck",
-    appBundleId: "com.kieranwilliams.claude-deck",
+    appBundleId: "com.claude-deck.app",
     appCategoryType: "public.app-category.developer-tools",
   },
   rebuildConfig: {},

@@ -7,6 +7,7 @@ import path from "node:path";
 import os from "node:os";
 import type { DeckConfig } from "../../shared/config-types";
 import { normalizePriority, extractKey as extractKeyUtil, STAGE_ORDER, CONFIDENCE_THRESHOLD, sanitizeUrl, cadenceToMs, setSlackWorkspace, getSlackBaseUrl } from "../../shared/task-utils";
+import { initSlackChannels } from "../agents/message-parser";
 import { loadSkills, loadSkillTemplate } from "../../shared/skill-loader";
 import { computeLookbackHours, migrateCacheFormat, buildCachePayload } from "../../shared/poll-cache";
 import { createProject, addTaskToProject, detectProjectFromSource, findProjectByName, getAllProjects, loadProjects, saveProjects } from "../../shared/project-model";
@@ -78,6 +79,7 @@ export function startPolling(): void {
 
   const config = getConfig() as DeckConfig | null;
   if (config?.slackWorkspace) setSlackWorkspace(config.slackWorkspace);
+  if (config?.slackChannels?.length) initSlackChannels(config.slackChannels);
   const cadence = config?.fetchCadence ?? "manual";
   const intervalMs = cadenceToMs(cadence);
 

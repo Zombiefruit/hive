@@ -260,7 +260,7 @@ export async function prepareWorkPlan(notification: {
     }
     const linearMatch = c.match(/get_issue.*?([A-Z]+-\d+)/i) || c.match(/issue["\s:]+([A-Z]+-\d+)/i);
     if (linearMatch) {
-      discoveredLinks.push({ type: "linear", label: linearMatch[1], url: `https://linear.app/montecarlodata/issue/${linearMatch[1]}` });
+      discoveredLinks.push({ type: "linear", label: linearMatch[1], url: `https://linear.app/issue/${linearMatch[1]}` });
     }
   }
   // Merge with existing links (dedup by URL)

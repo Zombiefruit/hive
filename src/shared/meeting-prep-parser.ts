@@ -21,6 +21,9 @@ export interface MeetingPrepData {
   relatedDocs: RelatedDoc[];
 }
 
+// Re-export is not needed — import helpers from task-utils at call sites
+import { getSlackBaseUrl } from "./task-utils";
+
 export function parseMeetingPrepContext(events: Array<{ type: string; content: string; timestamp: string }>): MeetingPrepData {
   const result: MeetingPrepData = { talkingPoints: [], attendees: [], relatedDocs: [] };
 
@@ -64,14 +67,14 @@ export function parseMeetingPrepContext(events: Array<{ type: string; content: s
       if (linearMatch) {
         const id = linearMatch[1];
         if (!result.relatedDocs.some(d => d.label === id)) {
-          result.relatedDocs.push({ label: id, url: `https://linear.app/montecarlodata/issue/${id}`, type: "linear" });
+          result.relatedDocs.push({ label: id, url: `https://linear.app/issue/${id}`, type: "linear" });
         }
       }
       const slackMatch = evt.content.match(/channel_id["\s:]+([CDG][A-Z0-9]{8,})/i);
       if (slackMatch) {
         const ch = slackMatch[1];
         if (!result.relatedDocs.some(d => d.label === ch)) {
-          result.relatedDocs.push({ label: `Slack ${ch}`, url: `https://montecarloai.slack.com/archives/${ch}`, type: "slack" });
+          result.relatedDocs.push({ label: `Slack ${ch}`, url: `${getSlackBaseUrl()}/archives/${ch}`, type: "slack" });
         }
       }
     }

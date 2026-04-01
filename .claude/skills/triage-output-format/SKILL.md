@@ -45,7 +45,7 @@ Return a JSON object with FOUR arrays:
     "url": "https://...",
     "links": [{"type": "...", "label": "...", "url": "..."}]
   },
-  "timeline_event": "PR #123 opened by kwilliams, 2 approvals received"
+  "timeline_event": "PR #123 opened by the-user, 2 approvals received"
 }
 ```
 
