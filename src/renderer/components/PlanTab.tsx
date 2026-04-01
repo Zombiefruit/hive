@@ -11,8 +11,9 @@ interface PlanTabProps {
 export function PlanTab({ planText }: PlanTabProps) {
   const parsedPlan = useMemo(() => (planText ? parsePlanMd(planText) : null), [planText]);
 
-  if (!parsedPlan) {
-    return <EmptyState icon={IconFileText} message="No plan yet." detail="Start work from the Agent tab to generate a plan." />;
+  // Only show plan if it has actual phases/tasks — not for response/meeting_prep text
+  if (!parsedPlan || parsedPlan.phases.length === 0) {
+    return <EmptyState icon={IconFileText} message="No implementation plan." detail="Implementation tasks get a phased plan from /start-work." />;
   }
 
   return (
@@ -20,4 +21,11 @@ export function PlanTab({ planText }: PlanTabProps) {
       <PlanView plan={parsedPlan} />
     </div>
   );
+}
+
+/** Check if plan text contains actual implementation plan phases (not just response context). */
+export function hasPlanPhases(planText: string | null): boolean {
+  if (!planText) return false;
+  const parsed = parsePlanMd(planText);
+  return parsed.phases.length > 0;
 }

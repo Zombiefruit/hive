@@ -9,7 +9,7 @@ import { IconMessageCircle, IconFileText, IconDatabase, IconTimeline, IconExtern
 import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AgentTab } from "./AgentTab";
-import { PlanTab } from "./PlanTab";
+import { PlanTab, hasPlanPhases } from "./PlanTab";
 import { ContextTab } from "./ContextTab";
 import { TimelineTab } from "./TimelineTab";
 import { RepoDetectionBanner, deriveBranch } from "./RepoDetectionBanner";
@@ -348,10 +348,10 @@ export function DetailDrawer({
           <Tabs.Tab value="agent" leftSection={<IconMessageCircle size={14} />} rightSection={loading ? <Loader size={8} /> : undefined}>
             Agent
           </Tabs.Tab>
-          <Tabs.Tab value="plan" leftSection={<IconFileText size={14} />} rightSection={planText ? <Badge size="xs" color="green" variant="filled" circle>✓</Badge> : undefined}>
+          <Tabs.Tab value="plan" leftSection={<IconFileText size={14} />} rightSection={hasPlanPhases(planText) ? <Badge size="xs" color="green" variant="filled" circle>✓</Badge> : undefined}>
             Plan
           </Tabs.Tab>
-          <Tabs.Tab value="context" leftSection={<IconDatabase size={14} />} rightSection={(n.links?.length ?? 0) + fetchedContext.filter(i => i.type === "tool_use").length > 0 ? <Badge size="xs" variant="light" color="gray">{(n.links?.length ?? 0) + fetchedContext.filter(i => i.type === "tool_use").length}</Badge> : undefined}>
+          <Tabs.Tab value="context" leftSection={<IconDatabase size={14} />} rightSection={(n.links?.length ?? 0) > 0 ? <Badge size="xs" variant="light" color="gray">{n.links?.length ?? 0}</Badge> : undefined}>
             Context
           </Tabs.Tab>
           <Tabs.Tab value="timeline" leftSection={<IconTimeline size={14} />}>
@@ -362,6 +362,7 @@ export function DetailDrawer({
         <Tabs.Panel value="agent" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
           <AgentTab
             notificationId={n.id}
+            stage={n.stage}
             conversation={conversation}
             activity={activity}
             loading={loading}

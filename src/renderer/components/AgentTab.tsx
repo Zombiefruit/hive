@@ -9,7 +9,7 @@
 import { Group, Loader, Stack, Text, UnstyledButton } from "@mantine/core";
 import { IconChevronRight, IconSend } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
-import { ChatBubble } from "./ChatBubble";
+import { ChatBubble, isQuestion } from "./ChatBubble";
 import { NextStepsCard, type NextStepsCardProps } from "./NextStepsCard";
 import { parseActions } from "../../shared/action-parser";
 import { Markdown } from "./Markdown";
@@ -30,6 +30,7 @@ export function getInputPlaceholder(skillRunning: boolean, hasConversation: bool
 
 interface AgentTabProps {
   notificationId: string;
+  stage?: string;
   conversation: Array<{ role: string; content: string }>;
   activity: Array<{ type: string; content: string; timestamp: string }>;
   loading: boolean;
@@ -42,6 +43,7 @@ interface AgentTabProps {
 
 export function AgentTab({
   notificationId,
+  stage,
   conversation,
   activity,
   loading,
@@ -53,10 +55,9 @@ export function AgentTab({
   const [showActivity, setShowActivity] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto-expand activity while loading
+  // Auto-expand activity while loading, keep expanded if there's activity
   useEffect(() => {
     if (shouldAutoExpand(loading, activity.length)) setShowActivity(true);
-    if (!loading && showActivity && activity.length > 0) setShowActivity(false);
   }, [loading, activity.length]);
 
   // Auto-scroll conversation
@@ -84,25 +85,44 @@ export function AgentTab({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-      {/* Zone 1: Chat bubbles */}
-      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
-        {conversation.length === 0 && !loading && (
+      {/* Zone 1: Conversation */}
+      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
+        {/* Empty state — stage aware */}
+        {conversation.length === 0 && !loading && activity.length === 0 && (
           <Stack align="center" py="xl" gap="sm">
-            <Text size="sm" c="dimmed">Click "Start Work" to begin planning.</Text>
+            <Text size="sm" c="dimmed">
+              {stage === "new" || stage === "skipped" ? "Click \"Start Work\" to begin planning."
+                : stage === "start_work" || stage === "preparing" ? "Agent is being set up..."
+                : "No conversation yet."}
+            </Text>
           </Stack>
         )}
 
+        {/* Loading at top when no conversation yet */}
+        {loading && !hasConversation && (
+          <Group gap={8} py="sm" justify="center">
+            <Loader size={16} />
+            <Text size="sm" c="dimmed">
+              {stage === "start_work" ? "Planning..." : stage === "preparing" ? "Gathering context..." : "Working..."}
+            </Text>
+          </Group>
+        )}
+
         {conversation.map((msg, i) => {
-          // Split assistant messages at "---" into TL;DR + Details
-          if (msg.role === "assistant" && msg.content.includes("\n---\n")) {
-            const parts = msg.content.split("\n---\n");
+          if (msg.role === "user") {
+            return <ChatBubble key={i} role="user" content={msg.content} />;
+          }
+          // Assistant messages — render with Markdown, split at "---"
+          const content = msg.content;
+          if (content.includes("\n---\n")) {
+            const parts = content.split("\n---\n");
             const tldr = parts[0].trim();
             const details = parts.slice(1).join("\n---\n").trim();
             return (
               <div key={i} style={{
-                padding: "10px 14px", borderRadius: 12, marginBottom: 8,
+                padding: "10px 14px", borderRadius: 8, marginBottom: 8,
                 backgroundColor: "var(--mantine-color-dark-7)",
-                border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
+                border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
               }}>
                 <Markdown content={tldr} />
                 {details && (
@@ -118,21 +138,25 @@ export function AgentTab({
               </div>
             );
           }
-          return <ChatBubble key={i} role={msg.role as "user" | "assistant"} content={msg.content} />;
+          // Regular assistant message — use Markdown, not raw text
+          return (
+            <div key={i} style={{
+              padding: "10px 14px", borderRadius: 8, marginBottom: 8,
+              backgroundColor: "var(--mantine-color-dark-7)",
+              border: isQuestion(content)
+                ? "1px solid color-mix(in srgb, var(--mantine-color-yellow-5) 40%, transparent)"
+                : "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
+            }}>
+              <Markdown content={content} />
+            </div>
+          );
         })}
 
-        {/* Loading indicator */}
+        {/* Loading indicator after conversation */}
         {loading && hasConversation && (
-          <Group gap={8} py="sm">
+          <Group gap={8} py={8}>
             <Loader size={14} />
             <Text size="xs" c="dimmed">Thinking...</Text>
-          </Group>
-        )}
-
-        {loading && !hasConversation && (
-          <Group gap={8} py="sm">
-            <Loader size={14} />
-            <Text size="xs" c="dimmed">Working...</Text>
           </Group>
         )}
 
