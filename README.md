@@ -13,8 +13,8 @@ An autonomous engineering manager built on Electron. Monitors your work channels
 
 ```bash
 # Clone and install
-git clone https://github.com/kieranwilliams/claude-deck.git
-cd claude-deck
+git clone https://github.com/kieranwilliams/hive.git
+cd hive
 pnpm install
 
 # Run in development
@@ -37,11 +37,11 @@ The app will start polling your configured sources via MCP.
 # Package the app (no installer)
 pnpm run package
 
-# Build a distributable .dmg
+# Build a distributable .zip
 pnpm run make
 ```
 
-The `.dmg` will be in `out/make/`. Share it directly -- the recipient opens the DMG, drags to Applications, and runs it.
+The `.zip` will be in `out/make/zip/`. Share it directly -- the recipient unzips, moves Hive.app to Applications, and runs it.
 
 **Note:** The app is unsigned, so macOS will show a Gatekeeper warning on first launch. The recipient needs to right-click > Open (or System Settings > Privacy > Open Anyway).
 
@@ -84,11 +84,11 @@ pnpm run dev:clean
 
 ## Configuration
 
-Config is stored at `~/Library/Application Support/claude-deck/config.json`. Edit via Settings page or manually.
+Config is stored at `~/Library/Application Support/hive/config.json`. Edit via Settings page or manually.
 
-Notification cache: `~/Library/Application Support/claude-deck/notifications-cache.json`
-Database: `~/Library/Application Support/claude-deck/claude-deck.db`
-Logs: `~/Library/Application Support/claude-deck/*.log`
+Notification cache: `~/Library/Application Support/hive/notifications-cache.json`
+Database: `~/Library/Application Support/hive/hive.db`
+Logs: `~/Library/Application Support/hive/*.log`
 
 ## License
 

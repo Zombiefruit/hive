@@ -13,9 +13,10 @@ import { AddToManagerButton } from "../components/AddToManagerButton";
 import { AddTaskModal } from "../components/AddTaskModal";
 import { AppHeader } from "../components/AppHeader";
 import { DetailDrawer } from "../components/DetailDrawer";
-import { buildSlackArchiveUrl } from "../../shared/task-utils";
+import { buildSlackArchiveUrl, computeParentStage } from "../../shared/task-utils";
 import { STAGE_META, SOURCE_COLORS } from "../../shared/ui-constants";
 import { formatTimeSince } from "../components/shared";
+import { SubtaskList } from "../components/SubtaskList";
 
 interface NotificationItem {
   id: string;
@@ -38,6 +39,8 @@ interface NotificationItem {
   sessionId?: string;
   workSlug?: string;
   branch?: string;
+  parentTaskId?: string;
+  subtaskIds?: string[];
 }
 
 // Agent-actionable: an agent can do the actual work
@@ -107,6 +110,12 @@ export function Notifications() {
   const [pollProgress, setPollProgress] = useState<{ source: string; current: number; total: number } | null>(null);
   const [showSkipped, setShowSkipped] = useState(false);
   const [collapsedCols, setCollapsedCols] = useState<Set<string>>(() => new Set(["done", "backlog"]));
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
+  const toggleParentExpanded = (id: string) => setExpandedParents(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
   // Track which poll cycle each item was last seen at — items with pollCycle > seenCycle show a badge
   const [seenCycle, setSeenCycle] = useState<Map<string, number>>(new Map());
   const markSeen = (id: string, cycle: number) => setSeenCycle(prev => new Map(prev).set(id, cycle));
@@ -248,6 +257,25 @@ export function Notifications() {
     // All items are now server-side, just update by ID
     window.deck.updateNotificationById?.(id, { stage: newStage })
       .catch(() => {});
+
+    // Stage cascade: if this is a subtask, recompute and update the parent stage
+    if (movedItem?.parentTaskId) {
+      const parentId = movedItem.parentTaskId;
+      setNotifications(prev => {
+        const parent = prev.find(n => n.id === parentId);
+        if (!parent?.subtaskIds) return prev;
+        const siblingStages = parent.subtaskIds.map(sid => {
+          const sibling = prev.find(n => n.id === sid);
+          return sibling?.stage ?? "new";
+        });
+        const newParentStage = computeParentStage(siblingStages);
+        if (newParentStage !== parent.stage) {
+          window.deck.updateNotificationById?.(parentId, { stage: newParentStage }).catch(() => {});
+          return prev.map(n => n.id === parentId ? { ...n, stage: newParentStage } : n);
+        }
+        return prev;
+      });
+    }
   }, []);
 
   // Trigger agent actions for a card (call AFTER moveCardToStage)
@@ -336,14 +364,28 @@ export function Notifications() {
     return (b.confidence ?? 0) - (a.confidence ?? 0);
   };
 
+  // Build a lookup map for quick notification access by ID
+  const notificationMap = useMemo(() => {
+    const m = new Map<string, NotificationItem>();
+    for (const n of notifications) m.set(n.id, n);
+    return m;
+  }, [notifications]);
+
   // Memoize filtered lists so we don't re-filter on every render
   const actionableByStage = useMemo(() => {
     const map = new Map<string, NotificationItem[]>();
     for (const stage of ACTIONABLE_ROW) {
       const filtered = notifications.filter(n => {
+        // Exclude subtasks from top-level kanban — they appear nested under parent
+        if (n.parentTaskId) return false;
         if (HUMAN_ONLY_TYPES.has(n.taskType ?? "")) return false;
         if (n.stage === "skipped") return false;
-        const nStage = n.stage ?? "new";
+        // Parent tasks: compute effective stage from children
+        let nStage = n.stage ?? "new";
+        if (n.subtaskIds && n.subtaskIds.length > 0) {
+          const childStages = n.subtaskIds.map(id => notificationMap.get(id)?.stage ?? "new");
+          nStage = computeParentStage(childStages);
+        }
         // plan_review tasks appear in the Planning (start_work) column
         const effectiveStage = nStage === "plan_review" ? "start_work" : nStage;
         return effectiveStage === stage.key;
@@ -351,12 +393,14 @@ export function Notifications() {
       map.set(stage.key, filtered);
     }
     return map;
-  }, [notifications]);
+  }, [notifications, notificationMap]);
 
   const humanByStage = useMemo(() => {
     const map = new Map<string, NotificationItem[]>();
     for (const stage of HUMAN_ROW) {
       const filtered = notifications.filter(n => {
+        // Exclude subtasks from top-level kanban
+        if (n.parentTaskId) return false;
         if (!HUMAN_ONLY_TYPES.has(n.taskType ?? "")) return false;
         if (n.stage === "skipped") return false;
         return (n.stage ?? "new") === stage.key;
@@ -393,7 +437,7 @@ export function Notifications() {
               itemLabel="items"
             />
             {!pollStatus.fetching && notifications.some(n => n.pollCycle && (!seenCycle.has(n.id) || (seenCycle.get(n.id) ?? 0) < n.pollCycle)) && (
-              <UnstyledButton onClick={markAllSeen} aria-label="Mark all as read" style={{ fontSize: "0.6rem", color: "var(--mantine-color-blue-filled)", padding: "2px 6px", borderRadius: 4, backgroundColor: "var(--mantine-color-blue-light)" }}>
+              <UnstyledButton onClick={markAllSeen} aria-label="Mark all as read" style={{ fontSize: "0.6rem", color: "var(--mantine-color-blue-4)", padding: "2px 6px", borderRadius: 4, backgroundColor: "color-mix(in srgb, var(--mantine-color-blue-9) 15%, transparent)" }}>
                 Mark all read
               </UnstyledButton>
             )}
@@ -516,12 +560,14 @@ export function Notifications() {
                           const SrcIcon = sourceIcons[n.source] ?? IconFileText;
                           const srcColor = sourceColors[n.source] ?? "#6b7280";
                           const isDragging = draggingId === n.id;
+                          const isParent = (n.subtaskIds?.length ?? 0) > 0;
+                          const isExpanded = expandedParents.has(n.id);
                           return (
+                            <div key={n.id}>
                             <div
-                              key={n.id}
-                              draggable
+                              draggable={!isParent}
                               onMouseDown={() => { wasDragging.current = false; }}
-                              onDragStart={(e) => { e.dataTransfer.setData("text/plain", n.id); setDraggingId(n.id); wasDragging.current = true; }}
+                              onDragStart={(e) => { if (isParent) { e.preventDefault(); return; } e.dataTransfer.setData("text/plain", n.id); setDraggingId(n.id); wasDragging.current = true; }}
                               onDragEnd={() => { setDraggingId(null); setDragOverStage(null); }}
                               onClick={() => {
                                 if (wasDragging.current) { wasDragging.current = false; return; }
@@ -530,7 +576,7 @@ export function Notifications() {
                               }}
                               className="notif-card"
                               style={{
-                                padding: "10px 12px", borderRadius: 6, cursor: "grab", userSelect: "none",
+                                padding: "10px 12px", borderRadius: 6, cursor: isParent ? "pointer" : "grab", userSelect: "none",
                                 border: `1px solid ${
                                   n.id === selectedId ? "var(--mantine-color-blue-5)"
                                   : "color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)"
@@ -542,7 +588,15 @@ export function Notifications() {
                             >
                               <Group gap={6} mb={2} justify="space-between">
                                 <Group gap={4}>
-                                  <IconGripVertical size={10} color="var(--mantine-color-dimmed)" style={{ opacity: 0.3 }} />
+                                  {!isParent && <IconGripVertical size={10} color="var(--mantine-color-dimmed)" style={{ opacity: 0.3 }} />}
+                                  {isParent && (
+                                    <UnstyledButton
+                                      onClick={(e) => { e.stopPropagation(); toggleParentExpanded(n.id); }}
+                                      style={{ padding: 0, display: "flex", alignItems: "center" }}
+                                    >
+                                      {isExpanded ? <IconChevronDown size={12} color="var(--mantine-color-dimmed)" /> : <IconChevronRight size={12} color="var(--mantine-color-dimmed)" />}
+                                    </UnstyledButton>
+                                  )}
                                   <SrcIcon size={12} color={srcColor} />
                                   {n.author && <Text size="xs" c="dimmed" truncate style={{ maxWidth: 90 }}>{n.author}</Text>}
                                 </Group>
@@ -583,10 +637,15 @@ export function Notifications() {
                                     {n.taskType}
                                   </Badge>
                                 )}
+                                {isParent && (
+                                  <Badge size="xs" variant="light" color="violet" radius="sm" style={{ fontSize: "0.55rem" }}>
+                                    {n.subtaskIds!.length} subtask{n.subtaskIds!.length !== 1 ? "s" : ""}
+                                  </Badge>
+                                )}
                               </Group>
                               <Group gap={6} mb={4} wrap="nowrap">
                                 {n.pollCycle && (!seenCycle.has(n.id) || (seenCycle.get(n.id) ?? 0) < n.pollCycle) && (
-                                  <div style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, backgroundColor: seenCycle.has(n.id) ? "var(--mantine-color-yellow-filled)" : "var(--mantine-color-blue-filled)" }} />
+                                  <div style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, backgroundColor: seenCycle.has(n.id) ? "#f59e0b" : "#3b82f6" }} />
                                 )}
                                 <Text size="xs" fw={500} lineClamp={2}>{n.title}</Text>
                               </Group>
@@ -596,7 +655,7 @@ export function Notifications() {
                                 </Text>
                               )}
                               {/* Status indicator for in-progress stages */}
-                              {(stage.key === "start_work" || stage.key === "hack") && !plansReady.has(n.id) && (
+                              {!isParent && (stage.key === "start_work" || stage.key === "hack") && !plansReady.has(n.id) && (
                                 <Group gap={4} mt={2}>
                                   <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: stage.color, animation: "pulse 1.5s infinite" }} />
                                   <Text size="xs" c={stage.color} fw={500} style={{ fontSize: "0.6rem" }}>
@@ -606,11 +665,11 @@ export function Notifications() {
                               )}
                               {stage.key === "start_work" && plansReady.has(n.id) && (
                                 <Group gap={4} mt={2}>
-                                  <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "var(--mantine-color-green-filled)" }} />
-                                  <Text size="xs" c="green" fw={500} style={{ fontSize: "0.6rem" }}>Plan ready</Text>
+                                  <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#22c55e" }} />
+                                  <Text size="xs" c="#22c55e" fw={500} style={{ fontSize: "0.6rem" }}>Plan ready</Text>
                                 </Group>
                               )}
-                              {stage.key !== "done" && stage.key !== "skipped" && stage.key !== "start_work" && stage.key !== "hack" && (
+                              {!isParent && stage.key !== "done" && stage.key !== "skipped" && stage.key !== "start_work" && stage.key !== "hack" && (
                                 <Group gap={4} mt={2}>
                                   <UnstyledButton
                                     onClick={(e) => { e.stopPropagation(); moveCardToStage(n.id, "done"); }}
@@ -620,6 +679,26 @@ export function Notifications() {
                                   </UnstyledButton>
                                 </Group>
                               )}
+                            </div>
+                            {/* Expanded subtask list for parent cards */}
+                            {isParent && isExpanded && (
+                              <div style={{
+                                padding: "4px 8px",
+                                borderLeft: "2px solid var(--mantine-color-violet-5)",
+                                marginLeft: 8,
+                                marginTop: 2,
+                              }}>
+                                <SubtaskList
+                                  subtasks={(n.subtaskIds ?? []).map(id => {
+                                    const child = notificationMap.get(id);
+                                    return { id, title: child?.title ?? id, stage: child?.stage ?? "new" };
+                                  })}
+                                  onSelect={(childId) => {
+                                    setSelectedId(childId);
+                                  }}
+                                />
+                              </div>
+                            )}
                             </div>
                           );
                         })}
@@ -743,21 +822,21 @@ export function Notifications() {
                               </Group>
                               <Group gap={6} mb={4} wrap="nowrap">
                                 {n.pollCycle && (!seenCycle.has(n.id) || (seenCycle.get(n.id) ?? 0) < n.pollCycle) && (
-                                  <div style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, backgroundColor: seenCycle.has(n.id) ? "var(--mantine-color-yellow-filled)" : "var(--mantine-color-blue-filled)" }} />
+                                  <div style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, backgroundColor: seenCycle.has(n.id) ? "#f59e0b" : "#3b82f6" }} />
                                 )}
                                 <Text size="xs" fw={500} lineClamp={2}>{n.title}</Text>
                               </Group>
                               {n.actionNeeded && <Text size="xs" c="blue.4" lineClamp={1} mb={4} style={{ fontSize: "0.65rem" }}>→ {n.actionNeeded}</Text>}
                               {stage.key === "preparing" && !plansReady.has(n.id) && (
                                 <Group gap={4} mt={2}>
-                                  <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "var(--mantine-color-cyan-filled)", animation: "pulse 1.5s infinite" }} />
-                                  <Text size="xs" c="cyan" fw={500} style={{ fontSize: "0.6rem" }}>Preparing...</Text>
+                                  <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#06b6d4", animation: "pulse 1.5s infinite" }} />
+                                  <Text size="xs" c="#06b6d4" fw={500} style={{ fontSize: "0.6rem" }}>Preparing...</Text>
                                 </Group>
                               )}
                               {stage.key === "preparing" && plansReady.has(n.id) && (
                                 <Group gap={4} mt={2}>
-                                  <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "var(--mantine-color-green-filled)" }} />
-                                  <Text size="xs" c="green" fw={500} style={{ fontSize: "0.6rem" }}>Ready</Text>
+                                  <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#22c55e" }} />
+                                  <Text size="xs" c="#22c55e" fw={500} style={{ fontSize: "0.6rem" }}>Ready</Text>
                                 </Group>
                               )}
                               {stage.key !== "done" && stage.key !== "ready" && stage.key !== "skipped" && (
@@ -827,7 +906,7 @@ export function Notifications() {
           {/* Backdrop — click to close */}
           <div
             onClick={() => setSelectedId(null)}
-            style={{ position: "fixed", inset: 0, top: 42, zIndex: 99, backgroundColor: "color-mix(in srgb, var(--mantine-color-body) 40%, transparent)", backdropFilter: "blur(2px)" }}
+            style={{ position: "fixed", inset: 0, top: 42, zIndex: 99, backgroundColor: "rgba(0,0,0,0.2)" }}
           />
           <div
             onClick={(e) => e.stopPropagation()}
@@ -838,7 +917,7 @@ export function Notifications() {
               zIndex: 100,
               backgroundColor: "var(--mantine-color-body)",
               borderLeft: "1px solid var(--mantine-color-default-border)",
-              boxShadow: "-4px 0 20px color-mix(in srgb, var(--mantine-color-body) 50%, transparent)",
+              boxShadow: "-4px 0 20px rgba(0,0,0,0.3)",
               animation: "slideInRight 0.2s ease-out",
             }}
           >
@@ -849,6 +928,8 @@ export function Notifications() {
               onPlanReady={() => setPlansReady(prev => new Set([...prev, selected.id]))}
               onPlanCleared={() => setPlansReady(prev => { const next = new Set(prev); next.delete(selected.id); return next; })}
               config={config}
+              notificationMap={notificationMap}
+              onSelectNotification={(id) => setSelectedId(id)}
             />
           </div>
         </>
