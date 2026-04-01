@@ -12,12 +12,23 @@ import { useEffect, useRef, useState } from "react";
 import { ChatBubble, isQuestion } from "./ChatBubble";
 import { NextStepsCard, type NextStepsCardProps } from "./NextStepsCard";
 import { parseActions } from "../../shared/action-parser";
+import type { Action } from "../../shared/action-types";
 import { Markdown } from "./Markdown";
 
 // ── Exported helpers (tested) ──
 
 export function shouldAutoExpand(loading: boolean, eventCount: number): boolean {
   return loading && eventCount > 0;
+}
+
+/** Derive display actions from raw parsed actions + task state. */
+export function deriveActions(rawActions: Action[], stage?: string): Action[] {
+  const allNoAction = rawActions.length > 0 && rawActions.every(a => a.type === "no_action");
+  const isDone = stage === "done" || stage === "backlog";
+  if (allNoAction && !isDone) {
+    return [...rawActions, { type: "dismiss" as const, label: "Mark Done", reason: "No action needed", risk: "low" as const }];
+  }
+  return rawActions;
 }
 
 export function getInputPlaceholder(skillRunning: boolean, hasConversation: boolean): string {
@@ -74,11 +85,7 @@ export function AgentTab({
   // Parse actions from last assistant message
   const lastAssistant = [...conversation].reverse().find(m => m.role === "assistant");
   const rawActions = lastAssistant ? parseActions(lastAssistant.content) : [];
-  // If the only actions are no_action, add a dismiss button so the user can mark done
-  const allNoAction = rawActions.length > 0 && rawActions.every(a => a.type === "no_action");
-  const actions = allNoAction
-    ? [...rawActions, { type: "dismiss" as const, label: "Mark Done", reason: "No action needed", risk: "low" as const }]
-    : rawActions;
+  const actions = deriveActions(rawActions, stage);
 
   const hasConversation = conversation.length > 0;
   const inputDisabled = !skillRunning && !hasConversation;
