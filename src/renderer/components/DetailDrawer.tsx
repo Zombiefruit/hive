@@ -5,7 +5,7 @@
  */
 
 import { Badge, Group, Loader, Tabs, Text, UnstyledButton } from "@mantine/core";
-import { IconMessageCircle, IconFileText, IconDatabase, IconTimeline, IconExternalLink, IconBrandSlack, IconBrandGithub, IconMail } from "@tabler/icons-react";
+import { IconMessageCircle, IconFileText, IconDatabase, IconTimeline, IconExternalLink, IconBrandSlack, IconBrandGithub, IconMail, IconArrowUpRight } from "@tabler/icons-react";
 import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AgentTab } from "./AgentTab";
@@ -14,6 +14,7 @@ import { ContextTab } from "./ContextTab";
 import { TimelineTab } from "./TimelineTab";
 import { RepoDetectionBanner, deriveBranch } from "./RepoDetectionBanner";
 import { StartWorkModal } from "./StartWorkModal";
+import { SubtaskList } from "./SubtaskList";
 import { STAGE_META } from "../../shared/ui-constants";
 import { detectRepo } from "../../shared/repo-detection";
 import type { NextStepsCardProps } from "./NextStepsCard";
@@ -46,6 +47,8 @@ interface NotificationItem {
   sessionId?: string;
   workSlug?: string;
   branch?: string;
+  parentTaskId?: string;
+  subtaskIds?: string[];
 }
 
 interface DetailDrawerProps {
@@ -55,6 +58,10 @@ interface DetailDrawerProps {
   onPlanReady?: () => void;
   onPlanCleared?: () => void;
   config: { repoMappings?: Array<{ pattern: string; repoPath: string }>; name?: string; linearUsername?: string } | null;
+  /** Map of all notifications by ID — used to look up subtask/parent details. */
+  notificationMap?: Map<string, NotificationItem>;
+  /** Called when user wants to navigate to a different notification (e.g. parent or subtask). */
+  onSelectNotification?: (id: string) => void;
 }
 
 // ── Component ──
@@ -66,6 +73,8 @@ export function DetailDrawer({
   onPlanReady,
   onPlanCleared,
   config,
+  notificationMap,
+  onSelectNotification,
 }: DetailDrawerProps) {
   // ── State ──
   const [activeTab, setActiveTab] = useState<TabId>("agent");
@@ -267,7 +276,7 @@ export function DetailDrawer({
 
   // ── Render ──
 
-  const stageConfig = STAGE_META[n.stage as keyof typeof STAGE_META] ?? { label: n.stage ?? "new", color: "var(--mantine-color-gray-6)" };
+  const stageConfig = STAGE_META[n.stage as keyof typeof STAGE_META] ?? { label: n.stage ?? "new", color: "#6b7280" };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", backgroundColor: "var(--mantine-color-body)" }}>
@@ -282,6 +291,19 @@ export function DetailDrawer({
             <Text size="xs" c="dimmed">Close</Text>
           </UnstyledButton>
         </Group>
+        {/* Subtask: "Part of" parent link */}
+        {n.parentTaskId && notificationMap && (
+          <UnstyledButton
+            onClick={() => onSelectNotification?.(n.parentTaskId!)}
+            style={{
+              display: "flex", alignItems: "center", gap: 4, marginBottom: 4,
+              fontSize: "0.65rem", color: "var(--mantine-color-violet-4)",
+            }}
+          >
+            <IconArrowUpRight size={10} />
+            <span>Part of: {notificationMap.get(n.parentTaskId)?.title ?? n.parentTaskId}</span>
+          </UnstyledButton>
+        )}
         <Text size="sm" fw={600} mb={2}>{n.title}</Text>
         <Group gap={6} mb={4}>
           {n.author && <Text size="xs" c="dimmed">{n.author}</Text>}
@@ -342,6 +364,22 @@ export function DetailDrawer({
         )}
       </div>
 
+      {/* Parent task: subtask list */}
+      {n.subtaskIds && n.subtaskIds.length > 0 && notificationMap && (
+        <div style={{ padding: "8px 20px", borderBottom: "1px solid var(--mantine-color-default-border)", flexShrink: 0 }}>
+          <Text size="xs" fw={600} c="dimmed" mb={4}>
+            {n.subtaskIds.filter(id => notificationMap.get(id)?.stage === "done").length} of {n.subtaskIds.length} subtasks done
+          </Text>
+          <SubtaskList
+            subtasks={n.subtaskIds.map(id => {
+              const child = notificationMap.get(id);
+              return { id, title: child?.title ?? id, stage: child?.stage ?? "new" };
+            })}
+            onSelect={(childId) => onSelectNotification?.(childId)}
+          />
+        </div>
+      )}
+
       {/* Tabs */}
       <Tabs value={activeTab} onChange={(v) => v && setActiveTab(v as TabId)} style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
         <Tabs.List style={{ flexShrink: 0 }}>
@@ -385,8 +423,8 @@ export function DetailDrawer({
         </Tabs.Panel>
       </Tabs>
 
-      {/* Action bar — Start Work / Rerun / Dismiss */}
-      {!loading && (n.stage === "new" || n.stage === "skipped") && conversation.length === 0 && (
+      {/* Action bar — Start Work / Rerun / Dismiss (hidden for parent tasks — children get started individually) */}
+      {!loading && !(n.subtaskIds && n.subtaskIds.length > 0) && (n.stage === "new" || n.stage === "skipped") && conversation.length === 0 && (
         <div style={{
           padding: "8px 20px",
           borderTop: "1px solid var(--mantine-color-default-border)",
