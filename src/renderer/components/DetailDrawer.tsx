@@ -223,18 +223,12 @@ export function DetailDrawer({
   }, [n.id, n.title]);
 
   const handlePrepare = useCallback(() => {
-    const isHuman = n.taskType === "response" || n.taskType === "meeting_prep";
-    if (!isHuman) {
-      if (detectedRepo) {
-        handleStartWork(detectedRepo, suggestedBranch);
-        return;
-      }
-      setStartWorkOpen(true);
-      return;
-    }
+    // "Move to Planning" always starts the planning phase — context gathering + plan creation.
+    // Repo selection happens later when moving from Planning → Hacking.
     setLoading(true);
     setActiveTab("agent");
-    window.deck?.updateNotificationById?.(n.id, { stage: "preparing" });
+    const isHuman = n.taskType === "response" || n.taskType === "meeting_prep";
+    window.deck?.updateNotificationById?.(n.id, { stage: isHuman ? "preparing" : "start_work" });
     (async () => {
       try {
         const result = await window.deck.prepareWorkPlan({
@@ -244,7 +238,7 @@ export function DetailDrawer({
         const plan = result as { conversationHistory?: typeof conversation; fetchedContext?: typeof fetchedContext };
         if (plan?.conversationHistory) setConversation(plan.conversationHistory);
         if (plan?.fetchedContext) setFetchedContext(plan.fetchedContext);
-        window.deck?.updateNotificationById?.(n.id, { stage: "ready" });
+        window.deck?.updateNotificationById?.(n.id, { stage: isHuman ? "ready" : "plan_review" });
       } catch {}
       setLoading(false);
     })();
@@ -439,6 +433,35 @@ export function DetailDrawer({
             }}
           >
             Move to Planning
+          </UnstyledButton>
+          <UnstyledButton onClick={onDismiss} style={{ padding: "6px 12px", borderRadius: 6, fontSize: "0.75rem", color: "var(--mantine-color-dimmed)" }}>
+            Dismiss
+          </UnstyledButton>
+        </div>
+      )}
+
+      {/* Approve & Start bar — shown when plan is ready for implementation tasks */}
+      {!loading && !(n.subtaskIds && n.subtaskIds.length > 0) && (n.stage === "plan_review" || n.stage === "start_work") && planText && (
+        <div style={{
+          padding: "8px 20px",
+          borderTop: "1px solid var(--mantine-color-default-border)",
+          flexShrink: 0,
+          display: "flex", gap: 8,
+        }}>
+          <UnstyledButton
+            onClick={() => {
+              if (detectedRepo) {
+                handleStartWork(detectedRepo, suggestedBranch);
+              } else {
+                setStartWorkOpen(true);
+              }
+            }}
+            style={{
+              padding: "6px 12px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 600,
+              backgroundColor: "var(--mantine-color-green-filled)", color: "white",
+            }}
+          >
+            Approve &amp; Start
           </UnstyledButton>
           <UnstyledButton onClick={onDismiss} style={{ padding: "6px 12px", borderRadius: 6, fontSize: "0.75rem", color: "var(--mantine-color-dimmed)" }}>
             Dismiss
