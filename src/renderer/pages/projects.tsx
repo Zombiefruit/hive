@@ -1,5 +1,5 @@
 import { Badge, Group, Stack, Text, UnstyledButton, Loader, Tooltip } from "@mantine/core";
-import { IconFolder, IconChevronRight, IconChevronLeft, IconRefresh, IconBrandGithub, IconHash, IconMail, IconFileText, IconExternalLink } from "@tabler/icons-react";
+import { IconFolder, IconChevronRight, IconChevronLeft, IconRefresh, IconBrandGithub, IconHash, IconMail, IconFileText, IconExternalLink, IconCheck } from "@tabler/icons-react";
 import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -7,6 +7,7 @@ import { AppHeader } from "../components/AppHeader";
 import { PollStatusIndicator } from "../components/PollStatusIndicator";
 import { usePollStatus } from "../hooks/usePollStatus";
 import type { Project } from "../../shared/project-model";
+import { STAGE_ORDER } from "../../shared/task-utils";
 import { STAGE_META, SOURCE_COLORS } from "../../shared/ui-constants";
 import { formatTimeSince, EmptyState } from "../components/shared";
 
@@ -178,6 +179,12 @@ export default function ProjectsPage() {
           <Text size="lg" fw={700}>{proj.name}</Text>
           <Badge size="sm" variant="light" color={sourceColor(proj.source)}>{proj.source}</Badge>
           <Badge size="sm" variant="outline" color="gray">{taskCount} task{taskCount !== 1 ? "s" : ""}</Badge>
+          {taskCount > 0 && (() => {
+            const doneCount = projectTasks.filter(n => n.stage === "done" || n.stage === "skipped").length;
+            return doneCount === taskCount
+              ? <Badge size="sm" color="green" variant="filled" leftSection={<IconCheck size={10} />}>All done</Badge>
+              : <Badge size="sm" variant="light" color="gray">{doneCount}/{taskCount} done</Badge>;
+          })()}
         </Group>
         <Text size="xs" c="dimmed" mb={proj.reasoning ? 8 : 20}>
           Created {new Date(proj.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
@@ -277,7 +284,7 @@ export default function ProjectsPage() {
         ) : (
           <Stack gap={16}>
             {[...tasksByStage.entries()].map(([stage, items]) => {
-              const cfg = STAGE_LABELS[stage] ?? { label: stage, color: "#6b7280" };
+              const cfg = STAGE_LABELS[stage] ?? { label: stage, color: "var(--mantine-color-gray-6)" };
               return (
                 <div key={stage}>
                   <Group gap={8} mb={8}>
@@ -288,8 +295,8 @@ export default function ProjectsPage() {
                   <Stack gap={6}>
                     {items.map(n => {
                       const SrcIcon = sourceIcons[n.source] ?? IconFileText;
-                      const srcColor = sourceColors[n.source] ?? "#6b7280";
-                      const stageCfg = STAGE_LABELS[n.stage ?? "new"] ?? { label: n.stage ?? "new", color: "#6b7280" };
+                      const srcColor = sourceColors[n.source] ?? "var(--mantine-color-gray-6)";
+                      const stageCfg = STAGE_LABELS[n.stage ?? "new"] ?? { label: n.stage ?? "new", color: "var(--mantine-color-gray-6)" };
                       return (
                         <UnstyledButton
                           key={n.id}
@@ -421,32 +428,58 @@ export default function ProjectsPage() {
                       )}
 
                       {/* Stage progress bar */}
-                      {taskCount > 0 && stageCounts.size > 0 && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <div style={{ display: "flex", height: 4, borderRadius: 2, overflow: "hidden", flex: 1 }}>
-                            {[...stageCounts.entries()].map(([stage, count]) => {
-                              const cfg = STAGE_LABELS[stage] ?? { label: stage, color: "#6b7280" };
-                              return (
-                                <Tooltip key={stage} label={`${cfg.label}: ${count}`} withArrow position="top">
-                                  <div
-                                    style={{
-                                      width: `${(count / taskCount) * 100}%`,
-                                      backgroundColor: cfg.color,
-                                      minWidth: 4,
-                                    }}
-                                  />
+                      {taskCount > 0 && stageCounts.size > 0 && (() => {
+                        const doneCount = (stageCounts.get("done") ?? 0) + (stageCounts.get("skipped") ?? 0);
+                        const allDone = doneCount === taskCount;
+                        const activeStages = [...stageCounts.entries()]
+                          .filter(([s]) => s !== "done" && s !== "skipped")
+                          .sort((a, b) => (STAGE_ORDER[b[0]] ?? 0) - (STAGE_ORDER[a[0]] ?? 0));
+                        return (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{
+                              position: "relative", flex: 1, height: 6, borderRadius: 3,
+                              overflow: "hidden",
+                              backgroundColor: "color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
+                            }}>
+                              <div style={{ display: "flex", height: "100%", width: `${(doneCount / taskCount) * 100}%`, minWidth: doneCount > 0 ? 4 : 0 }}>
+                                <Tooltip label={`Done: ${doneCount}`} withArrow position="top">
+                                  <div style={{ width: "100%", backgroundColor: "var(--mantine-color-green-filled)" }} />
                                 </Tooltip>
-                              );
-                            })}
+                              </div>
+                              {activeStages.length > 0 && (
+                                <div style={{
+                                  position: "absolute", top: 0, left: `${(doneCount / taskCount) * 100}%`,
+                                  display: "flex", height: "100%",
+                                  width: `${((taskCount - doneCount) / taskCount) * 100}%`,
+                                }}>
+                                  {activeStages.map(([stage, count]) => {
+                                    const cfg = STAGE_LABELS[stage] ?? { label: stage, color: "var(--mantine-color-gray-6)" };
+                                    const pct = (count / (taskCount - doneCount)) * 100;
+                                    return (
+                                      <Tooltip key={stage} label={`${cfg.label}: ${count}`} withArrow position="top">
+                                        <div style={{
+                                          width: `${pct}%`, minWidth: 4,
+                                          backgroundColor: cfg.color, opacity: 0.5,
+                                        }} />
+                                      </Tooltip>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                            {allDone ? (
+                              <Group gap={4} style={{ flexShrink: 0 }}>
+                                <IconCheck size={12} color="var(--mantine-color-green-filled)" />
+                                <Text size="xs" c="green" fw={600} style={{ fontSize: "0.65rem" }}>Done</Text>
+                              </Group>
+                            ) : (
+                              <Text size="xs" c="dimmed" style={{ fontSize: "0.6rem", whiteSpace: "nowrap", flexShrink: 0 }}>
+                                {doneCount}/{taskCount} done
+                              </Text>
+                            )}
                           </div>
-                          <Text size="xs" c="dimmed" style={{ fontSize: "0.55rem", whiteSpace: "nowrap" }}>
-                            {[...stageCounts.entries()].map(([stage, count]) => {
-                              const cfg = STAGE_LABELS[stage] ?? { label: stage, color: "#6b7280" };
-                              return `${count} ${cfg.label.toLowerCase()}`;
-                            }).join(" \u00b7 ")}
-                          </Text>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       {/* Latest activity */}
                       {latest && (

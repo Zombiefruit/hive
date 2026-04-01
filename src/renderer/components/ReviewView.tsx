@@ -10,10 +10,10 @@ interface ReviewViewProps {
 }
 
 const SEVERITY_CONFIG: Record<Severity, { color: string; icon: typeof IconAlertTriangle; label: string }> = {
-  BLOCKER: { color: "#ef4444", icon: IconAlertTriangle, label: "Blocker" },
-  ISSUE: { color: "#f97316", icon: IconInfoCircle, label: "Issue" },
-  SUGGESTION: { color: "#3b82f6", icon: IconBulb, label: "Suggestion" },
-  NIT: { color: "#6b7280", icon: IconDots, label: "Nit" },
+  BLOCKER: { color: "var(--mantine-color-red-filled)", icon: IconAlertTriangle, label: "Blocker" },
+  ISSUE: { color: "var(--mantine-color-orange-filled)", icon: IconInfoCircle, label: "Issue" },
+  SUGGESTION: { color: "var(--mantine-color-blue-filled)", icon: IconBulb, label: "Suggestion" },
+  NIT: { color: "var(--mantine-color-dimmed)", icon: IconDots, label: "Nit" },
 };
 
 export function ReviewView({ review, onFixSelected, onPostToPR }: ReviewViewProps) {
@@ -130,8 +130,8 @@ export function ReviewView({ review, onFixSelected, onPostToPR }: ReviewViewProp
               onClick={() => onFixSelected(Array.from(selectedIds))}
               style={{
                 padding: "8px 16px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 600,
-                backgroundColor: selectedIds.size > 0 ? "var(--mantine-color-blue-6)" : "var(--mantine-color-default-hover)",
-                color: "white", display: "flex", alignItems: "center", gap: 6,
+                backgroundColor: selectedIds.size > 0 ? "var(--mantine-color-blue-filled)" : "var(--mantine-color-default-hover)",
+                color: selectedIds.size > 0 ? "var(--mantine-color-white)" : "var(--mantine-color-text)", display: "flex", alignItems: "center", gap: 6,
                 opacity: selectedIds.size > 0 ? 1 : 0.5,
               }}
               disabled={selectedIds.size === 0}

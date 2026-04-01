@@ -865,6 +865,39 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
       saveCacheToFile();
     }
 
+    // Dedup triage projects: merge entries that normalize to the same name
+    if (triageProjects.length > 1) {
+      const normalizeProjectName = (s: string) =>
+        s.toLowerCase()
+          .replace(/\b(project|launch|improvements|updates|epic|phase\s*\d+|work|follow.?up|chat|extension|v\d+|initiative)\b/gi, "")
+          .replace(/\s+/g, " ")
+          .trim();
+      const seen = new Map<string, number>(); // normalized name → index in deduped array
+      const deduped: typeof triageProjects = [];
+      for (const tp of triageProjects) {
+        const key = normalizeProjectName(tp.name);
+        const existingIdx = seen.get(key);
+        if (existingIdx !== undefined) {
+          // Merge related_channels and related_tickets into existing entry
+          const existing = deduped[existingIdx];
+          const mergedChannels = new Set([...(existing.related_channels ?? []), ...(tp.related_channels ?? [])]);
+          const mergedTickets = new Set([...(existing.related_tickets ?? []), ...(tp.related_tickets ?? [])]);
+          existing.related_channels = [...mergedChannels];
+          existing.related_tickets = [...mergedTickets];
+          // Prefer the entry with a source_id if current one lacks it
+          if (!existing.source_id && tp.source_id) existing.source_id = tp.source_id;
+          logPoll(`Dedup project: merged "${tp.name}" into "${existing.name}"`);
+        } else {
+          seen.set(key, deduped.length);
+          deduped.push(tp);
+        }
+      }
+      if (deduped.length < triageProjects.length) {
+        logPoll(`Deduped projects: ${triageProjects.length} → ${deduped.length}`);
+        triageProjects = deduped;
+      }
+    }
+
     // CREATE/UPDATE PROJECTS from triage output
     if (triageProjects.length > 0) {
       for (const tp of triageProjects) {

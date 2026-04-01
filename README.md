@@ -1,4 +1,4 @@
-# Claude Deck
+# Hive
 
 An autonomous engineering manager built on Electron. Monitors your work channels (Slack, Linear, Gmail, GitHub, Calendar, Notion), triages incoming items with AI priority classification, groups tasks into projects, designs your daily schedule, and spawns Claude Code agents to execute the actionable ones.
 

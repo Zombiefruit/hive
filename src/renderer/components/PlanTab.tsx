@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { IconFileText } from "@tabler/icons-react";
 import { PlanView } from "./PlanView";
+import { Markdown } from "./Markdown";
 import { parsePlanMd } from "../../shared/plan-parser";
 import { EmptyState } from "./shared";
 
@@ -10,15 +11,26 @@ interface PlanTabProps {
 
 export function PlanTab({ planText }: PlanTabProps) {
   const parsedPlan = useMemo(() => (planText ? parsePlanMd(planText) : null), [planText]);
+  const hasPhases = parsedPlan && parsedPlan.phases.length > 0;
 
-  // Only show plan if it has actual phases/tasks — not for response/meeting_prep text
-  if (!parsedPlan || parsedPlan.phases.length === 0) {
-    return <EmptyState icon={IconFileText} message="No implementation plan." detail="Implementation tasks get a phased plan from /start-work." />;
+  // No plan text at all → empty state
+  if (!planText) {
+    return <EmptyState icon={IconFileText} message="No plan yet." detail="Start work from the Agent tab." />;
   }
 
+  // Phased implementation plan → structured PlanView
+  if (hasPhases) {
+    return (
+      <div style={{ padding: "16px 20px", overflowY: "auto", flex: 1 }}>
+        <PlanView plan={parsedPlan} />
+      </div>
+    );
+  }
+
+  // Non-phased plan (response/meeting_prep agent output) → render as markdown
   return (
     <div style={{ padding: "16px 20px", overflowY: "auto", flex: 1 }}>
-      <PlanView plan={parsedPlan} />
+      <Markdown content={planText} />
     </div>
   );
 }

@@ -384,7 +384,7 @@ export function Settings() {
             <Group grow>
               <TextInput
                 label="Manager name"
-                placeholder="e.g. Yael Chemla"
+                placeholder="e.g. Jane Smith"
                 value={managerName}
                 onChange={(e) => setManagerName(e.currentTarget.value)}
                 size="sm"
@@ -445,23 +445,18 @@ export function Settings() {
             <div>
               <Text size="xs" fw={600} mb={6}>Add coworker</Text>
               <Group gap={8}>
-                <Select
-                  placeholder="Search Slack by name..."
-                  value={newCoworkerName || null}
-                  onChange={(val) => {
-                    if (!val) return;
+                <TextInput
+                  placeholder={bridgeStatus?.ready ? "Name (or search Slack)..." : "Name"}
+                  value={newCoworkerName}
+                  onChange={(e) => {
+                    const val = e.currentTarget.value;
                     setNewCoworkerName(val);
-                    const match = coworkerSearchResults.find(r => r.label === val);
-                    if (match?.slackId) setNewCoworkerSlackId(match.slackId);
-                  }}
-                  data={coworkerSearchResults.map(r => ({ value: r.label, label: r.label }))}
-                  searchable
-                  onSearchChange={(query) => {
-                    if (query.length < 2) { setCoworkerSearchResults([]); return; }
+                    if (val.length < 2) { setCoworkerSearchResults([]); return; }
+                    if (!bridgeStatus?.ready) return;
                     if (coworkerSearchTimer.current) clearTimeout(coworkerSearchTimer.current);
                     coworkerSearchTimer.current = setTimeout(async () => {
                       try {
-                        const result = await window.deck.searchUsers("slack", query);
+                        const result = await window.deck.searchUsers("slack", val);
                         if (result.ok && result.data) {
                           const users = JSON.parse(result.data) as Array<{ id: string; title: string }>;
                           setCoworkerSearchResults(users.map(u => ({ label: u.title, slackId: u.id })));
@@ -471,8 +466,22 @@ export function Settings() {
                   }}
                   size="xs"
                   style={{ flex: 2 }}
-                  nothingFoundMessage="Type to search Slack..."
                 />
+                {coworkerSearchResults.length > 0 && (
+                  <Select
+                    placeholder="Pick from Slack..."
+                    data={coworkerSearchResults.map(r => ({ value: r.label, label: r.label }))}
+                    value={null}
+                    onChange={(val) => {
+                      if (!val) return;
+                      setNewCoworkerName(val);
+                      const match = coworkerSearchResults.find(r => r.label === val);
+                      if (match?.slackId) setNewCoworkerSlackId(match.slackId);
+                    }}
+                    size="xs"
+                    style={{ flex: 1 }}
+                  />
+                )}
                 <Select
                   data={COWORKER_ROLES}
                   value={newCoworkerRole}
@@ -598,7 +607,7 @@ export function Settings() {
             {sectionHeader(
               <IconPlug size={16} color="var(--mantine-color-teal-5)" />,
               "Integrations",
-              "Enable the sources you want Claude Deck to monitor.",
+              "Enable the sources you want Hive to monitor.",
             )}
             <Stack gap={8}>
               {INTEGRATION_LIST.map(({ key, label, description }) => (
@@ -617,7 +626,7 @@ export function Settings() {
                         : "color-mix(in srgb, var(--mantine-color-default-border) 50%, transparent)"
                     }`,
                     backgroundColor: integrations[key]
-                      ? "color-mix(in srgb, var(--mantine-color-blue-9) 15%, transparent)"
+                      ? "var(--mantine-color-blue-light)"
                       : "transparent",
                     transition: "all 0.1s ease",
                   }}
@@ -724,7 +733,7 @@ export function Settings() {
                 )}
                 {skillStatus?.installed && (
                   <Group gap={6} mt={8}>
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#22c55e" }} />
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "var(--mantine-color-green-filled)" }} />
                     <Text size="xs" c="dimmed">MC skills installed (start-work, hack, ship, code-review)</Text>
                   </Group>
                 )}
@@ -823,7 +832,7 @@ export function Settings() {
             {sectionHeader(
               <IconSettings size={16} color="var(--mantine-color-orange-5)" />,
               "Preferences",
-              "Configure how and when Claude Deck works for you.",
+              "Configure how and when Hive works for you.",
             )}
             <Select
               label="Fetch cadence"
@@ -864,6 +873,42 @@ export function Settings() {
               size="sm"
               disabled={!integrations.slack}
             />
+
+            {sectionDivider}
+
+            {/* ── Danger Zone ── */}
+            <div style={{ padding: "16px 20px", borderRadius: 8, border: "1px solid color-mix(in srgb, var(--mantine-color-red-5) 30%, transparent)" }}>
+              <Text size="sm" fw={600} c="red.4" mb={12}>Danger Zone</Text>
+              <Group gap={8}>
+                <Button
+                  variant="outline"
+                  color="red"
+                  size="xs"
+                  onClick={async () => {
+                    if (!confirm("Reset database? This clears all agent history and events. Notifications and config are kept.")) return;
+                    await window.deck.resetDatabase?.();
+                    window.location.reload();
+                  }}
+                >
+                  Reset Database
+                </Button>
+                <Button
+                  variant="filled"
+                  color="red"
+                  size="xs"
+                  onClick={async () => {
+                    if (!confirm("Reset everything? This deletes your config, database, and all cached data. You'll need to redo onboarding.")) return;
+                    await window.deck.resetAll?.();
+                    window.location.reload();
+                  }}
+                >
+                  Reset Everything
+                </Button>
+              </Group>
+              <Text size="xs" c="dimmed" mt={8}>
+                "Reset Database" clears agent history. "Reset Everything" also deletes your config and notification cache — you'll see the onboarding flow again.
+              </Text>
+            </div>
           </Stack>
         </div>
       </div>

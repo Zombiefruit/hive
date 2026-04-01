@@ -5,8 +5,8 @@ import { useState, useEffect } from "react";
 
 // Shared constants — match HEADER_HEIGHT in src/main/index.ts
 export const TITLEBAR_HEIGHT = 44;
-export const TITLEBAR_PADDING_LEFT = 84; // Clears traffic lights in windowed mode
-export const TITLEBAR_PADDING_LEFT_FULLSCREEN = 24;
+export const TITLEBAR_PADDING_LEFT = 78; // Clears traffic lights in windowed mode
+export const TITLEBAR_PADDING_LEFT_FULLSCREEN = 16;
 
 const TABS = [
   { path: "/", label: "Agents" },
@@ -70,7 +70,7 @@ export function AppHeader({ rightContent }: AppHeaderProps) {
       }}
     >
       <Group gap={6} style={{ WebkitAppRegion: "no-drag", minWidth: 120 }} wrap="nowrap">
-        <Text size="md" fw={700}>Claude Deck</Text>
+        <Text size="md" fw={700}>Hive</Text>
       </Group>
 
       {/* Centered tabs — fixed position so they don't jump when right content changes */}

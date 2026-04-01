@@ -134,8 +134,8 @@ export function Dashboard() {
                   borderRadius: 6,
                   fontSize: "0.8rem",
                   fontWeight: 500,
-                  backgroundColor: "var(--mantine-color-blue-5)",
-                  color: "white",
+                  backgroundColor: "var(--mantine-color-blue-filled)",
+                  color: "var(--mantine-color-white)",
                 }}
               >
                 <IconPlus size={14} stroke={2} />

@@ -83,6 +83,8 @@ export function Onboarding() {
   // Step 1 — Identity
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [slackUserId, setSlackUserId] = useState("");
+  const [linearUsername, setLinearUsername] = useState("");
 
   // Step 2 — Role
   const [role, setRole] = useState<UserRole>("fullstack_dev");
@@ -159,6 +161,8 @@ export function Onboarding() {
       const config: DeckConfig = {
         name: name.trim(),
         email: email.trim(),
+        slackUserId: slackUserId.trim() || undefined,
+        linearUsername: linearUsername.trim() || undefined,
         role,
         managerName: managerName.trim(),
         teamName: teamName.trim(),
@@ -257,7 +261,7 @@ export function Onboarding() {
           fw={700}
           style={{ WebkitAppRegion: "no-drag", minWidth: 120 }}
         >
-          Claude Deck
+          Hive
         </Text>
         <Text
           size="sm"
@@ -289,13 +293,19 @@ export function Onboarding() {
             allowNextStepsSelect={false}
             styles={{
               separator: { marginLeft: 4, marginRight: 4 },
+              stepIcon: {
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderColor: "var(--mantine-color-default-border)",
+              },
             }}
           >
             {STEP_ICONS.map((Icon, i) => (
               <Stepper.Step
                 key={i}
-                icon={<Icon size={16} />}
-                completedIcon={<IconCheck size={16} />}
+                icon={<Icon size={16} style={{ display: "block" }} />}
+                completedIcon={<IconCheck size={16} style={{ display: "block" }} />}
               />
             ))}
           </Stepper>
@@ -306,7 +316,7 @@ export function Onboarding() {
               <Stack gap="lg">
                 <div>
                   <Text size="lg" fw={700}>
-                    Welcome to Claude Deck
+                    Welcome to Hive
                   </Text>
                   <Text size="sm" c="dimmed" mt={4}>
                     Let's get you set up. We'll start with the basics.
@@ -326,6 +336,23 @@ export function Onboarding() {
                   onChange={(e) => setEmail(e.currentTarget.value)}
                   size="sm"
                 />
+                <Group grow>
+                  <TextInput
+                    label="Slack User ID"
+                    placeholder="e.g. U02PKBZSB9Q"
+                    description="Find in Slack profile > More > Copy member ID"
+                    value={slackUserId}
+                    onChange={(e) => setSlackUserId(e.currentTarget.value)}
+                    size="sm"
+                  />
+                  <TextInput
+                    label="Linear username"
+                    placeholder="e.g. kwilliams"
+                    value={linearUsername}
+                    onChange={(e) => setLinearUsername(e.currentTarget.value)}
+                    size="sm"
+                  />
+                </Group>
               </Stack>
             )}
 
@@ -374,7 +401,7 @@ export function Onboarding() {
                 </div>
                 <TextInput
                   label="Manager name"
-                  placeholder="e.g. Yael Chemla"
+                  placeholder="e.g. Jane Smith"
                   value={managerName}
                   onChange={(e) => setManagerName(e.currentTarget.value)}
                   size="sm"
@@ -420,7 +447,7 @@ export function Onboarding() {
                               : "color-mix(in srgb, var(--mantine-color-default-border) 50%, transparent)"
                           }`,
                           backgroundColor: selected
-                            ? "color-mix(in srgb, var(--mantine-color-blue-9) 20%, transparent)"
+                            ? "var(--mantine-color-blue-light)"
                             : "transparent",
                           transition: "all 0.1s ease",
                         }}
@@ -445,7 +472,7 @@ export function Onboarding() {
                           }}
                         >
                           {selected && (
-                            <IconCheck size={10} color="white" stroke={3} />
+                            <IconCheck size={10} color="var(--mantine-color-white)" stroke={3} />
                           )}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -513,7 +540,7 @@ export function Onboarding() {
                     Integrations
                   </Text>
                   <Text size="sm" c="dimmed" mt={4}>
-                    Enable the sources you want Claude Deck to monitor.
+                    Enable the sources you want Hive to monitor.
                   </Text>
                 </div>
 
@@ -534,7 +561,7 @@ export function Onboarding() {
                             : "color-mix(in srgb, var(--mantine-color-default-border) 50%, transparent)"
                         }`,
                         backgroundColor: integrations[key]
-                          ? "color-mix(in srgb, var(--mantine-color-blue-9) 15%, transparent)"
+                          ? "var(--mantine-color-blue-light)"
                           : "transparent",
                         transition: "all 0.1s ease",
                       }}
@@ -566,7 +593,7 @@ export function Onboarding() {
                     Preferences
                   </Text>
                   <Text size="sm" c="dimmed" mt={4}>
-                    Configure how and when Claude Deck works for you.
+                    Configure how and when Hive works for you.
                   </Text>
                 </div>
 

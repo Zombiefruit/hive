@@ -175,6 +175,31 @@ app.whenReady().then(() => {
     return { ok: true };
   });
 
+  // Reset handlers
+  ipcMain.handle("reset:database", () => {
+    try {
+      const dbPath = path.join(app.getPath("userData"), "claude-deck.db");
+      if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  });
+
+  ipcMain.handle("reset:all", () => {
+    try {
+      const userData = app.getPath("userData");
+      const files = ["claude-deck.db", "config.json", "notifications-cache.json", "plans-cache.json", "planning-events-cache.json"];
+      for (const file of files) {
+        const p = path.join(userData, file);
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      }
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String(err) };
+    }
+  });
+
   // Register IPC handlers with real agent logic
   registerIpcHandlers({
     onSpawn: async (config) => {

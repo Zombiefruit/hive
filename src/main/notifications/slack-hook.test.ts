@@ -12,7 +12,7 @@ import {
 const baseEvent: SlackEvent = {
   type: "message",
   channel: "C0AMSV2SK4Z",
-  user: "U043ENDKV4Y",
+  user: "UEXAMPLE01",
   text: "Hey <@U02PKBZSB9Q> can you look at this?",
   ts: "1711234567.890",
   thread_ts: undefined,
@@ -104,12 +104,12 @@ describe("buildNotificationFromSlack", () => {
     const notif = buildNotificationFromSlack({
       event: baseEvent,
       channelName: "team-vector",
-      userName: "Yael Chemla",
+      userName: "Jane Smith",
       isDM: true,
     });
     expect(notif.taskType).toBe("response");
     expect(notif.source).toBe("slack");
-    expect(notif.title).toContain("Yael Chemla");
+    expect(notif.title).toContain("Jane Smith");
     expect(notif.priority).toBeDefined();
   });
 
@@ -117,7 +117,7 @@ describe("buildNotificationFromSlack", () => {
     const notif = buildNotificationFromSlack({
       event: baseEvent,
       channelName: "team-vector",
-      userName: "Yael Chemla",
+      userName: "Jane Smith",
       isDM: false,
     });
     expect(notif.taskType).toBe("response");
@@ -130,7 +130,7 @@ describe("buildNotificationFromSlack", () => {
     const notif = buildNotificationFromSlack({
       event: withThread,
       channelName: "team-vector",
-      userName: "Yael Chemla",
+      userName: "Jane Smith",
       isDM: false,
     });
     expect(notif.url).toContain("archives");

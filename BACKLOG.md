@@ -1,4 +1,4 @@
-# Claude Deck — Backlog
+# Hive — Backlog
 
 Persistent backlog of planned features and improvements. Items here survive across sessions.
 
@@ -16,27 +16,19 @@ When triage detects a task spanning multiple repos (e.g., API change in `monolit
 - Each subtask runs the MC skills workflow independently (`/start-work` → `/hack` → `/ship`)
 - One task = one repo remains the default; subtasks are opt-in when multi-repo is detected
 
-### Rich Stage UI (Task #92)
-Each stage (plan, review, PR feedback) produces structured output. Instead of dumping raw markdown, parse the structure and render interactive UI:
-- **Plan view**: Collapsible phases, task checklists with checkboxes, relevant files table, scope badge
-- **Review view**: Finding cards with severity badges (BLOCKER/ISSUE/SUGGESTION/NIT), confidence indicators, fix status
-- **PR feedback view**: Categorized items (human vs bot), validation status, fix progress
-- **Meeting prep view**: Talking points as cards, context links, attendee list
-- **Response view**: Suggested responses as selectable options, context sidebar
-
 ---
 
 ## Medium Priority
 
-### Slack Real-Time Hook (Task #43)
-Auto-spawn agent on Slack mentions/DMs — real-time reactive pipeline instead of polling.
-
-### MCP Server Status in Settings
-Show per-server auth status from `claude /mcp`, allow one-click re-authenticate per connector.
+### Bridge Pool for True Parallel Fetching
+Spawn N bridge processes at startup for parallel source fetching. The current implementation uses per-source isolation but sequential bridge calls — a pool would allow genuinely concurrent fetches across all sources.
 
 ---
 
 ## Low Priority / Ideas
+
+### Project Dedup Across Poll Cycles
+Periodic scan to merge duplicate projects that arise when poll cycles create near-identical project entries for the same underlying work.
 
 ### Git Log Integration
 Read recent commits to enrich standup reports and understand what was actually shipped.

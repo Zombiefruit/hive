@@ -125,11 +125,11 @@ describe("Daily Summary — formatStandupText", () => {
     const report = {
       yesterday: [] as Array<{ title: string; source: string; event: string }>,
       today: [] as Array<{ title: string; source: string; priority: string }>,
-      blockers: ["Waiting on design review from Yael", "CI pipeline broken"],
+      blockers: ["Waiting on design review from Jane", "CI pipeline broken"],
       date: "2026-03-25",
     };
     const text = formatStandupText(report);
-    expect(text).toContain("Waiting on design review from Yael");
+    expect(text).toContain("Waiting on design review from Jane");
     expect(text).toContain("CI pipeline broken");
     expect(text).not.toContain("- None");
   });

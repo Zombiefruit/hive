@@ -9,7 +9,7 @@ import { IconMessageCircle, IconFileText, IconDatabase, IconTimeline, IconExtern
 import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AgentTab } from "./AgentTab";
-import { PlanTab, hasPlanPhases } from "./PlanTab";
+import { PlanTab } from "./PlanTab";
 import { ContextTab } from "./ContextTab";
 import { TimelineTab } from "./TimelineTab";
 import { RepoDetectionBanner, deriveBranch } from "./RepoDetectionBanner";
@@ -267,7 +267,7 @@ export function DetailDrawer({
 
   // ── Render ──
 
-  const stageConfig = STAGE_META[n.stage as keyof typeof STAGE_META] ?? { label: n.stage ?? "new", color: "#6b7280" };
+  const stageConfig = STAGE_META[n.stage as keyof typeof STAGE_META] ?? { label: n.stage ?? "new", color: "var(--mantine-color-gray-6)" };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", backgroundColor: "var(--mantine-color-body)" }}>
@@ -348,7 +348,7 @@ export function DetailDrawer({
           <Tabs.Tab value="agent" leftSection={<IconMessageCircle size={14} />} rightSection={loading ? <Loader size={8} /> : undefined}>
             Agent
           </Tabs.Tab>
-          <Tabs.Tab value="plan" leftSection={<IconFileText size={14} />} rightSection={hasPlanPhases(planText) ? <Badge size="xs" color="green" variant="filled" circle>✓</Badge> : undefined}>
+          <Tabs.Tab value="plan" leftSection={<IconFileText size={14} />} rightSection={planText ? <Badge size="xs" color="green" variant="filled" circle>✓</Badge> : undefined}>
             Plan
           </Tabs.Tab>
           <Tabs.Tab value="context" leftSection={<IconDatabase size={14} />} rightSection={(n.links?.length ?? 0) > 0 ? <Badge size="xs" variant="light" color="gray">{n.links?.length ?? 0}</Badge> : undefined}>

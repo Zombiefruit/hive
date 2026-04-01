@@ -1,5 +1,5 @@
 /**
- * System Tray — shows Claude Deck in the macOS menu bar with active agent count.
+ * System Tray — shows Hive in the macOS menu bar with active agent count.
  */
 
 import { Tray, Menu, nativeImage, BrowserWindow, app } from "electron";
@@ -26,7 +26,7 @@ function createTrayIcon(): Electron.NativeImage {
 function buildMenu(activeCount: number): Electron.Menu {
   return Menu.buildFromTemplate([
     {
-      label: "Show Claude Deck",
+      label: "Show Hive",
       click: () => {
         const win = BrowserWindow.getAllWindows()[0];
         if (win) {
@@ -57,7 +57,7 @@ export function initTray(): void {
   if (tray) return;
   const icon = createTrayIcon();
   tray = new Tray(icon);
-  tray.setToolTip("Claude Deck");
+  tray.setToolTip("Hive");
   tray.setContextMenu(buildMenu(0));
 
   // Click on the tray icon shows the window

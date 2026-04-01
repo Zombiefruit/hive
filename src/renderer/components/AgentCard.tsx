@@ -46,7 +46,7 @@ export function AgentCard({ agent }: { agent: Agent }) {
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = "var(--mantine-color-default-border)";
-        e.currentTarget.style.boxShadow = "0 8px 24px rgba(0, 0, 0, 0.2)";
+        e.currentTarget.style.boxShadow = "0 8px 24px var(--mantine-color-default-border)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = "color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)";

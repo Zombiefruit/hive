@@ -37,7 +37,7 @@ export function ActivityFeed() {
   return (
     <Stack gap={0}>
       {events.slice(0, 20).map((event, i) => {
-        const config = eventConfig[event.type] ?? { color: "#6b7280", icon: IconTool };
+        const config = eventConfig[event.type] ?? { color: "var(--mantine-color-gray-6)", icon: IconTool };
         const Icon = config.icon;
         return (
           <Group

@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, Outlet, RouterProvider } from "react-router-dom";
+import { createHashRouter, Navigate, Outlet, RouterProvider } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Loader, Center } from "@mantine/core";
 import { Dashboard } from "./pages/index";
@@ -49,7 +49,7 @@ function ConfigGuard() {
   return <Outlet />;
 }
 
-const router = createBrowserRouter([
+const router = createHashRouter([
   {
     element: <ConfigGuard />,
     children: [

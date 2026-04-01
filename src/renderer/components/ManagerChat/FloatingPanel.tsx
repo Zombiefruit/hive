@@ -135,7 +135,7 @@ export function FloatingPanel({ dockedWidth = 480 }: { dockedWidth?: number }) {
           borderLeft: "1px solid var(--mantine-color-default-border)",
           display: "flex",
           flexDirection: "row",
-          boxShadow: "-4px 0 20px rgba(0, 0, 0, 0.3)",
+          boxShadow: "-4px 0 20px color-mix(in srgb, var(--mantine-color-body) 50%, transparent)",
         }}
       >
         {chatContent}
@@ -159,7 +159,7 @@ export function FloatingPanel({ dockedWidth = 480 }: { dockedWidth?: number }) {
             zIndex: 299,
             borderRadius: 12,
             overflow: "hidden",
-            boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--mantine-color-default-border)",
+            boxShadow: "0 20px 60px color-mix(in srgb, var(--mantine-color-body) 50%, transparent), 0 0 0 1px var(--mantine-color-default-border)",
             backgroundColor: "var(--mantine-color-body)",
             display: "flex",
             flexDirection: "row",

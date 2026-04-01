@@ -28,7 +28,7 @@ export function PollStatusIndicator({ fetching, pollProgress, lastRefreshed, ite
 
   return (
     <>
-      <div style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#22c55e" }} />
+      <div style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "var(--mantine-color-green-filled)" }} />
       <Text size="xs" c="dimmed">
         {itemCount} {itemLabel}{lastRefreshed ? ` · Updated ${formatTimeSince(lastRefreshed)}` : ""}
       </Text>

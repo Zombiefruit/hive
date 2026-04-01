@@ -91,7 +91,7 @@ export function Card({ children, onClick, active, "aria-label": ariaLabel }: Car
         border: `1px solid ${active
           ? "var(--mantine-color-blue-7)"
           : "color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)"}`,
-        backgroundColor: active ? "color-mix(in srgb, var(--mantine-color-blue-9) 20%, var(--mantine-color-default))" : "var(--mantine-color-default)",
+        backgroundColor: active ? "var(--mantine-color-blue-light)" : "var(--mantine-color-default)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
