@@ -829,14 +829,28 @@ export function Notifications() {
             onClick={() => setSelectedId(null)}
             style={{ position: "fixed", inset: 0, top: 42, zIndex: 99, backgroundColor: "rgba(0,0,0,0.2)" }}
           />
-          <DetailDrawer
-            notification={selected}
-            onClose={() => setSelectedId(null)}
-            onDismiss={() => dismiss(selected.id)}
-            onPlanReady={() => setPlansReady(prev => new Set([...prev, selected.id]))}
-            onPlanCleared={() => setPlansReady(prev => { const next = new Set(prev); next.delete(selected.id); return next; })}
-            config={config}
-          />
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="detail-drawer-panel"
+            style={{
+              position: "fixed", top: 42, right: 0, bottom: 0,
+              width: 520, maxWidth: "60vw",
+              zIndex: 100,
+              backgroundColor: "var(--mantine-color-body)",
+              borderLeft: "1px solid var(--mantine-color-default-border)",
+              boxShadow: "-4px 0 20px rgba(0,0,0,0.3)",
+              animation: "slideInRight 0.2s ease-out",
+            }}
+          >
+            <DetailDrawer
+              notification={selected}
+              onClose={() => setSelectedId(null)}
+              onDismiss={() => dismiss(selected.id)}
+              onPlanReady={() => setPlansReady(prev => new Set([...prev, selected.id]))}
+              onPlanCleared={() => setPlansReady(prev => { const next = new Set(prev); next.delete(selected.id); return next; })}
+              config={config}
+            />
+          </div>
         </>
       )}
 

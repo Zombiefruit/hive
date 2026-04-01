@@ -9,8 +9,15 @@ interface ContextItem {
   timestamp: string;
 }
 
+interface NotificationLink {
+  type: string;
+  label: string;
+  url: string;
+}
+
 interface ContextTabProps {
   items: ContextItem[];
+  notificationLinks?: NotificationLink[];
   onOpenUrl: (url: string) => void;
 }
 
@@ -21,8 +28,9 @@ const typeIcons: Record<string, React.FC<{ size?: number }>> = {
   notion: SiNotion as React.FC<{ size?: number }>,
 };
 
-export function ContextTab({ items, onOpenUrl }: ContextTabProps) {
-  if (items.length === 0) {
+export function ContextTab({ items, notificationLinks, onOpenUrl }: ContextTabProps) {
+  const hasContent = items.length > 0 || (notificationLinks?.length ?? 0) > 0;
+  if (!hasContent) {
     return <EmptyState icon={IconFileText} message="No context fetched yet." />;
   }
 
@@ -42,10 +50,16 @@ export function ContextTab({ items, onOpenUrl }: ContextTabProps) {
     }
   }
 
+  // Merge notification links with extracted tool links
+  const allLinks = [
+    ...(notificationLinks ?? []),
+    ...links.filter(l => !(notificationLinks ?? []).some(nl => nl.url === l.url)),
+  ];
+
   return (
     <div style={{ padding: "16px 20px", overflowY: "auto", flex: 1 }}>
       <Stack gap={8}>
-        {links.map((link, i) => {
+        {allLinks.map((link, i) => {
           const Icon = typeIcons[link.type] ?? IconFileText;
           return (
             <UnstyledButton

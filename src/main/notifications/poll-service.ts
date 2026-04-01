@@ -415,7 +415,7 @@ async function poll(): Promise<void> {
 
     if (integrations.slack && userSlackId) {
       enabledSourceNames.push("Slack");
-      const slackLimit = 50;
+      const slackLimit = 100;
       const channelList = channels.map(ch => `- slack_read_channel: channel_id "${ch.id}" (${ch.name}), limit ${slackLimit}`).join("\n");
       const slackSearches = [
         `- slack_search_public_and_private: query "<@${userSlackId}> after:${slackAfter}"`,

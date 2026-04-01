@@ -1,5 +1,5 @@
-import { Group, Text, UnstyledButton } from "@mantine/core";
-import { IconSettings } from "@tabler/icons-react";
+import { Group, Text, UnstyledButton, useMantineColorScheme } from "@mantine/core";
+import { IconSettings, IconSun, IconMoon, IconDeviceDesktop } from "@tabler/icons-react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 const TABS = [
@@ -13,6 +13,23 @@ const TABS = [
 interface AppHeaderProps {
   /** Extra content to render on the right side of the header */
   rightContent?: React.ReactNode;
+}
+
+function ThemeToggle() {
+  const { colorScheme, setColorScheme } = useMantineColorScheme();
+  const next = colorScheme === "auto" ? "dark" : colorScheme === "dark" ? "light" : "auto";
+  const Icon = colorScheme === "auto" ? IconDeviceDesktop : colorScheme === "dark" ? IconMoon : IconSun;
+  const label = colorScheme === "auto" ? "System theme" : colorScheme === "dark" ? "Dark theme" : "Light theme";
+
+  return (
+    <UnstyledButton
+      onClick={() => setColorScheme(next)}
+      aria-label={`${label} — click to switch`}
+      style={{ padding: 4, borderRadius: 4, color: "var(--mantine-color-dimmed)" }}
+    >
+      <Icon size={16} />
+    </UnstyledButton>
+  );
 }
 
 export function AppHeader({ rightContent }: AppHeaderProps) {
@@ -64,6 +81,7 @@ export function AppHeader({ rightContent }: AppHeaderProps) {
       {/* Right side */}
       <Group gap={8} style={{ WebkitAppRegion: "no-drag", marginLeft: "auto" }}>
         {rightContent}
+        <ThemeToggle />
         <UnstyledButton
           onClick={() => navigate("/settings")}
           style={{ padding: 4, borderRadius: 4, color: location.pathname === "/settings" ? "var(--mantine-color-blue-4)" : "var(--mantine-color-dimmed)" }}

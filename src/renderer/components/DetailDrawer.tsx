@@ -5,7 +5,8 @@
  */
 
 import { Badge, Group, Loader, Tabs, Text, UnstyledButton } from "@mantine/core";
-import { IconMessageCircle, IconFileText, IconDatabase, IconTimeline } from "@tabler/icons-react";
+import { IconMessageCircle, IconFileText, IconDatabase, IconTimeline, IconExternalLink, IconHash, IconBrandGithub, IconMail } from "@tabler/icons-react";
+import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AgentTab } from "./AgentTab";
 import { PlanTab } from "./PlanTab";
@@ -284,6 +285,48 @@ export function DetailDrawer({
         <Text size="sm" fw={600} mb={4}>{n.title}</Text>
         {n.summary && <Text size="xs" c="dimmed" mb={4} lineClamp={2}>{n.summary}</Text>}
 
+        {/* Quick context links */}
+        {(n.links?.length || n.url) && (
+          <Group gap={6} mb={8} wrap="wrap">
+            {(n.links ?? []).map((link, i) => {
+              const Icon = link.type === "linear" ? SiLinear as React.FC<{ size?: number }>
+                : link.type === "slack_thread" || link.type === "slack_dm" ? IconHash
+                : link.type === "github_pr" ? IconBrandGithub
+                : link.type === "notion" ? SiNotion as React.FC<{ size?: number }>
+                : IconExternalLink;
+              return (
+                <UnstyledButton
+                  key={i}
+                  onClick={() => window.deck.openExternal(link.url)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 4,
+                    padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem",
+                    backgroundColor: "var(--mantine-color-dark-6)",
+                    color: "var(--mantine-color-blue-4)",
+                  }}
+                >
+                  <Icon size={10} />
+                  <span>{link.label}</span>
+                </UnstyledButton>
+              );
+            })}
+            {n.url && !(n.links ?? []).some(l => l.url === n.url) && (
+              <UnstyledButton
+                onClick={() => window.deck.openExternal(n.url!)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 4,
+                  padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem",
+                  backgroundColor: "var(--mantine-color-dark-6)",
+                  color: "var(--mantine-color-blue-4)",
+                }}
+              >
+                <IconExternalLink size={10} />
+                <span>Source</span>
+              </UnstyledButton>
+            )}
+          </Group>
+        )}
+
         {/* Repo detection banner */}
         {detectedRepo && (n.stage === "new" || !n.repoPath) && (
           <RepoDetectionBanner
@@ -329,7 +372,7 @@ export function DetailDrawer({
         </Tabs.Panel>
 
         <Tabs.Panel value="context" style={{ flex: 1, overflow: "auto" }}>
-          <ContextTab items={fetchedContext} onOpenUrl={(url) => window.deck.openExternal(url)} />
+          <ContextTab items={fetchedContext} notificationLinks={n.links} onOpenUrl={(url) => window.deck.openExternal(url)} />
         </Tabs.Panel>
 
         <Tabs.Panel value="timeline" style={{ flex: 1, overflow: "auto" }}>
