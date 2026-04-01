@@ -257,7 +257,7 @@ export function Onboarding() {
           fw={700}
           style={{ WebkitAppRegion: "no-drag", minWidth: 120 }}
         >
-          Claude Deck
+          Hive
         </Text>
         <Text
           size="sm"
@@ -306,7 +306,7 @@ export function Onboarding() {
               <Stack gap="lg">
                 <div>
                   <Text size="lg" fw={700}>
-                    Welcome to Claude Deck
+                    Welcome to Hive
                   </Text>
                   <Text size="sm" c="dimmed" mt={4}>
                     Let's get you set up. We'll start with the basics.
@@ -513,7 +513,7 @@ export function Onboarding() {
                     Integrations
                   </Text>
                   <Text size="sm" c="dimmed" mt={4}>
-                    Enable the sources you want Claude Deck to monitor.
+                    Enable the sources you want Hive to monitor.
                   </Text>
                 </div>
 
@@ -566,7 +566,7 @@ export function Onboarding() {
                     Preferences
                   </Text>
                   <Text size="sm" c="dimmed" mt={4}>
-                    Configure how and when Claude Deck works for you.
+                    Configure how and when Hive works for you.
                   </Text>
                 </div>
 

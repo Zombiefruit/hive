@@ -58,6 +58,10 @@ const api = {
   sendSlackMessage: (channel: string, threadTs: string, text: string) =>
     ipcRenderer.invoke("slack:send-message", channel, threadTs, text) as Promise<{ ok: boolean; data?: string; error?: string }>,
 
+  // Reset functions
+  resetDatabase: () => ipcRenderer.invoke("reset:database") as Promise<{ ok: boolean; error?: string }>,
+  resetAll: () => ipcRenderer.invoke("reset:all") as Promise<{ ok: boolean; error?: string }>,
+
   // Update Linear ticket via MCP bridge
   updateLinear: (ticket: string, field: string, value: string) =>
     ipcRenderer.invoke("linear:update", { ticket, field, value }) as Promise<{ ok: boolean; data?: string; error?: string }>,

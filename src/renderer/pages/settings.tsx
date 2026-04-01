@@ -598,7 +598,7 @@ export function Settings() {
             {sectionHeader(
               <IconPlug size={16} color="var(--mantine-color-teal-5)" />,
               "Integrations",
-              "Enable the sources you want Claude Deck to monitor.",
+              "Enable the sources you want Hive to monitor.",
             )}
             <Stack gap={8}>
               {INTEGRATION_LIST.map(({ key, label, description }) => (
@@ -823,7 +823,7 @@ export function Settings() {
             {sectionHeader(
               <IconSettings size={16} color="var(--mantine-color-orange-5)" />,
               "Preferences",
-              "Configure how and when Claude Deck works for you.",
+              "Configure how and when Hive works for you.",
             )}
             <Select
               label="Fetch cadence"
@@ -865,6 +865,40 @@ export function Settings() {
               disabled={!integrations.slack}
             />
           </Stack>
+        </div>
+
+        {/* ── Danger Zone ── */}
+        <div style={{ marginTop: 24, padding: "16px 20px", borderRadius: 8, border: "1px solid color-mix(in srgb, var(--mantine-color-red-5) 30%, transparent)" }}>
+          <Text size="sm" fw={600} c="red.4" mb={12}>Danger Zone</Text>
+          <Group gap={8}>
+            <Button
+              variant="outline"
+              color="red"
+              size="xs"
+              onClick={async () => {
+                if (!confirm("Reset database? This clears all agent history and events. Notifications and config are kept.")) return;
+                await window.deck.resetDatabase?.();
+                window.location.reload();
+              }}
+            >
+              Reset Database
+            </Button>
+            <Button
+              variant="filled"
+              color="red"
+              size="xs"
+              onClick={async () => {
+                if (!confirm("Reset everything? This deletes your config, database, and all cached data. You'll need to redo onboarding.")) return;
+                await window.deck.resetAll?.();
+                window.location.reload();
+              }}
+            >
+              Reset Everything
+            </Button>
+          </Group>
+          <Text size="xs" c="dimmed" mt={8}>
+            "Reset Database" clears agent history. "Reset Everything" also deletes your config and notification cache — you'll see the onboarding flow again.
+          </Text>
         </div>
       </div>
 

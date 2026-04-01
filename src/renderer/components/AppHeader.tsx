@@ -70,7 +70,7 @@ export function AppHeader({ rightContent }: AppHeaderProps) {
       }}
     >
       <Group gap={6} style={{ WebkitAppRegion: "no-drag", minWidth: 120 }} wrap="nowrap">
-        <Text size="md" fw={700}>Claude Deck</Text>
+        <Text size="md" fw={700}>Hive</Text>
       </Group>
 
       {/* Centered tabs — fixed position so they don't jump when right content changes */}

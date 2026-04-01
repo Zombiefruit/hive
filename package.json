@@ -1,6 +1,6 @@
 {
-  "name": "claude-deck",
-  "productName": "claude-deck",
+  "name": "hive",
+  "productName": "Hive",
   "version": "1.0.0",
   "description": "Orchestration dashboard for managing Claude Code agents",
   "main": ".vite/build/index.js",
