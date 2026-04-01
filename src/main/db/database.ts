@@ -23,6 +23,16 @@ export function initDatabase(): void {
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   createTables();
+  migrate();
+}
+
+function migrate(): void {
+  // Add summary column to agents if it doesn't exist (added 2026-04-01)
+  try {
+    db.prepare("SELECT summary FROM agents LIMIT 0").run();
+  } catch {
+    try { db.exec("ALTER TABLE agents ADD COLUMN summary TEXT"); } catch {}
+  }
 }
 
 function createTables(): void {
@@ -34,6 +44,7 @@ function createTables(): void {
       status TEXT NOT NULL DEFAULT 'active',
       source TEXT NOT NULL DEFAULT 'deck',
       task TEXT NOT NULL,
+      summary TEXT,
       model TEXT NOT NULL DEFAULT 'claude-sonnet-4-6',
       branch TEXT,
       cwd TEXT NOT NULL,
@@ -190,6 +201,18 @@ export function updateAgentTask(id: string, task: string, branch?: string): void
     db.prepare("UPDATE agents SET task = ?, branch = ?, updatedAt = ? WHERE id = ?").run(task, branch, now, id);
   } else {
     db.prepare("UPDATE agents SET task = ?, updatedAt = ? WHERE id = ?").run(task, now, id);
+  }
+}
+
+export function updateAgentSummary(id: string, summary: string): void {
+  try {
+    db.prepare("UPDATE agents SET summary = ?, updatedAt = ? WHERE id = ?").run(summary, new Date().toISOString(), id);
+  } catch {
+    // summary column may not exist in old databases — add it
+    try {
+      db.exec("ALTER TABLE agents ADD COLUMN summary TEXT");
+      db.prepare("UPDATE agents SET summary = ?, updatedAt = ? WHERE id = ?").run(summary, new Date().toISOString(), id);
+    } catch {}
   }
 }
 

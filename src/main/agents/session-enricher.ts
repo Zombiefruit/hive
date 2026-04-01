@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { getAllAgents, getMessages, addMessage, addEvent, updateAgentTask, addContextRef } from "../db/database";
+import { getAllAgents, getMessages, addMessage, addEvent, updateAgentTask, updateAgentSummary, addContextRef } from "../db/database";
 import { broadcastStoreUpdate } from "../ipc/bridge";
 import { parseSessionToDisplayMessages, detectContextFromLines } from "./message-parser";
 
@@ -64,27 +64,85 @@ export function enrichExternalAgents(): void {
 
       logEnricher(`Agent ${agent.id.slice(0, 8)}: parsed ${displayMessages.length} display messages`);
 
-      // Extract a clean title from the first meaningful user message
-      const userMessages = displayMessages.filter(m => m.role === "user");
+      // Extract a clean title from the conversation — try multiple strategies
       let title = "";
-      for (const msg of userMessages) {
-        let candidate = msg.content
-          .replace(/Used skill:\s*\S+\s*/g, "")  // Remove skill prefixes
-          .replace(/https?:\/\/\S+/g, (url) => {  // Shorten URLs
-            const match = url.match(/github\.com\/[^/]+\/[^/]+\/pull\/(\d+)/);
-            if (match) return `PR #${match[1]}`;
-            const linearMatch = url.match(/\/issue\/([A-Z]+-\d+)/);
-            if (linearMatch) return linearMatch[1];
-            return url.split("/").pop() ?? url;
-          })
-          .replace(/\s+/g, " ")
-          .trim();
-        if (candidate.length > 10) {
-          title = candidate.slice(0, 80);
+      let summary = "";
+
+      // Strategy 1: Look for ticket IDs (VEC-44, DAR-123) in user messages
+      for (const msg of displayMessages.filter(m => m.role === "user")) {
+        const ticketMatch = msg.content.match(/\b([A-Z]+-\d+)\b/);
+        if (ticketMatch) {
+          // Use the ticket + any text after it as the title
+          const afterTicket = msg.content.slice(msg.content.indexOf(ticketMatch[0])).replace(/\s+/g, " ").trim();
+          title = afterTicket.length > ticketMatch[0].length + 2 ? afterTicket.slice(0, 80) : ticketMatch[0];
           break;
         }
       }
-      if (title) updateAgentTask(agent.id, title);
+
+      // Strategy 2: Look for skill invocations — use the skill name + args
+      if (!title) {
+        const skillMsg = displayMessages.find(m => m.role === "skill");
+        const firstUser = displayMessages.find(m => m.role === "user");
+        if (skillMsg) {
+          const skillName = skillMsg.content.replace(/^\//, "");
+          // Try to combine skill name with the user's context
+          if (firstUser && firstUser.content.length > 5) {
+            const userText = firstUser.content.replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim();
+            title = userText.length > 10 ? userText.slice(0, 70) : `${skillName} session`;
+          } else {
+            title = `${skillName} session`;
+          }
+        }
+      }
+
+      // Strategy 3: Use first meaningful user message (>15 chars, not just a URL)
+      if (!title) {
+        for (const msg of displayMessages.filter(m => m.role === "user")) {
+          const cleaned = msg.content
+            .replace(/https?:\/\/\S+/g, (url) => {
+              const prMatch = url.match(/github\.com\/[^/]+\/[^/]+\/pull\/(\d+)/);
+              if (prMatch) return `PR #${prMatch[1]}`;
+              const linMatch = url.match(/\/issue\/([A-Z]+-\d+)/);
+              if (linMatch) return linMatch[1];
+              return "";
+            })
+            .replace(/\s+/g, " ")
+            .trim();
+          if (cleaned.length > 15) {
+            title = cleaned.slice(0, 80);
+            break;
+          }
+        }
+      }
+
+      // Strategy 4: Use first assistant response as title if it starts with a clear summary
+      if (!title) {
+        const firstAssistant = displayMessages.find(m => m.role === "assistant");
+        if (firstAssistant) {
+          const firstLine = firstAssistant.content.split("\n")[0].replace(/^#+\s*/, "").trim();
+          if (firstLine.length > 10 && firstLine.length < 100) {
+            title = firstLine.slice(0, 80);
+          }
+        }
+      }
+
+      // Fallback: use the cwd folder name
+      if (!title) {
+        title = `Session in ${agent.cwd.split("/").pop() ?? agent.cwd}`;
+      }
+
+      updateAgentTask(agent.id, title);
+
+      // Generate a summary from the first assistant response
+      const firstAssistant = displayMessages.find(m => m.role === "assistant");
+      if (firstAssistant) {
+        // Take the first 2-3 sentences or first 200 chars
+        const text = firstAssistant.content.replace(/^#+\s*/gm, "").trim();
+        const sentences = text.split(/(?<=[.!?])\s+/);
+        summary = sentences.slice(0, 3).join(" ");
+        if (summary.length > 200) summary = summary.slice(0, 197) + "...";
+        if (summary) updateAgentSummary(agent.id, summary);
+      }
 
       // Store messages — tool_group/skill/agent_group get stored as special roles
       for (const msg of displayMessages) {

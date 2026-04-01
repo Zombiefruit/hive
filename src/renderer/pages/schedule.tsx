@@ -126,6 +126,7 @@ export function Schedule() {
   const [generating, setGenerating] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isNextDay, setIsNextDay] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState<string | null>(null);
 
   // Load working hours from config (not hardcoded)
   const [workingHours, setWorkingHours] = useState({ start: "09:00", end: "18:00" });
@@ -257,6 +258,7 @@ export function Schedule() {
 
       saveTimeSlots(slots);
       setIsNextDay(isPastWorkingHours);
+      setScheduleDate(new Date().toISOString().split("T")[0]);
       setItems(schedule);
     } catch {}
     setGenerating(false);
@@ -278,13 +280,21 @@ export function Schedule() {
     const n = new Date();
     return n.getHours() * 60 + n.getMinutes();
   });
+  // Track the current date string so we can detect day changes
+  const [todayStr, setTodayStr] = useState(() => new Date().toISOString().split("T")[0]);
   useEffect(() => {
     const interval = setInterval(() => {
       const n = new Date();
       setNowMinutes(n.getHours() * 60 + n.getMinutes());
+      // Detect day change (midnight boundary) — regenerate schedule
+      const newDay = n.toISOString().split("T")[0];
+      if (newDay !== todayStr) {
+        setTodayStr(newDay);
+        generateSchedule(true);
+      }
     }, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [todayStr, generateSchedule]);
 
   // Timeline — full 24-hour day, always
   const startHour = 0;
@@ -294,10 +304,12 @@ export function Schedule() {
   const dayStartMinutes = timeToMinutes(workingHours.start);
   const dayEndMinutes = timeToMinutes(workingHours.end);
   // Show current time indicator — always visible on today's schedule
-  // Extend display range to include current time if it's past endHour
-  const displayEndMinutes = isNextDay ? endHour * 60 : Math.max(endHour * 60, nowMinutes + 30);
-  const nowInRange = !isNextDay && nowMinutes >= dayStartMinutes;
-  const nowOffset = nowInRange ? ((nowMinutes - dayStartMinutes) / 60) * HOUR_HEIGHT : -1;
+  // The timeline starts at startHour (0), so offset is from hour 0
+  const nowInRange = !isNextDay;
+  const nowOffset = nowInRange ? ((nowMinutes - startHour * 60) / 60) * HOUR_HEIGHT : -1;
+
+  // Detect stale schedule: data was generated for a previous day
+  const isStaleSchedule = scheduleDate !== null && scheduleDate !== todayStr && !isNextDay;
 
   const totalHeight = (endHour - startHour) * HOUR_HEIGHT;
 
@@ -439,6 +451,31 @@ export function Schedule() {
           </div>
         );
       })()}
+
+      {/* Stale schedule banner — shown when schedule was generated on a previous day */}
+      {isStaleSchedule && (
+        <div style={{
+          padding: "8px 20px",
+          backgroundColor: "color-mix(in srgb, var(--mantine-color-yellow-9) 15%, transparent)",
+          borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-yellow-6) 30%, transparent)",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          flexShrink: 0,
+        }}>
+          <Text size="xs" c="yellow.4">
+            Schedule is from yesterday — regenerate?
+          </Text>
+          <UnstyledButton
+            onClick={() => generateSchedule(true)}
+            disabled={generating}
+            style={{
+              padding: "2px 10px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 600,
+              backgroundColor: "var(--mantine-color-yellow-9)", color: "var(--mantine-color-yellow-2)",
+            }}
+          >
+            {generating ? "Regenerating..." : "Regenerate"}
+          </UnstyledButton>
+        </div>
+      )}
 
       {/* Schedule body — sidebar fixed, calendar scrolls */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>

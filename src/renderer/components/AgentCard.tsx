@@ -80,9 +80,14 @@ export function AgentCard({ agent }: { agent: Agent }) {
         </Group>
 
         {/* Task description */}
-        <Text size="sm" c="dimmed" lineClamp={2} style={{ lineHeight: 1.5 }}>
+        <Text size="sm" c="dimmed" lineClamp={1} style={{ lineHeight: 1.5 }}>
           {agent.task}
         </Text>
+        {agent.summary && (
+          <Text size="xs" c="dimmed" lineClamp={2} style={{ lineHeight: 1.4, fontSize: "0.7rem" }}>
+            {agent.summary}
+          </Text>
+        )}
 
         {/* Metadata row */}
         <Group gap="md">

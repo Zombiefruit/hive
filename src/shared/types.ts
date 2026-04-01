@@ -13,6 +13,7 @@ export interface Agent {
   status: AgentStatus;
   source: AgentSource;
   task: string;
+  summary: string | null;
   model: string;
   branch: string | null;
   cwd: string;
