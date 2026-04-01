@@ -285,17 +285,24 @@ export function runSkill(
     log(`[skill] Spawned PID ${proc.pid}`);
     emit("status", `Spawned skill runner — loading tools...`);
 
-    // Send skill command as user message
+    // We send the skill command AFTER init (see init handler below)
     const userMessage = `${invocation.skill} ${invocation.args}`.trim();
-    proc.stdin?.write(
-      JSON.stringify({
-        type: "user",
-        message: { role: "user", content: userMessage },
-        parent_tool_use_id: null,
-        uuid: randomUUID(),
-        session_id: sessionId ?? "",
-      }) + "\n",
-    );
+    let messageSent = false;
+
+    const sendUserMessage = () => {
+      if (messageSent || !proc.stdin?.writable) return;
+      messageSent = true;
+      proc.stdin.write(
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: userMessage },
+          parent_tool_use_id: null,
+          uuid: randomUUID(),
+          session_id: sessionId ?? "",
+        }) + "\n",
+      );
+      log(`[skill] Sent command after init: ${userMessage}`);
+    };
 
     // Periodic status updates during silent init
     const startTs = Date.now();
@@ -303,6 +310,11 @@ export function runSkill(
       if (!initialized && !done) {
         const elapsed = Math.round((Date.now() - startTs) / 1000);
         emit("status", `Loading tools... (${elapsed}s)`);
+        // Safety: if init never comes after 30s, send anyway
+        if (elapsed >= 30 && !messageSent) {
+          log("[skill] Init timeout — sending message anyway");
+          sendUserMessage();
+        }
       }
     }, 10000);
 
@@ -352,6 +364,8 @@ export function runSkill(
             const tools: string[] = msg.tools ?? [];
             log(`[skill] Initialized: ${tools.length} tools, session=${sessionId}`);
             emit("init", `Agent ready — ${tools.length} tools`);
+            // NOW send the skill command — agent is ready to receive
+            sendUserMessage();
           }
 
           // Assistant content — text and tool_use blocks
