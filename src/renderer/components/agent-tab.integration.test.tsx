@@ -56,9 +56,9 @@ function renderTab(props: Partial<Parameters<typeof AgentTab>[0]> = {}) {
 }
 
 describe("AgentTab integration", () => {
-  it("shows 'Click Start Work' when stage is new and no conversation", () => {
+  it("shows 'Move to Planning' when stage is new and no conversation", () => {
     renderTab({ stage: "new" });
-    expect(screen.getByText(/Start Work/i)).toBeTruthy();
+    expect(screen.getByText(/Move to Planning/i)).toBeTruthy();
   });
 
   it("shows 'Planning...' when stage is start_work and loading", () => {
@@ -71,9 +71,9 @@ describe("AgentTab integration", () => {
     expect(screen.getByText(/Gathering context/i)).toBeTruthy();
   });
 
-  it("does NOT show 'Click Start Work' when stage is start_work", () => {
+  it("does NOT show 'Move to Planning' when stage is start_work", () => {
     renderTab({ stage: "start_work", loading: false, activity: [{ type: "init", content: "Ready", timestamp: "" }] });
-    expect(screen.queryByText(/Click.*Start Work/)).toBeNull();
+    expect(screen.queryByText(/Move to Planning/)).toBeNull();
   });
 
   it("renders assistant messages with Markdown", () => {

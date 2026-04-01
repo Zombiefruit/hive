@@ -438,7 +438,7 @@ export function DetailDrawer({
               backgroundColor: "var(--mantine-color-blue-5)", color: "white",
             }}
           >
-            Start Work
+            Move to Planning
           </UnstyledButton>
           <UnstyledButton onClick={onDismiss} style={{ padding: "6px 12px", borderRadius: 6, fontSize: "0.75rem", color: "var(--mantine-color-dimmed)" }}>
             Dismiss

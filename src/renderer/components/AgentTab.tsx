@@ -104,7 +104,7 @@ export function AgentTab({
         {conversation.length === 0 && !loading && activity.length === 0 && (
           <Stack align="center" py="xl" gap="sm">
             <Text size="sm" c="dimmed">
-              {stage === "new" || stage === "skipped" ? "Click \"Start Work\" to begin planning."
+              {stage === "new" || stage === "skipped" ? "Click \"Move to Planning\" to begin."
                 : stage === "start_work" || stage === "preparing" ? "Agent is being set up..."
                 : "No conversation yet."}
             </Text>
