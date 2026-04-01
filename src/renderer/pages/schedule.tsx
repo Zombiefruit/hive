@@ -387,8 +387,8 @@ export function Schedule() {
                 onClick={() => setFocusMode(f => !f)}
                 style={{
                   padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500,
-                  backgroundColor: focusMode ? "var(--mantine-color-blue-9)" : "var(--mantine-color-default-hover)",
-                  color: focusMode ? "var(--mantine-color-blue-4)" : "var(--mantine-color-dimmed)",
+                  backgroundColor: focusMode ? "var(--mantine-color-blue-filled)" : "var(--mantine-color-default-hover)",
+                  color: focusMode ? "white" : "var(--mantine-color-dimmed)",
                   display: "flex", alignItems: "center", gap: 4,
                   transition: "background-color 0.15s ease, color 0.15s ease",
                 }}
@@ -777,7 +777,7 @@ export function Schedule() {
                 <Text size="xs" c="dimmed">{item.startTime} – {item.endTime} ({item.estimatedMinutes}min)</Text>
               </Group>
               {item.actionNeeded && (
-                <div style={{ padding: "8px 12px", borderRadius: 6, backgroundColor: "color-mix(in srgb, var(--mantine-color-blue-9) 15%, transparent)", marginBottom: 12 }}>
+                <div style={{ padding: "8px 12px", borderRadius: 6, backgroundColor: "var(--mantine-color-blue-light)", marginBottom: 12 }}>
                   <Text size="xs" c="blue.4">{item.actionNeeded}</Text>
                 </div>
               )}

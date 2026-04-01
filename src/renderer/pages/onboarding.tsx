@@ -289,13 +289,19 @@ export function Onboarding() {
             allowNextStepsSelect={false}
             styles={{
               separator: { marginLeft: 4, marginRight: 4 },
+              stepIcon: {
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderColor: "var(--mantine-color-default-border)",
+              },
             }}
           >
             {STEP_ICONS.map((Icon, i) => (
               <Stepper.Step
                 key={i}
-                icon={<Icon size={16} />}
-                completedIcon={<IconCheck size={16} />}
+                icon={<Icon size={16} style={{ display: "block" }} />}
+                completedIcon={<IconCheck size={16} style={{ display: "block" }} />}
               />
             ))}
           </Stepper>
@@ -420,7 +426,7 @@ export function Onboarding() {
                               : "color-mix(in srgb, var(--mantine-color-default-border) 50%, transparent)"
                           }`,
                           backgroundColor: selected
-                            ? "color-mix(in srgb, var(--mantine-color-blue-9) 20%, transparent)"
+                            ? "var(--mantine-color-blue-light)"
                             : "transparent",
                           transition: "all 0.1s ease",
                         }}
@@ -534,7 +540,7 @@ export function Onboarding() {
                             : "color-mix(in srgb, var(--mantine-color-default-border) 50%, transparent)"
                         }`,
                         backgroundColor: integrations[key]
-                          ? "color-mix(in srgb, var(--mantine-color-blue-9) 15%, transparent)"
+                          ? "var(--mantine-color-blue-light)"
                           : "transparent",
                         transition: "all 0.1s ease",
                       }}

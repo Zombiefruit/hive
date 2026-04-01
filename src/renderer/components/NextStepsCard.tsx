@@ -148,10 +148,10 @@ function ActionRow({
               style={{
                 padding: "4px 12px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 500,
                 backgroundColor: disabled ? "var(--mantine-color-default-hover)"
-                  : action.type === "dismiss" ? "#22c55e"
+                  : action.type === "dismiss" ? "var(--mantine-color-green-filled)"
                   : risk === "high" ? "var(--mantine-color-default-hover)"
-                  : "var(--mantine-color-blue-9)",
-                color: disabled ? "var(--mantine-color-dimmed)" : action.type === "dismiss" ? "white" : "var(--mantine-color-text)",
+                  : "var(--mantine-color-blue-filled)",
+                color: disabled ? "var(--mantine-color-dimmed)" : action.type === "dismiss" ? "white" : "white",
                 opacity: disabled ? 0.5 : 1,
                 cursor: disabled ? "not-allowed" : "pointer",
                 flexShrink: 0,
@@ -260,7 +260,7 @@ export function NextStepsCard({
     <div style={{
       padding: "14px 16px", borderRadius: 10,
       border: "1px solid color-mix(in srgb, var(--mantine-color-blue-5) 30%, transparent)",
-      backgroundColor: "color-mix(in srgb, var(--mantine-color-blue-9) 8%, var(--mantine-color-body))",
+      backgroundColor: "var(--mantine-color-blue-light)",
     }}>
       <Text size="xs" fw={600} mb={10} c="blue.4">Next Steps</Text>
       <Stack gap={8}>

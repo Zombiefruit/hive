@@ -393,7 +393,7 @@ export function Notifications() {
               itemLabel="items"
             />
             {!pollStatus.fetching && notifications.some(n => n.pollCycle && (!seenCycle.has(n.id) || (seenCycle.get(n.id) ?? 0) < n.pollCycle)) && (
-              <UnstyledButton onClick={markAllSeen} aria-label="Mark all as read" style={{ fontSize: "0.6rem", color: "var(--mantine-color-blue-4)", padding: "2px 6px", borderRadius: 4, backgroundColor: "color-mix(in srgb, var(--mantine-color-blue-9) 15%, transparent)" }}>
+              <UnstyledButton onClick={markAllSeen} aria-label="Mark all as read" style={{ fontSize: "0.6rem", color: "var(--mantine-color-blue-filled)", padding: "2px 6px", borderRadius: 4, backgroundColor: "var(--mantine-color-blue-light)" }}>
                 Mark all read
               </UnstyledButton>
             )}

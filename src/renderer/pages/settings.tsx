@@ -617,7 +617,7 @@ export function Settings() {
                         : "color-mix(in srgb, var(--mantine-color-default-border) 50%, transparent)"
                     }`,
                     backgroundColor: integrations[key]
-                      ? "color-mix(in srgb, var(--mantine-color-blue-9) 15%, transparent)"
+                      ? "var(--mantine-color-blue-light)"
                       : "transparent",
                     transition: "all 0.1s ease",
                   }}

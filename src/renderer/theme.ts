@@ -84,7 +84,50 @@ const deckTheme = createTheme({
     Drawer: { defaultProps: { position: "right" } },
     ActionIcon: { defaultProps: { variant: "subtle" } },
     Text: { defaultProps: { size: "sm" } },
-    Select: { defaultProps: { checkIconPosition: "right", allowDeselect: false } },
+    Select: {
+      defaultProps: { checkIconPosition: "right", allowDeselect: false },
+      styles: {
+        dropdown: {
+          backgroundColor: "var(--mantine-color-body)",
+          borderColor: "var(--mantine-color-default-border)",
+        },
+        option: {
+          borderRadius: 4,
+        },
+      },
+    },
+    Radio: {
+      styles: {
+        radio: {
+          borderColor: "var(--mantine-color-default-border)",
+        },
+      },
+    },
+    Switch: {
+      styles: {
+        track: {
+          borderColor: "var(--mantine-color-default-border)",
+        },
+      },
+    },
+    Tabs: {
+      styles: {
+        tab: {
+          "&[dataActive]": {
+            borderColor: "var(--mantine-color-blue-filled)",
+          },
+        },
+      },
+    },
+    Stepper: {
+      styles: {
+        stepIcon: {
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        },
+      },
+    },
     Tooltip: { defaultProps: { events: { hover: true, focus: true, touch: false } } },
   },
 });
