@@ -104,3 +104,4 @@ dist/
 .superpowers/
 .prompts/working/
 .work/
+local_cache/
