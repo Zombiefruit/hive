@@ -30,6 +30,7 @@ export interface IntegrationToggles {
   calendar: boolean;
   notion: boolean;
   github: boolean;
+  gong: boolean;
 }
 
 export interface DeckConfig {

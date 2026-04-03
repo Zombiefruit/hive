@@ -189,7 +189,11 @@ app.whenReady().then(() => {
   ipcMain.handle("reset:all", () => {
     try {
       const userData = app.getPath("userData");
-      const files = ["claude-deck.db", "config.json", "notifications-cache.json", "plans-cache.json", "planning-events-cache.json"];
+      const files = [
+        "claude-deck.db", "config.json", "notifications-cache.json", "plans-cache.json",
+        "planning-events-cache.json", "projects-cache.json", "skipped-cache.json",
+        "business-context.md", "business-context.log",
+      ];
       for (const file of files) {
         const p = path.join(userData, file);
         if (fs.existsSync(p)) fs.unlinkSync(p);
@@ -312,6 +316,9 @@ app.whenReady().then(() => {
 
   // Start agent monitoring loop
   startMonitoring();
+
+  // Start autonomous orchestrator
+  import("./orchestrator").then(({ startOrchestrator }) => startOrchestrator()).catch(() => {});
 
   // Start process monitor sampling (RSS tracking for spawned processes)
   startProcessSampling();
@@ -507,6 +514,136 @@ app.whenReady().then(() => {
   // Projects
   ipcMain.handle("projects:get-all", () => getAllProjects());
   ipcMain.handle("projects:get", (_event, id: string) => getProject(id));
+
+  // Global refresh
+  ipcMain.handle("global:refresh", async () => {
+    const results: Record<string, string> = {};
+
+    // Broadcast global refresh start
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send("global:refresh-start");
+    }
+
+    try {
+      const { forcePoll } = await import("./notifications/poll-service");
+      forcePoll();
+      results.notifications = "triggered";
+    } catch { results.notifications = "failed"; }
+    try {
+      const { generateInsights } = await import("./insights/service");
+      const cfg = getConfig();
+      generateInsights(cfg?.name ?? "User").catch(() => {});
+      results.insights = "triggered";
+    } catch { results.insights = "failed"; }
+    try {
+      const { needsRefresh, refreshBusinessContext } = await import("./business-context");
+      if (needsRefresh()) {
+        refreshBusinessContext().catch(() => {});
+        results.context = "triggered";
+      } else {
+        results.context = "fresh";
+      }
+    } catch { results.context = "failed"; }
+    return results;
+  });
+
+  // Orchestrator
+  ipcMain.handle("orchestrator:status", async () => {
+    const { getOrchestratorStatus } = await import("./orchestrator");
+    return getOrchestratorStatus();
+  });
+  ipcMain.handle("orchestrator:thoughts", async (_event, limit?: number) => {
+    const { getRecentThoughts } = await import("./orchestrator");
+    return getRecentThoughts(limit);
+  });
+
+  // Business Context
+  ipcMain.handle("context:get-business", async () => {
+    const { loadBusinessContext } = await import("./business-context");
+    return loadBusinessContext();
+  });
+  ipcMain.handle("context:refresh-business", async () => {
+    const { refreshBusinessContext } = await import("./business-context");
+    return refreshBusinessContext();
+  });
+  ipcMain.handle("context:save-business", async (_event, content: string) => {
+    const { saveBusinessContext } = await import("./business-context");
+    saveBusinessContext(content);
+  });
+
+  // Coach
+  ipcMain.handle("coach:daily-brief", async () => {
+    const { generateDailyBrief } = await import("./coach/service");
+    return generateDailyBrief();
+  });
+  ipcMain.handle("coach:work-patterns", async (_event, days?: number) => {
+    const { analyzeWorkPatterns } = await import("./coach/service");
+    return analyzeWorkPatterns(days);
+  });
+  ipcMain.handle("coach:output-score", async () => {
+    const { scoreOutput } = await import("./coach/service");
+    return scoreOutput();
+  });
+
+  // Setup Agent
+  ipcMain.handle("setup:run", async (_event, name: string, email: string) => {
+    const { runSetupAgent } = await import("./setup-agent");
+    return runSetupAgent(name, email);
+  });
+
+  // Insights
+  ipcMain.handle("insights:get", async () => {
+    const { getStoredInsights } = await import("./insights/service");
+    return getStoredInsights();
+  });
+  ipcMain.handle("insights:generate", async () => {
+    const { generateInsights } = await import("./insights/service");
+    const config = getConfig();
+    return generateInsights(config?.name ?? "User");
+  });
+  ipcMain.handle("insights:update", async (_event, id: string, changes: Record<string, unknown>) => {
+    const { updateInsightStatus } = await import("./insights/service");
+    updateInsightStatus(id, changes.status as "new" | "acknowledged" | "converted" | "dismissed");
+  });
+  ipcMain.handle("insights:convert", async (_event, id: string) => {
+    const { updateInsightStatus, getStoredInsights } = await import("./insights/service");
+    const insights = getStoredInsights();
+    const insight = insights.find((i: { id: string }) => i.id === id);
+    if (insight) {
+      const { createManualNotification } = await import("./notifications/poll-service");
+      const n = createManualNotification({ title: insight.title, summary: insight.description, taskType: "investigation", priority: insight.impactEstimate === "high" ? "high" : "medium" });
+      const taskId = n.id;
+      updateInsightStatus(id, "converted", taskId);
+      return taskId;
+    }
+  });
+
+  // Agent Memory
+  ipcMain.handle("memory:stats", async () => {
+    const { getMemoryStats } = await import("./memory/service");
+    return getMemoryStats();
+  });
+  ipcMain.handle("memory:list", async (_event, scope?: string) => {
+    const { getAllMemoriesList } = await import("./memory/service");
+    return getAllMemoriesList(scope as "shared" | "triage" | "planning" | "work" | undefined);
+  });
+  ipcMain.handle("memory:search", async (_event, query: string, scope?: string) => {
+    const { getRelevantMemories } = await import("./memory/service");
+    return getRelevantMemories(query, scope as "shared" | "triage" | "planning" | "work" | undefined, 20);
+  });
+  ipcMain.handle("memory:learn-action", async (_event, action: string, details: string) => {
+    const { learnFromTriageOverride } = await import("./memory/service");
+    return learnFromTriageOverride("User action", action as "priority_change" | "dismissed" | "reclassified", details);
+  });
+  ipcMain.handle("memory:delete", async (_event, id: string) => {
+    const mod = await import("./memory/service");
+    mod.deleteMemory(id);
+  });
+  ipcMain.handle("memory:clear", async () => {
+    const mod = await import("./memory/service");
+    const all = mod.getAllMemoriesList();
+    for (const m of all) mod.deleteMemory(m.id);
+  });
 
   // Start periodic store sync to renderer (every 100ms)
   startStoreSync(buildStoreState, 100);

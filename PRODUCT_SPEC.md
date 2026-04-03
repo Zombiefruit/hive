@@ -1,6 +1,6 @@
 # Hive — Product Specification
 
-> Last updated: 2026-04-01
+> Last updated: 2026-04-03
 
 ## Vision
 
@@ -10,7 +10,7 @@ The goal is to replace the manual inbox-checking → context-gathering → task-
 
 ---
 
-## Current State (March 2026)
+## Current State (April 2026)
 
 ### What's Built
 
@@ -70,11 +70,40 @@ Priority assignment is context-aware: who asked matters (manager → critical, l
 - **Plan regeneration** via `clearPlan()` IPC
 - **Work agent spawning** — starts a Claude Code agent to execute the plan
 
-#### Manager AI
-- **Chat interface** — floating panel accessible from any page
-- **Task management** — can update priority, stage, status, confidence via JSON action blocks
-- **Conversation persistence** — multiple conversations, switch/delete
-- **Fleet awareness** — sees current agent states and pending approvals
+#### Agent-as-Judge Verification
+- **Three judge types:** Triage (checks missed items, wrong priorities), Planning (feasibility, completeness), Work (plan adherence, completion)
+- **All judges use Sonnet** via `askJudgeProcess()` — lightweight, no MCP tools, ~3s startup
+- **Triage judge** runs in parallel with parsing, applies corrections automatically
+- **Planning judge** verifies plans before showing to user, auto-iterates once on rejection
+- **Work judge** runs post-exit, broadcasts verdict, holds stage on rejection
+- **Verdicts** appear on kanban cards (badge) and in Plan tab (verdict panel)
+
+#### Agent Memory System
+- **SQLite + fastembed** (BAAI/bge-small-en-v1.5, 384-dim) for semantic search
+- **Per-agent scopes** (triage, planning, work) + shared pool
+- **Memory types:** preference, fact, relationship, procedure, context, feedback
+- **Dedup:** cosine similarity > 0.85 merges memories
+- **Confidence decay** for unused memories (7+ days)
+- **Learning loop:** Low-confidence judges can ask user questions → answers stored as high-confidence memories
+- **All judges read memories** before making verdicts
+
+#### Autonomous Orchestrator
+- **60-second poll loop** monitoring all active tasks
+- **Parent stage auto-computation** from children
+- **Stall detection** — 15+ min idle triggers escalation
+- **Thinking bubble** — broadcasts real-time thoughts to UI
+- **Structured escalation** with severity, whatWasTried, suggestedActions
+
+#### Business Context
+- **Agent-maintained** living document scanned from Slack, Notion, Linear, Gong weekly
+- **User reviews/approves** before saving
+- **Injected into all judge prompts** as grounding context
+
+#### Setup Agent
+- **Skill-based** (`discover-workspace/SKILL.md`), re-runnable from Settings
+- **Auto-discovers:** Slack ID, Linear username, channels, coworkers, manager, working hours
+- **Mines Gmail + Calendar** for org structure (1:1 patterns = manager, team syncs = teammates)
+- **Stores discovered context** as agent memories
 
 ---
 
@@ -106,39 +135,58 @@ Priority assignment is context-aware: who asked matters (manager → critical, l
 - **Time estimates** per task type (implementation=90min, review=45min, response=15min, etc.)
 - **Current time indicator** (red line)
 - **Drag to reorder** with automatic time recalculation
-- **Focus mode** (hides sidebar)
-- **Capacity progress bar** + free time labels
-- **Priority breakdown sidebar** (count per priority level)
+
+#### Coach (/coach) — Productivity Coach (replaced Standup)
+- **Daily Brief** — yesterday's completions, today's priorities, blockers
+- **Work Patterns** — task distribution by type, completion rates, bottleneck detection, meeting load
+- **Output Scoring** — weekly composite score (0-100): completion rate, response speed, plan quality
+- **Actionable Suggestions** — "60% of tasks are responses — batch Slack replies"
+
+#### Insights (/insights) — Proactive Ideas
+- **Auto-discovers** useful Slack channels (learned over time)
+- **Extracts** feature ideas, customer pain points, trends, proactive tasks
+- **Sources:** Slack channels, Gong calls, Linear trends
+- **Actions:** Create Task (converts to notification), Acknowledge, Dismiss
+- **Channel scoring** — user actions adjust channel usefulness scores
+
+#### Memories (/memories) — Agent Memory Viewer
+- **Stats header** — total by scope (triage/planning/work/shared) and category
+- **Semantic search** — find memories by meaning, not just keywords
+- **Filter chips** — by scope, category
+- **Memory cards** — content, confidence bar, source, access count
+- **Actions** — delete individual, clear all
+
+#### Context (/context) — Business Context
+- **Agent-generated** business context document (Markdown)
+- **Generate/Refresh** — scans Slack, Notion, Linear, Gong
+- **Editable** — user can edit before saving
+- **Injected** into all judge prompts automatically
 
 #### Settings (/settings)
 - **Identity** — name, email, Slack User ID, Linear username
-- **Role & Team** — role (dev/PM/designer), manager name, team name
-- **Coworkers** — add/remove with name, role (manager/lead/PM/peer), optional Slack ID
-- **Slack Channels** — channels to monitor (name + ID)
-- **Integrations** — toggle per source (Slack, Linear, Gmail, Calendar, Notion, GitHub)
-- **MCP Connections** — per-connector health badges (green/red), restart bridge, open terminal for auth
+- **Auto-Discover** — button that runs setup agent to auto-fill all fields from MCP tools
+- **Role & Team** — role, manager, team, coworkers
+- **Integrations** — toggle per source (Slack, Linear, Gmail, Calendar, Notion, GitHub, Gong)
+- **MCP Connections** — per-connector health badges
 - **Preferences** — fetch cadence, timezone, working hours
 
 #### Onboarding (/onboarding) — First-Run Wizard
 - 6-step flow matching settings sections
+- **Auto-Discover** button — fills everything from name + email
 - Auto-detected timezone
 - Saves to `config.json`
-
-#### Other Pages
-- **Agent Detail (/agent/[id])** — live logs, chat, timeline, context panel, controls
-- **Task Detail (/task/[id])** — task status, logs, actions
-- **History (/history)** — session history with terminal replay
-- **Debug (/debug)** — development utilities
 
 ---
 
 ### Skills System (.claude/skills/)
 
-14 specialized skills for the manager/agents:
-- **Fetch:** fetch-slack, fetch-linear, fetch-github, fetch-gmail, fetch-calendar, fetch-notion
+24 specialized skills:
+- **Fetch:** fetch-slack, fetch-linear, fetch-github, fetch-gmail, fetch-calendar, fetch-notion, fetch-gong
 - **Parse:** parse-implementation, parse-review, parse-response, parse-meeting-prep
 - **Execute:** execute-implementation, execute-review
 - **Manage:** manage-agent, update-task
+- **Judge:** judge-triage, judge-plan, judge-work
+- **Discovery:** discover-workspace, refresh-business-context, extract-insights
 - **Structured Agent Actions** — agents return typed JSON action blocks (run skill, update Linear, send Slack, open URL, dismiss, snooze) rendered as risk-tiered CTAs in the detail drawer
 
 ### Configuration System
@@ -215,23 +263,22 @@ Shared
 ## Future Roadmap
 
 ### Near-term
-- [ ] Slack/Linear user search via MCP — populate coworker dropdowns using existing MCP tools
-- [ ] End-to-end test — notification → plan → approve → agent → PR
-- [ ] Slack hook — auto-spawn agent on mentions/DMs
-- [ ] Smart refresh — cheap update checks on known tasks vs expensive full re-scan
-- [ ] Config-driven poll cadence — use settings instead of manual/startup only
+- [ ] Orchestrator thinking bubble UI — floating speech bubble showing real-time orchestrator thoughts
+- [ ] Sidebar navigation redesign — 8+ tabs too many for horizontal bar
+- [ ] Response task safety — CTA always "Draft", never auto-send
+- [ ] Global refresh — single button refreshes all data sources across all tabs
+- [ ] Better logging/visibility — all agent actions should have visible logs
 
 ### Medium-term
-- [ ] Manager learns from history — accumulated task history as context for smarter triage
-- [ ] Attach tasks to existing Claude sessions — link manual tasks to running agents
-- [ ] Slack channel search in onboarding — search instead of manual ID entry
-- [ ] UI prompts on timeout — user-facing messages when fetches time out
+- [ ] Bridge pool for true parallel fetching — spawn N bridge processes
+- [ ] End-to-end test pipeline — notification → plan → approve → agent → PR
+- [ ] Smart refresh — cheap update checks vs expensive full re-scan
+- [ ] Learning system v2 — judges learn from user overrides
 
 ### Long-term Vision
-- [ ] Proactive monitoring — continuously watch channels, act on new mentions without manual refresh
-- [ ] Skill library — extensible skill system where the manager picks the right skill per task
-- [ ] Multi-agent orchestration — manager coordinates multiple agents working on related tasks
-- [ ] Learning system — manager improves priority/triage decisions based on user feedback patterns
+- [ ] Skill library — extensible skill system where orchestrator picks the right skill
+- [ ] Multi-workspace support — manage multiple Slack/Linear/GitHub orgs
+- [ ] Team mode — multiple users sharing insights and coordinating work
 
 ---
 

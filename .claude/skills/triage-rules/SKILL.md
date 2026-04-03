@@ -26,6 +26,12 @@ user-invocable: false
 5. **UPDATE TASK STAGES based on evidence:**
    - If an existing task has a PR (draft or open) -> update stage to "working"
    - If an existing task's PR was merged or ticket was closed -> update stage to "done"
+   - **CRITICAL: PR STATUS VERIFICATION**: Before creating ANY review task, cross-check ALL available data:
+     1. Check the GITHUB section (ground truth) — if a PR is NOT in the "Open PRs awaiting my review" list, the review is done
+     2. Check Gmail — GitHub sends email notifications when PRs are merged/approved/closed
+     3. Check Slack reactions — ✅, 👀, white_check_mark indicate the review was handled
+     4. If ANY source says the PR is merged/approved/closed → the task is DONE, do not create a review task
+   - **CRITICAL**: Old Slack threads about PRs (3+ days old with reactions) are almost always already handled. SKIP them unless the GitHub ground truth section confirms the PR is still open and awaiting review.
    - If someone replied in a thread that was "response" type and the user hasn't replied back -> keep as actionable
    - If the user already replied in a thread -> update to "done" or "follow_up"
    - If a Linear ticket changed status (e.g., "In Progress" -> "In Review") -> update the summary/action_needed

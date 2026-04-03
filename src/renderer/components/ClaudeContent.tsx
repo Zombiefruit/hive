@@ -67,6 +67,13 @@ function cleanClaudeOutput(raw: string): string {
   // Strip any remaining XML-like tags that look like Claude internals
   text = text.replace(/<\/?(?:tool-use|tool-result|artifact|antArtifact)[^>]*>/gi, "");
 
+  // Strip raw JSON action blocks that the manager outputs ({"action": "update_task", ...})
+  // These are machine-readable actions, not for human display
+  text = text.replace(/\n?\{[\s\n]*"action"\s*:\s*"[^"]+?"[\s\S]*?\}\n?/g, "");
+
+  // Also strip standalone JSON blocks wrapped in code fences that contain action fields
+  text = text.replace(/```(?:json)?\s*\n?\{[\s\n]*"action"\s*:[\s\S]*?\}\n?\s*```/g, "");
+
   // Clean up excessive whitespace from tag removal
   text = text.replace(/\n{3,}/g, "\n\n");
   text = text.trim();

@@ -11,6 +11,7 @@ import {
   Text,
   TextInput,
   UnstyledButton,
+  Loader,
 } from "@mantine/core";
 import {
   IconArrowLeft,
@@ -25,8 +26,9 @@ import {
   IconPlugConnected,
   IconSettings,
 } from "@tabler/icons-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { IconSparkles } from "@tabler/icons-react";
 import type {
   DeckConfig,
   UserRole,
@@ -109,6 +111,7 @@ export function Onboarding() {
     calendar: false,
     notion: false,
     github: true,
+    gong: false,
   });
 
   // Step 6 — Preferences
@@ -116,6 +119,47 @@ export function Onboarding() {
   const [timezone, setTimezone] = useState(detectTimezone);
   const [workStart, setWorkStart] = useState("09:00");
   const [workEnd, setWorkEnd] = useState("18:00");
+
+  // Auto-discovery
+  const [discovering, setDiscovering] = useState(false);
+  const [discoveryStatus, setDiscoveryStatus] = useState("");
+
+  const handleAutoDiscover = useCallback(async () => {
+    if (!name.trim() || !email.trim()) return;
+    setDiscovering(true);
+    setDiscoveryStatus("Starting discovery...");
+
+    const unsub = window.deck?.onSetupProgress?.((msg: string) => setDiscoveryStatus(msg));
+
+    try {
+      const result = await window.deck?.runSetupAgent?.(name.trim(), email.trim());
+      if (result) {
+        if (result.slackUserId) setSlackUserId(result.slackUserId);
+        if (result.linearUsername) setLinearUsername(result.linearUsername);
+        if (result.managerName) setManagerName(result.managerName);
+        if (result.teamName) setTeamName(result.teamName);
+        if (result.role) setRole(result.role as UserRole);
+        // Coworkers are stored in config directly at save time (onboarding doesn't have a coworker editor)
+        if (result.slackChannels?.length) {
+          setChannels(result.slackChannels);
+          setSelectedChannelIds(new Set(result.slackChannels.map((c: { id: string }) => c.id)));
+        }
+        if (result.integrations) {
+          setIntegrations(prev => ({ ...prev, ...result.integrations }));
+        }
+        if (result.discoveredContext?.workingHours) {
+          setWorkStart(result.discoveredContext.workingHours.start);
+          setWorkEnd(result.discoveredContext.workingHours.end);
+        }
+        setDiscoveryStatus("Discovery complete!");
+      }
+    } catch {
+      setDiscoveryStatus("Discovery failed — fill in manually.");
+    } finally {
+      setDiscovering(false);
+      unsub?.();
+    }
+  }, [name, email]);
 
   // Pre-fill from git config (Electron only)
   useEffect(() => {
@@ -336,18 +380,31 @@ export function Onboarding() {
                   onChange={(e) => setEmail(e.currentTarget.value)}
                   size="sm"
                 />
+                {/* Auto-discover button */}
+                {name.trim() && email.trim() && (
+                  <Button
+                    variant={slackUserId ? "light" : "filled"}
+                    color="blue"
+                    leftSection={discovering ? <Loader size={14} color="white" /> : <IconSparkles size={14} />}
+                    onClick={handleAutoDiscover}
+                    disabled={discovering}
+                    size="sm"
+                  >
+                    {discovering ? discoveryStatus : slackUserId ? "Re-discover workspace" : "Auto-discover from workspace"}
+                  </Button>
+                )}
                 <Group grow>
                   <TextInput
                     label="Slack User ID"
-                    placeholder="e.g. U02PKBZSB9Q"
-                    description="Find in Slack profile > More > Copy member ID"
+                    placeholder={discovering ? "Discovering..." : "e.g. U02PKBZSB9Q"}
+                    description={slackUserId ? undefined : "Auto-discovered or find in Slack profile > More > Copy member ID"}
                     value={slackUserId}
                     onChange={(e) => setSlackUserId(e.currentTarget.value)}
                     size="sm"
                   />
                   <TextInput
                     label="Linear username"
-                    placeholder="e.g. kwilliams"
+                    placeholder={discovering ? "Discovering..." : "e.g. kwilliams"}
                     value={linearUsername}
                     onChange={(e) => setLinearUsername(e.currentTarget.value)}
                     size="sm"

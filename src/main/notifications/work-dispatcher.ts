@@ -17,6 +17,8 @@ import { BrowserWindow } from "electron";
 import { registerAgent, recordAgentEvent, unregisterAgent } from "./agent-monitor";
 import { buildSlackArchiveUrl } from "../../shared/task-utils";
 import { hasConfig, getConfig } from "../config";
+import { judgePlan, judgeWork } from "../judge-bridge";
+import type { PlanVerdict, WorkVerdict } from "../../shared/judge-types";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -83,6 +85,8 @@ export interface WorkPlan {
   conversationHistory: Array<{ role: "user" | "assistant"; content: string }>;
   /** Raw context fetched by the planning agent — Slack messages, Linear details, etc. */
   fetchedContext?: Array<{ type: string; content: string; timestamp: string }>;
+  /** Verdict from the planning judge (if verification ran) */
+  verdict?: PlanVerdict;
 }
 
 // Persist plans so they survive page refreshes
@@ -260,6 +264,51 @@ export async function prepareWorkPlan(notification: {
     fetchedContext: collectedEvents.filter(e => e.type === "text" || e.type === "tool_use" || e.type === "init"),
   };
 
+  // Run planning judge to verify the plan
+  const planVerdict = await judgePlan(
+    { title: notification.title, summary: notification.summary, taskType: notification.taskType },
+    response,
+    collectedEvents.filter(e => e.type === "text" || e.type === "tool_use"),
+  ).catch(err => {
+    log(`Plan judge error: ${String(err).slice(0, 100)}`);
+    return null;
+  });
+
+  if (planVerdict) {
+    plan.verdict = planVerdict;
+    addDebugEntry("out", `⚖️ [PLANNING] Judge verdict: ${planVerdict.status} (${planVerdict.confidence}/10, ${planVerdict.durationMs}ms)`, "planning");
+
+    // If rejected, auto-iterate once with judge concerns as feedback
+    if (planVerdict.status === "rejected" && planVerdict.concerns.length > 0) {
+      const judgeFeedback = `The planning judge has rejected this plan. Address these concerns:\n\n${planVerdict.concerns.map(c => `- [${c.severity}] ${c.description}${c.suggestion ? ` → ${c.suggestion}` : ""}`).join("\n")}${planVerdict.missingSteps.length > 0 ? `\n\nMissing steps:\n${planVerdict.missingSteps.map(s => `- ${s}`).join("\n")}` : ""}`;
+      addDebugEntry("in", `⚖️ [PLANNING] Auto-iterating based on judge rejection`, "planning");
+
+      try {
+        const iteratedPlan = await askEphemeralProcess(
+          `You previously produced this plan:\n\n${response}\n\n---\n\nFeedback from reviewer:\n${judgeFeedback}\n\nPlease revise the plan to address all concerns. Return ONLY the revised plan.`,
+          120000,
+        );
+        if (iteratedPlan && iteratedPlan.length > response.length * 0.3) {
+          plan.plan = iteratedPlan;
+          plan.conversationHistory.push(
+            { role: "user", content: judgeFeedback },
+            { role: "assistant", content: iteratedPlan },
+          );
+          // Re-judge the iterated plan
+          const secondVerdict = await judgePlan(
+            { title: notification.title, summary: notification.summary, taskType: notification.taskType },
+            iteratedPlan,
+            collectedEvents.filter(e => e.type === "text" || e.type === "tool_use"),
+          ).catch(() => null);
+          if (secondVerdict) plan.verdict = secondVerdict;
+          addDebugEntry("out", `⚖️ [PLANNING] Re-judge after iteration: ${secondVerdict?.status ?? "skipped"}`, "planning");
+        }
+      } catch (err) {
+        log(`Plan auto-iteration error: ${String(err).slice(0, 100)}`);
+      }
+    }
+  }
+
   plans.set(notification.id, plan);
   savePlans();
 
@@ -385,9 +434,29 @@ Write the prompt as if you're giving instructions to a skilled developer. Be tho
   const workPrompt = await askEphemeralProcess(promptComposition, 120000);
   log(`Work prompt composed: ${workPrompt.length} chars`);
 
-  // Spawn the work agent
+  // Spawn the work agent — use git worktree if repo is configured
   const claudePath = getClaudeCodePath();
   const agentId = `work-${Date.now()}`;
+
+  // Look up repo path from the notification
+  let effectiveCwd = os.homedir();
+  let worktreePath: string | null = null;
+  try {
+    const { getNotifications } = await import("./poll-service");
+    const notification2 = getNotifications().find(n => n.id === notificationId);
+    if (notification2?.repoPath) {
+      const { createWorktree } = await import("../skill-runner");
+      const branch = notification2.branch ?? `hive-work-${Date.now()}`;
+      try {
+        worktreePath = createWorktree(notification2.repoPath, branch);
+        effectiveCwd = worktreePath;
+        log(`Work agent using worktree: ${worktreePath}`);
+      } catch {
+        effectiveCwd = notification2.repoPath;
+        log(`Worktree failed, using repo directly: ${effectiveCwd}`);
+      }
+    }
+  } catch {}
 
   const proc = spawn(claudePath, [
     "--output-format", "stream-json",
@@ -397,7 +466,7 @@ Write the prompt as if you're giving instructions to a skilled developer. Be tho
     "--model", "claude-sonnet-4-6",
     "--permission-mode", "default",
   ], {
-    cwd: os.homedir(),
+    cwd: effectiveCwd,
     env: { ...process.env },
     stdio: ["pipe", "pipe", "pipe"],
   });
@@ -418,6 +487,9 @@ Write the prompt as if you're giving instructions to a skilled developer. Be tho
 
   // Parse agent output and broadcast events to the UI
   let outputBuffer = "";
+  let resultText = "";
+  const collectedWorkEvents: Array<{ type: string; content: string; timestamp: string }> = [];
+
   proc.stdout?.on("data", (chunk: Buffer) => {
     outputBuffer += chunk.toString("utf-8");
     const lines = outputBuffer.split("\n");
@@ -427,9 +499,14 @@ Write the prompt as if you're giving instructions to a skilled developer. Be tho
       if (!line.trim()) continue;
       try {
         const msg = JSON.parse(line);
+        // Capture final result text for work judge
+        if (msg.type === "result") {
+          resultText = String(msg.result ?? "");
+        }
         const event = parseAgentEvent(msg);
         if (event) {
           recordAgentEvent(agentId);
+          collectedWorkEvents.push(event);
           broadcastTaskEvent(agentId, event);
         }
       } catch {}
@@ -447,6 +524,19 @@ Write the prompt as if you're giving instructions to a skilled developer. Be tho
   proc.on("exit", (code) => {
     if (proc.pid) untrackProcess(proc.pid);
     log(`Work agent ${agentId} exited: ${code}`);
+
+    // Clean up worktree if one was created
+    if (worktreePath) {
+      import("../skill-runner").then(({ cleanupWorktree }) => {
+        try {
+          const n2 = plan.notificationId;
+          import("./poll-service").then(({ getNotifications }) => {
+            const notif = getNotifications().find(n => n.id === n2);
+            if (notif?.repoPath) cleanupWorktree(notif.repoPath, worktreePath!);
+          });
+        } catch {}
+      }).catch(() => {});
+    }
     activeWorkAgents.delete(agentId);
     unregisterAgent(agentId);
     broadcastTaskEvent(agentId, {
@@ -454,6 +544,28 @@ Write the prompt as if you're giving instructions to a skilled developer. Be tho
       type: "completed",
       content: `Agent finished with exit code ${code}`,
     });
+
+    // Run work judge asynchronously (non-blocking — does not delay the completed event)
+    judgeWork(plan.plan, collectedWorkEvents, resultText)
+      .then(verdict => {
+        if (verdict) {
+          log(`Work judge ${agentId}: ${verdict.status} (confidence ${verdict.confidence}/10, ${verdict.durationMs}ms)`);
+          broadcastTaskEvent(agentId, {
+            timestamp: new Date().toISOString(),
+            type: "verdict" as TaskEvent["type"],
+            content: JSON.stringify(verdict),
+          });
+          // If rejected, broadcast escalation so UI can hold the stage
+          if (verdict.status === "rejected") {
+            broadcastTaskEvent(agentId, {
+              timestamp: new Date().toISOString(),
+              type: "escalation",
+              content: `Work judge rejected: ${verdict.summary}`,
+            });
+          }
+        }
+      })
+      .catch(err => log(`Work judge error: ${String(err).slice(0, 100)}`));
   });
 
   return agentId;
@@ -461,7 +573,7 @@ Write the prompt as if you're giving instructions to a skilled developer. Be tho
 
 interface TaskEvent {
   timestamp: string;
-  type: "started" | "progress" | "tool_use" | "error" | "completed" | "escalation" | "text";
+  type: "started" | "progress" | "tool_use" | "error" | "completed" | "escalation" | "text" | "verdict";
   content: string;
 }
 

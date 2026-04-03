@@ -149,9 +149,9 @@ function ActionRow({
                 padding: "4px 12px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 500,
                 backgroundColor: disabled ? "var(--mantine-color-default-hover)"
                   : action.type === "dismiss" ? "var(--mantine-color-green-filled)"
-                  : risk === "high" ? "var(--mantine-color-default-hover)"
+                  : risk === "high" ? "var(--mantine-color-orange-filled)"
                   : "var(--mantine-color-blue-filled)",
-                color: disabled ? "var(--mantine-color-dimmed)" : action.type === "dismiss" ? "white" : "white",
+                color: disabled ? "var(--mantine-color-dimmed)" : "white",
                 opacity: disabled ? 0.5 : 1,
                 cursor: disabled ? "not-allowed" : "pointer",
                 flexShrink: 0,
@@ -161,7 +161,10 @@ function ActionRow({
                 : risk === "high" ? "Edit & Send"
                 : risk === "medium" ? "Run"
                 : action.type === "open_url" || action.type === "join_meeting" || action.type === "review_pr" ? "Open"
-                : "Go"}
+                : action.type === "send_slack" || action.type === "send_email" ? "Draft"
+                : action.type === "run_skill" ? "Start"
+                : action.type === "update_linear" ? "Update"
+                : "View"}
             </UnstyledButton>
           )
         )}
@@ -241,7 +244,10 @@ export function NextStepsCard({
   if (actions.length === 0) return null;
 
   const executeAction = (action: Action, index: number) => {
-    setExecutingIndex(index);
+    // Only show loading for async actions (skills, updates, messages)
+    const isAsync = action.type === "run_skill" || action.type === "update_linear" || action.type === "send_slack" || action.type === "send_email";
+    if (isAsync) setExecutingIndex(index);
+
     switch (action.type) {
       case "run_skill": onRunSkill(action.skill, action.params); break;
       case "update_linear": onUpdateLinear(action.ticket, action.field, action.value); break;
@@ -249,7 +255,11 @@ export function NextStepsCard({
       case "send_slack": onSendSlack(action.channel, action.message, action.threadTs); break;
       case "send_email": onSendEmail(action.to, action.subject, action.body); break;
       case "join_meeting": onOpenUrl(action.url); break;
-      case "review_pr": onOpenUrl(action.url); break;
+      case "review_pr":
+        // Review PRs should spin up the code-review skill, not just open a link
+        onRunSkill("/code-review", { url: action.url });
+        setExecutingIndex(index);
+        break;
       case "dismiss": onDismiss(action.reason); break;
       case "snooze": onSnooze(action.reason); break;
       case "no_action": break;

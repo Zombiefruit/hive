@@ -11,6 +11,9 @@ import { initSlackChannels } from "../agents/message-parser";
 import { loadSkills, loadSkillTemplate } from "../../shared/skill-loader";
 import { computeLookbackHours, migrateCacheFormat, buildCachePayload } from "../../shared/poll-cache";
 import { createProject, addTaskToProject, detectProjectFromSource, findProjectByName, getAllProjects, loadProjects, saveProjects } from "../../shared/project-model";
+import { judgeTriage } from "../judge-bridge";
+import { parseTriageResponse } from "../../shared/triage-parser";
+import type { TriageVerdict } from "../../shared/judge-types";
 
 export interface PollNotification {
   id: string;
@@ -38,6 +41,7 @@ export interface PollNotification {
   projectId?: string;
   parentTaskId?: string;     // if this is a subtask, points to parent
   subtaskIds?: string[];     // if this is a parent, lists child task IDs
+  verdict?: { status: "approved" | "concerns" | "rejected"; summary: string };
 }
 
 // normalizePriority, extractKey, STAGE_ORDER, CONFIDENCE_THRESHOLD imported from shared/task-utils
@@ -103,6 +107,9 @@ export function stopPolling(): void {
 }
 
 let lastSkippedItems: Array<{ source?: string; title?: string; reason?: string; url?: string }> = [];
+let lastTriageVerdict: TriageVerdict | null = null;
+
+export function getLastTriageVerdict(): TriageVerdict | null { return lastTriageVerdict; }
 
 function getSkippedCachePath(): string {
   return path.join(os.homedir(), "Library", "Application Support", "claude-deck", "skipped-cache.json");
@@ -391,7 +398,7 @@ async function poll(): Promise<void> {
     const teamName = config?.teamName ?? "";
     const tz = config?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
     const channels = config?.slackChannels ?? [];
-    const integrations = config?.integrations ?? { slack: true, linear: true, gmail: false, calendar: false, notion: false, github: true };
+    const integrations = config?.integrations ?? { slack: true, linear: true, gmail: false, calendar: false, notion: false, github: true, gong: false };
     const coworkers = config?.coworkers ?? [];
 
     // Build manager Slack search if we know the manager's Slack ID
@@ -492,19 +499,66 @@ RULES:
 - Be thorough and complete — include everything relevant
 - NEVER add commentary like "Let me compile..." or "I have enough data..." — return ONLY the data itself`;
 
+    // Pre-fetch: get GitHub PR status directly via gh CLI (fast, no MCP needed)
+    // This gives triage ground truth about PR states — prevents stale Slack threads from creating false review tasks
+    let githubContext = "";
+    if (integrations.github) {
+      try {
+        const { execFileSync } = await import("node:child_process");
+        // PRs where user is requested reviewer
+        const reviewRequested = execFileSync("gh", ["search", "prs", "--review-requested=@me", "--state=open", "--json", "number,title,repository,state,url,author", "--limit", "20"], { timeout: 15000 }).toString();
+        // PRs authored by user
+        const authored = execFileSync("gh", ["search", "prs", "--author=@me", "--state=open", "--json", "number,title,repository,state,url", "--limit", "10"], { timeout: 15000 }).toString();
+        // Recently merged PRs (to catch done items)
+        const merged = execFileSync("gh", ["search", "prs", "--author=@me", "--merged", "--json", "number,title,repository,state,closedAt,url", "--limit", "10", "--sort=updated"], { timeout: 15000 }).toString();
+
+        const sections: string[] = [];
+        const reviewPrs = JSON.parse(reviewRequested);
+        if (reviewPrs.length > 0) sections.push(`### Open PRs awaiting my review\n${reviewPrs.map((p: { number: number; title: string; repository: { nameWithOwner: string }; url: string; author: { login: string } }) => `- PR #${p.number}: ${p.title} (${p.repository.nameWithOwner}) by ${p.author.login} — ${p.url}`).join("\n")}`);
+        const authoredPrs = JSON.parse(authored);
+        if (authoredPrs.length > 0) sections.push(`### My open PRs\n${authoredPrs.map((p: { number: number; title: string; repository: { nameWithOwner: string }; state: string; url: string }) => `- PR #${p.number}: ${p.title} (${p.repository.nameWithOwner}) ${p.state} — ${p.url}`).join("\n")}`);
+        const mergedPrs = JSON.parse(merged);
+        if (mergedPrs.length > 0) sections.push(`### My recently merged PRs\n${mergedPrs.map((p: { number: number; title: string; repository: { nameWithOwner: string }; closedAt: string; url: string }) => `- PR #${p.number}: ${p.title} (${p.repository.nameWithOwner}) merged ${p.closedAt} — ${p.url}`).join("\n")}`);
+
+        if (sections.length > 0) {
+          githubContext = `\n\n## GITHUB (ground truth — PR states from GitHub API)\n${sections.join("\n\n")}\n\nIMPORTANT: Use this GitHub data as the SOURCE OF TRUTH for PR states. If a PR appears here as MERGED or CLOSED, do NOT create a review task for it — it's done. If a Slack thread mentions a PR that's not in the open review list above, the review is likely already handled.`;
+          logPoll(`  GitHub context: ${reviewPrs.length} review requests, ${authoredPrs.length} authored, ${mergedPrs.length} merged`);
+        }
+      } catch (err) {
+        logPoll(`  GitHub pre-fetch failed: ${String(err).slice(0, 100)}`);
+      }
+    }
+
     const fetchStart = Date.now();
     logPoll(`  Sending combined fetch prompt for: ${enabledSourceNames.join(", ")}`);
     addDebugEntry("in", `📤 Fetching all: ${enabledSourceNames.join(", ")}`, "fetch");
 
+    // First fetch gets generous timeout (10 min), subsequent fetches get 5 min.
+    const fetchTimeout = hasCompletedFirstPoll ? 300000 : 600000;
+
+    // Broadcast elapsed time every 10s so the UI shows progress
+    const broadcastElapsed = (phase: string, startMs: number) => {
+      const elapsed = Math.round((Date.now() - startMs) / 1000);
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", {
+          source: `${phase} (${elapsed}s)`,
+          current: phase === "Fetching" ? 1 : 2,
+          total: 2,
+        });
+      }
+    };
+    const fetchTicker = setInterval(() => broadcastElapsed("Fetching", fetchStart), 10000);
+
     let rawData = "";
     try {
-      rawData = await askBridge(fetchPrompt); // no timeout — let the agent finish
+      rawData = await askBridge(fetchPrompt, fetchTimeout);
       logPoll(`  Fetch complete: ${rawData.length} chars`);
       addDebugEntry("out", `✅ All sources: ${rawData.length} chars`, "fetch");
     } catch (err) {
       logPoll(`  Fetch ERROR: ${String(err).slice(0, 100)}`);
       addDebugEntry("out", `❌ Fetch error: ${String(err).slice(0, 100)}`, "fetch");
     }
+    clearInterval(fetchTicker);
 
     const fetchElapsed = Date.now() - fetchStart;
     logPoll(`Pass 1 complete: ${rawData.length} chars in ${(fetchElapsed / 1000).toFixed(1)}s`);
@@ -513,13 +567,9 @@ RULES:
     // Removing the restart saves 60s per poll cycle.
 
     logPoll("Pass 2: Triaging raw data");
-    for (const win of BrowserWindow.getAllWindows()) {
-      if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", {
-        source: "Triaging",
-        current: 2,
-        total: 2,
-      });
-    }
+    const triageStart = Date.now();
+    const triageTicker = setInterval(() => broadcastElapsed("Triaging", triageStart), 10000);
+    broadcastElapsed("Triaging", triageStart);
 
     // Build existing tasks summary for dedup — include IDs, URLs, and links so the AI can match
     const existingOpen = notifications.filter(n => n.stage !== "skipped" && n.stage !== "done");
@@ -550,6 +600,7 @@ Here is everything from ${enabledSourceNames.join(", ")}:
 ---
 ${rawData}
 ---
+${githubContext}
 ${existingTasksSummary ? `
 ## EXISTING TASKS (already tracked)
 ${existingTasksSummary}
@@ -582,9 +633,27 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
 - **investigation**: Tasks that need research/analysis before building.
 - DO NOT classify everything as implementation. A DM asking "can you take a look?" is a RESPONSE, not an implementation task.`;
 
-    const response = await askBridge(triagePrompt); // no timeout — let the agent finish
-    logPoll(`Poll complete: ${response.length} chars`);
+    const triageTimeout = hasCompletedFirstPoll ? 300000 : 600000;
+    logPoll(`  Triage timeout: ${triageTimeout / 1000}s (first poll: ${!hasCompletedFirstPoll})`);
+    const response = await askBridge(triagePrompt, triageTimeout);
+    clearInterval(triageTicker);
+    const triageElapsed = Math.round((Date.now() - triageStart) / 1000);
+    if (response.includes("timed out")) {
+      logPoll(`  TRIAGE TIMED OUT after ${triageElapsed}s — no results this cycle`);
+    } else {
+      logPoll(`Poll complete: ${response.length} chars in ${triageElapsed}s`);
+    }
     logPoll(`Response (first 300): ${response.slice(0, 300)}`);
+
+    // Launch triage judge in parallel with parsing (non-blocking)
+    const triageJudgePromise = judgeTriage(
+      rawData,
+      parseTriageResponse(response),
+      { userName, managerName },
+    ).catch(err => {
+      logPoll(`Triage judge error: ${String(err).slice(0, 100)}`);
+      return null;
+    });
 
     // Strip markdown code blocks if present
     let cleanResponse = response;
@@ -860,9 +929,34 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
 
     if (added > 0 || updated > 0) {
       logPoll(`Added ${added} new, updated ${updated} existing`);
-      // Save immediately after adding/updating — don't wait for consolidation/projects
-      // This ensures notifications survive even if later steps fail or the app crashes
       saveCacheToFile();
+    }
+
+    // POST-TRIAGE: Verify PR status for review tasks via gh CLI
+    // This catches merged/closed PRs that triage missed from stale Slack threads
+    const reviewTasks = notifications.filter(n =>
+      n.pollCycle === currentPollCycle && n.taskType === "review" && n.stage !== "done" && n.stage !== "skipped",
+    );
+    for (const task of reviewTasks) {
+      const prLink = task.links?.find(l => l.type === "github_pr" || l.url?.includes("github.com") && l.url?.includes("/pull/"));
+      if (!prLink) continue;
+      const prMatch = prLink.url.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
+      if (!prMatch) continue;
+      try {
+        const { execFileSync } = await import("node:child_process");
+        const result = execFileSync("gh", ["pr", "view", prMatch[2], "--repo", prMatch[1], "--json", "state,mergedAt"], { timeout: 10000 }).toString();
+        const pr = JSON.parse(result);
+        if (pr.state === "MERGED" || pr.state === "CLOSED") {
+          logPoll(`  PR #${prMatch[2]} is ${pr.state} — marking "${task.title.slice(0, 40)}" as done`);
+          task.stage = "done";
+          task.completedAt = pr.mergedAt ?? new Date().toISOString();
+          if (!task.timeline) task.timeline = [];
+          task.timeline.push({ timestamp: new Date().toISOString(), event: `PR #${prMatch[2]} is ${pr.state.toLowerCase()} — auto-resolved` });
+          saveCacheToFile();
+        }
+      } catch (err) {
+        logPoll(`  gh pr view #${prMatch[2]} failed: ${String(err).slice(0, 80)}`);
+      }
     }
 
     // Dedup triage projects: merge entries that normalize to the same name
@@ -966,25 +1060,30 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
       logPoll(`Processed ${triageProjects.length} projects`);
     }
 
-    // Also: auto-group existing ungrouped tasks by AI heuristic
-    // Tasks with no projectId that share a Linear ticket prefix get grouped
+    // ── AUTO-PROJECT DETECTION ──
+    // Runs every poll cycle to group ungrouped tasks into projects.
+    // Strategies: (1) ticket prefix, (2) shared Linear project, (3) keyword overlap
     const ungrouped = notifications.filter(n => !n.projectId && n.stage !== "skipped" && n.stage !== "done");
+    let projectsChanged = triageProjects.length > 0;
+
+    // Strategy 1: Group by ticket prefix (VEC-24, DAR-10, etc.)
     const ticketGroups = new Map<string, string[]>();
     for (const n of ungrouped) {
-      const ticketMatch = n.title.match(/^([A-Z]+-\d+)/);
+      const ticketMatch = n.title.match(/^([A-Z]+-)\d+/);
       if (ticketMatch) {
-        const ticket = ticketMatch[1];
-        if (!ticketGroups.has(ticket)) ticketGroups.set(ticket, []);
-        ticketGroups.get(ticket)!.push(n.id);
+        const prefix = ticketMatch[1]; // "VEC-", "DAR-"
+        if (!ticketGroups.has(prefix)) ticketGroups.set(prefix, []);
+        ticketGroups.get(prefix)!.push(n.id);
       }
     }
-    // If multiple tasks share a ticket prefix, group them
-    for (const [ticket, taskIds] of ticketGroups) {
+    for (const [prefix, taskIds] of ticketGroups) {
       if (taskIds.length >= 2) {
-        let proj = detectProjectFromSource("linear", ticket);
+        const projName = `${prefix.replace(/-$/, "")} Tasks`;
+        let proj = findProjectByName(projName);
         if (!proj) {
-          proj = createProject(ticket, "ai", undefined, `Auto-grouped ${taskIds.length} tasks sharing the ${ticket} ticket prefix`);
-          logPoll(`Auto-grouped ${taskIds.length} tasks under "${ticket}"`);
+          proj = createProject(projName, "ai", undefined, `Auto-grouped ${taskIds.length} tasks sharing the ${prefix} prefix`);
+          logPoll(`Auto-grouped ${taskIds.length} tasks under "${projName}"`);
+          projectsChanged = true;
         }
         for (const taskId of taskIds) {
           addTaskToProject(proj.id, taskId);
@@ -994,10 +1093,100 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
       }
     }
 
-    // Save projects after processing
-    if (triageProjects.length > 0 || ticketGroups.size > 0) {
+    // Strategy 2: Assign tasks with a "project" field from triage to matching projects
+    const stillUngrouped = notifications.filter(n => !n.projectId && n.stage !== "skipped" && n.stage !== "done");
+    for (const n of stillUngrouped) {
+      // Check if the task title contains a known ticket prefix that maps to an existing project
+      const ticketMatch = n.title.match(/^([A-Z]+-\d+)/);
+      if (ticketMatch) {
+        const prefix = ticketMatch[1].replace(/\d+$/, ""); // "VEC-"
+        const projName = `${prefix.replace(/-$/, "")} Tasks`;
+        const proj = findProjectByName(projName);
+        if (proj) {
+          addTaskToProject(proj.id, n.id);
+          n.projectId = proj.id;
+          projectsChanged = true;
+        }
+      }
+    }
+
+    // Strategy 3: Group by shared source URLs (same Slack channel, same Linear project)
+    const urlToTasks = new Map<string, string[]>();
+    const remaining = notifications.filter(n => !n.projectId && n.stage !== "skipped" && n.stage !== "done");
+    for (const n of remaining) {
+      const urls = [n.url, ...(n.links?.map(l => l.url) ?? [])].filter(Boolean) as string[];
+      for (const url of urls) {
+        // Normalize: extract channel ID or project slug
+        const channelMatch = url.match(/archives\/(C[A-Z0-9]+)/);
+        const linearProjMatch = url.match(/linear\.app\/[^/]+\/project\/([^/]+)/);
+        const key = channelMatch?.[1] ?? linearProjMatch?.[1];
+        if (key) {
+          if (!urlToTasks.has(key)) urlToTasks.set(key, []);
+          urlToTasks.get(key)!.push(n.id);
+        }
+      }
+    }
+    for (const [key, taskIds] of urlToTasks) {
+      if (taskIds.length >= 2) {
+        // Check if any of these tasks already have a project name hint
+        const firstTask = notifications.find(n => n.id === taskIds[0]);
+        const projName = firstTask?.title?.match(/^([A-Z]+-\d+)/)?.[0] ?? `${key.slice(0, 8)} Group`;
+        let proj = findProjectByName(projName);
+        if (!proj) {
+          proj = createProject(projName, "ai", undefined, `Auto-grouped ${taskIds.length} tasks sharing source ${key}`);
+          logPoll(`Auto-grouped ${taskIds.length} tasks by shared source "${key}"`);
+          projectsChanged = true;
+        }
+        for (const taskId of taskIds) {
+          const n = notifications.find(nn => nn.id === taskId);
+          if (n && !n.projectId) {
+            addTaskToProject(proj.id, n.id);
+            n.projectId = proj.id;
+          }
+        }
+      }
+    }
+
+    // Strategy 4: Match ungrouped tasks to existing projects by keyword overlap
+    const finalUngrouped = notifications.filter(n => !n.projectId && n.stage !== "skipped" && n.stage !== "done");
+    const existingProjects = getAllProjects();
+    for (const n of finalUngrouped) {
+      const titleWords = n.title.toLowerCase().split(/[\s\-:,]+/).filter(w => w.length > 3);
+      let bestMatch: { proj: typeof existingProjects[0]; score: number } | null = null;
+      for (const proj of existingProjects) {
+        const projWords = proj.name.toLowerCase().split(/[\s\-:,]+/).filter(w => w.length > 2);
+        const overlap = titleWords.filter(w => projWords.some(pw => w.includes(pw) || pw.includes(w))).length;
+        const score = projWords.length > 0 ? overlap / projWords.length : 0;
+        if (score >= 0.5 && (!bestMatch || score > bestMatch.score)) {
+          bestMatch = { proj, score };
+        }
+      }
+      if (bestMatch) {
+        addTaskToProject(bestMatch.proj.id, n.id);
+        n.projectId = bestMatch.proj.id;
+        projectsChanged = true;
+        logPoll(`Matched "${n.title.slice(0, 40)}" → project "${bestMatch.proj.name}" (score ${bestMatch.score.toFixed(2)})`);
+      }
+    }
+
+    // Always re-save projects and update task counts
+    if (projectsChanged) {
       saveProjects();
     }
+    // Update task counts on all projects (even if no new projects were created)
+    const allProjects = getAllProjects();
+    for (const proj of allProjects) {
+      const taskCount = notifications.filter(n => n.projectId === proj.id && n.stage !== "skipped").length;
+      const doneCount = notifications.filter(n => n.projectId === proj.id && n.stage === "done").length;
+      if (proj.tasks.length !== taskCount) {
+        // Rebuild task list from notification IDs
+        proj.tasks = notifications
+          .filter(n => n.projectId === proj.id && n.stage !== "skipped")
+          .map(n => n.id);
+        projectsChanged = true;
+      }
+    }
+    if (projectsChanged) saveProjects();
 
     // POST-TRIAGE CONSOLIDATION: merge duplicate notifications that share the same key
     // CRITICAL: Never remove a task that's in an active stage (user has started working on it)
@@ -1074,6 +1263,49 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
       }
     }
 
+    // Await triage judge verdict (should be done by now — ran in parallel with parsing)
+    const triageVerdict = await triageJudgePromise;
+    if (triageVerdict) {
+      lastTriageVerdict = triageVerdict;
+      logPoll(`Triage judge: ${triageVerdict.status} (confidence ${triageVerdict.confidence}/10, ${triageVerdict.durationMs}ms)`);
+
+      // Apply priority corrections
+      for (const correction of triageVerdict.priorityCorrections) {
+        const target = notifications.find(n => n.title === correction.title);
+        if (target) {
+          const newPri = normalizePriority(correction.shouldBe);
+          logPoll(`  Judge correction: "${target.title}" priority ${target.priority} → ${newPri}`);
+          target.priority = newPri;
+          if (!target.timeline) target.timeline = [];
+          target.timeline.push({ timestamp: new Date().toISOString(), event: `Judge: priority ${correction.was} → ${correction.shouldBe} (${correction.reason})` });
+        }
+      }
+
+      // Apply classification corrections
+      for (const correction of triageVerdict.classificationCorrections) {
+        const target = notifications.find(n => n.title === correction.title);
+        if (target) {
+          logPoll(`  Judge correction: "${target.title}" type ${target.taskType} → ${correction.shouldBe}`);
+          target.taskType = correction.shouldBe as PollNotification["taskType"];
+          if (!target.timeline) target.timeline = [];
+          target.timeline.push({ timestamp: new Date().toISOString(), event: `Judge: reclassified ${correction.was} → ${correction.shouldBe} (${correction.reason})` });
+        }
+      }
+
+      // Log missed items (can't re-fetch, but flag for awareness)
+      for (const missed of triageVerdict.missedItems) {
+        logPoll(`  Judge missed: [${missed.source}] ${missed.title} — ${missed.reason}`);
+      }
+
+      // Store verdict summary on the most recent notifications from this cycle
+      if (triageVerdict.status !== "approved") {
+        const thisPolled = notifications.filter(n => n.pollCycle === currentPollCycle);
+        for (const n of thisPolled) {
+          n.verdict = { status: triageVerdict.status, summary: triageVerdict.summary };
+        }
+      }
+    }
+
     lastPollTimestamp = new Date().toISOString();
     saveCacheToFile();
     broadcastNotifications();
@@ -1087,6 +1319,16 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
     // Broadcast that polling is complete so UI can stop loading indicator
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) win.webContents.send("notifications:polling-finished");
+    }
+
+    // After first poll: trigger business context refresh if needed
+    if (hasCompletedFirstPoll && notifications.length > 0) {
+      import("../business-context").then(({ needsRefresh, refreshBusinessContext }) => {
+        if (needsRefresh()) {
+          logPoll("First poll complete — triggering business context refresh");
+          refreshBusinessContext().catch(() => {});
+        }
+      }).catch(() => {});
     }
 
     // Restart the bridge to clear conversation context for next poll

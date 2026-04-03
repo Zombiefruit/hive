@@ -27,6 +27,7 @@ import {
   IconTrash,
   IconUser,
   IconUsers,
+  IconSparkles,
 } from "@tabler/icons-react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { AppHeader } from "../components/AppHeader";
@@ -120,6 +121,7 @@ export function Settings() {
     calendar: false,
     notion: false,
     github: true,
+    gong: false,
   });
 
   // Preferences
@@ -133,6 +135,52 @@ export function Settings() {
   const [repoMappings, setRepoMappings] = useState<Array<{ pattern: string; repoPath: string }>>([]);
   const [newPattern, setNewPattern] = useState("");
   const [newRepoPath, setNewRepoPath] = useState("");
+
+  // Auto-discovery
+  const [discovering, setDiscovering] = useState(false);
+  const [discoveryStatus, setDiscoveryStatus] = useState("");
+
+  const handleAutoDiscover = async () => {
+    if (!name.trim() || !email.trim()) return;
+    setDiscovering(true);
+    setDiscoveryStatus("Starting discovery...");
+
+    const unsub = window.deck?.onSetupProgress?.((msg: string) => setDiscoveryStatus(msg));
+
+    try {
+      const result = await window.deck?.runSetupAgent?.(name.trim(), email.trim());
+      if (result) {
+        if (result.slackUserId) setSlackUserId(result.slackUserId);
+        if (result.linearUsername) setLinearUsername(result.linearUsername);
+        if (result.managerName) setManagerName(result.managerName);
+        if (result.teamName) setTeamName(result.teamName);
+        if (result.role) setRole(result.role as UserRole);
+        if (result.coworkers?.length) {
+          setCoworkers(result.coworkers.map((c: { name: string; role: string; slackUserId?: string }) => ({
+            name: c.name,
+            role: c.role as CoworkerRole,
+            slackUserId: c.slackUserId,
+          })));
+        }
+        if (result.slackChannels?.length) {
+          setChannels(result.slackChannels);
+        }
+        if (result.integrations) {
+          setIntegrations(prev => ({ ...prev, ...result.integrations }));
+        }
+        if (result.discoveredContext?.workingHours) {
+          setWorkStart(result.discoveredContext.workingHours.start);
+          setWorkEnd(result.discoveredContext.workingHours.end);
+        }
+        setDiscoveryStatus("Discovery complete! Review and save.");
+      }
+    } catch {
+      setDiscoveryStatus("Discovery failed — fill in manually.");
+    } finally {
+      setDiscovering(false);
+      unsub?.();
+    }
+  };
 
   // Bridge connector status
   const [bridgeStatus, setBridgeStatus] = useState<{
@@ -186,7 +234,7 @@ export function Settings() {
           setChannels(config.slackChannels ?? []);
           setIntegrations(config.integrations ?? {
             slack: true, linear: true, gmail: false,
-            calendar: false, notion: false, github: true,
+            calendar: false, notion: false, github: true, gong: false,
           });
           setFetchCadence(config.fetchCadence ?? "30min");
           setTimezone(config.timezone ?? detectTimezone());
@@ -339,11 +387,26 @@ export function Settings() {
               onChange={(e) => setEmail(e.currentTarget.value)}
               size="sm"
             />
+            {/* Auto-discover button */}
+            <Button
+              variant={discovering ? "light" : "filled"}
+              color="blue"
+              leftSection={discovering ? <Loader size={14} color="white" /> : <IconSparkles size={14} />}
+              onClick={handleAutoDiscover}
+              disabled={discovering || !name.trim() || !email.trim()}
+              size="sm"
+            >
+              {discovering ? discoveryStatus : "Auto-discover from workspace"}
+            </Button>
+            {discoveryStatus && !discovering && (
+              <Text size="xs" c={discoveryStatus.includes("failed") ? "red" : "green"}>{discoveryStatus}</Text>
+            )}
+
             <Group grow>
               <TextInput
                 label="Slack User ID"
                 placeholder="e.g. U02PKBZSB9Q"
-                description="Find in Slack profile > More > Copy member ID"
+                description="Auto-discovered or find in Slack profile > More > Copy member ID"
                 value={slackUserId}
                 onChange={(e) => setSlackUserId(e.currentTarget.value)}
                 size="sm"

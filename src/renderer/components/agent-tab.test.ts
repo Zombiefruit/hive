@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { shouldAutoExpand, getInputPlaceholder, deriveActions } from "./AgentTab";
+import { shouldAutoExpand, getInputPlaceholder, deriveActions, getEmptyStateMessage } from "./AgentTab";
 import type { Action } from "../../shared/action-types";
 
 describe("shouldAutoExpand", () => {
@@ -66,5 +66,41 @@ describe("deriveActions", () => {
     const actions = deriveActions([runSkill], "start_work");
     expect(actions).toHaveLength(1);
     expect(actions[0]).toBe(runSkill);
+  });
+});
+
+describe("getEmptyStateMessage", () => {
+  it("returns 'Move to Planning' for new stage", () => {
+    expect(getEmptyStateMessage("new")).toContain("Move to Planning");
+  });
+
+  it("returns 'Move to Planning' for skipped stage", () => {
+    expect(getEmptyStateMessage("skipped")).toContain("Move to Planning");
+  });
+
+  it("returns null for start_work (should show loader, not static text)", () => {
+    expect(getEmptyStateMessage("start_work")).toBeNull();
+  });
+
+  it("returns null for preparing (should show loader, not static text)", () => {
+    expect(getEmptyStateMessage("preparing")).toBeNull();
+  });
+
+  it("returns null for plan_review (plan exists, agent tab shows conversation)", () => {
+    expect(getEmptyStateMessage("plan_review")).toBeNull();
+  });
+
+  it("returns null for hack (work agent should be running)", () => {
+    expect(getEmptyStateMessage("hack")).toBeNull();
+  });
+
+  it("returns generic message for unknown/done stages with no conversation", () => {
+    const msg = getEmptyStateMessage("done");
+    expect(msg).toBeTruthy();
+    expect(msg).toContain("No conversation");
+  });
+
+  it("returns generic message for undefined stage", () => {
+    expect(getEmptyStateMessage(undefined)).toContain("No conversation");
   });
 });

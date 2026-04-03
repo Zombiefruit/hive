@@ -31,6 +31,22 @@ export function deriveActions(rawActions: Action[], stage?: string): Action[] {
   return rawActions;
 }
 
+/**
+ * Get the empty state message for the Agent tab. Returns null when the stage
+ * implies an active agent process — in those cases the loading spinner should
+ * show instead of static text.
+ */
+export function getEmptyStateMessage(stage?: string): string | null {
+  // Stages where an agent is actively running — never show static empty text
+  if (stage === "start_work" || stage === "preparing" || stage === "plan_review" || stage === "hack" || stage === "ship" || stage === "code_review") {
+    return null;
+  }
+  if (stage === "new" || stage === "skipped") {
+    return 'Click "Move to Planning" to begin.';
+  }
+  return "No conversation yet.";
+}
+
 export function getInputPlaceholder(skillRunning: boolean, hasConversation: boolean): string {
   if (skillRunning) return "Reply to agent...";
   if (hasConversation) return "Push back, ask questions, or refine the plan...";
@@ -101,24 +117,33 @@ export function AgentTab({
       {/* Zone 1: Conversation */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
         {/* Empty state — stage aware */}
-        {conversation.length === 0 && !loading && activity.length === 0 && (
-          <Stack align="center" py="xl" gap="sm">
-            <Text size="sm" c="dimmed">
-              {stage === "new" || stage === "skipped" ? "Click \"Move to Planning\" to begin."
-                : stage === "start_work" || stage === "preparing" ? "Agent is being set up..."
-                : "No conversation yet."}
-            </Text>
-          </Stack>
-        )}
+        {conversation.length === 0 && !loading && activity.length === 0 && (() => {
+          const msg = getEmptyStateMessage(stage);
+          if (!msg) return null; // Active stages show the loader below instead
+          return (
+            <Stack align="center" py="xl" gap="sm">
+              <Text size="sm" c="dimmed">{msg}</Text>
+            </Stack>
+          );
+        })()}
 
-        {/* Loading at top when no conversation yet */}
-        {loading && !hasConversation && (
-          <Group gap={8} py="sm" justify="center">
+        {/* Loading at top when no conversation yet — also show for active stages during mount race */}
+        {!hasConversation && (loading || (activity.length === 0 && getEmptyStateMessage(stage) === null)) && (
+          <Stack align="center" py="sm" gap={6}>
             <Loader size={16} />
-            <Text size="sm" c="dimmed">
-              {stage === "start_work" ? "Planning..." : stage === "preparing" ? "Gathering context..." : "Working..."}
+            <Text size="sm" c="dimmed" ta="center">
+              {stage === "start_work" ? "Planning — connecting to your tools..."
+                : stage === "preparing" ? "Gathering context from Slack, Linear, and other sources..."
+                : stage === "plan_review" ? "Loading plan..."
+                : stage === "hack" ? "Agent is working..."
+                : "Working..."}
             </Text>
-          </Group>
+            {activity.length > 0 && (
+              <Text size="xs" c="dimmed" ta="center" truncate style={{ maxWidth: "90%" }}>
+                {activity[activity.length - 1].content}
+              </Text>
+            )}
+          </Stack>
         )}
 
         {conversation.map((msg, i) => {
@@ -210,6 +235,8 @@ export function AgentTab({
                 const color = evt.type === "error" ? "var(--mantine-color-red-5)"
                   : evt.type === "tool_use" ? "var(--mantine-color-blue-5)"
                   : evt.type === "init" ? "var(--mantine-color-green-5)"
+                  : evt.type === "verdict" ? "var(--mantine-color-violet-5)"
+                  : evt.type === "escalation" ? "var(--mantine-color-orange-5)"
                   : "var(--mantine-color-dimmed)";
                 return (
                   <div key={i} style={{ display: "flex", gap: 6, alignItems: "flex-start", padding: "1px 8px" }}>

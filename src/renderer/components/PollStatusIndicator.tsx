@@ -3,7 +3,7 @@
  * Shows fetching spinner with source progress, or green dot with item count + last updated.
  */
 
-import { Text, Group } from "@mantine/core";
+import { Text, Group, Loader } from "@mantine/core";
 import type { PollStatus } from "../hooks/usePollStatus";
 
 interface PollStatusIndicatorProps extends PollStatus {
@@ -15,13 +15,12 @@ export function PollStatusIndicator({ fetching, pollProgress, lastRefreshed, ite
   if (fetching) {
     return (
       <>
-        <div style={{ width: 14, height: 14, border: "2px solid var(--mantine-color-blue-5)", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+        <Loader size={12} color="blue" />
         <Text size="xs" c="blue">
           {pollProgress
-            ? `Fetching ${pollProgress.source} (${pollProgress.current}/${pollProgress.total})...`
+            ? pollProgress.source
             : "Fetching..."}
         </Text>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </>
     );
   }

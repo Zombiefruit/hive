@@ -14,7 +14,7 @@ import fs from "node:fs";
  * The `packageAfterCopy` hook below handles that, and `AutoUnpackNativesPlugin` ensures the
  * .node binaries are extracted from the ASAR so they can be dlopen'd at runtime.
  */
-const NATIVE_MODULES = ["better-sqlite3", "bindings", "file-uri-to-path", "prebuild-install", "node-addon-api"];
+const NATIVE_MODULES = ["better-sqlite3", "bindings", "file-uri-to-path", "prebuild-install", "node-addon-api", "sqlite-vec", "onnxruntime-node", "fastembed", "@anush008/tokenizers", "@anush008/tokenizers-darwin-universal"];
 
 const config: ForgeConfig = {
   packagerConfig: {

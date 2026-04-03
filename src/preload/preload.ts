@@ -204,6 +204,70 @@ const api = {
   hasConfig: () => ipcRenderer.invoke("config:has") as Promise<boolean>,
   getConfig: () => ipcRenderer.invoke("config:get"),
   saveConfig: (config: unknown) => ipcRenderer.invoke("config:save", config),
+
+  // Insights
+  getInsights: () => ipcRenderer.invoke("insights:get"),
+  generateInsights: () => ipcRenderer.invoke("insights:generate"),
+  updateInsight: (id: string, changes: unknown) => ipcRenderer.invoke("insights:update", id, changes),
+  convertInsightToTask: (id: string) => ipcRenderer.invoke("insights:convert", id),
+  onInsightsUpdate: (callback: (data: unknown) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data);
+    ipcRenderer.on("insights:update", listener);
+    return () => ipcRenderer.removeListener("insights:update", listener);
+  },
+
+  // Global refresh — triggers all data sources
+  globalRefresh: () => ipcRenderer.invoke("global:refresh"),
+  onGlobalRefreshStart: (callback: () => void) => {
+    const listener = () => callback();
+    ipcRenderer.on("global:refresh-start", listener);
+    return () => ipcRenderer.removeListener("global:refresh-start", listener);
+  },
+
+  // Orchestrator
+  getOrchestratorStatus: () => ipcRenderer.invoke("orchestrator:status"),
+  getOrchestratorThoughts: (limit?: number) => ipcRenderer.invoke("orchestrator:thoughts", limit),
+  onOrchestratorThought: (callback: (data: { timestamp: string; thought: string }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: { timestamp: string; thought: string }) => callback(data);
+    ipcRenderer.on("orchestrator:thought", listener);
+    return () => ipcRenderer.removeListener("orchestrator:thought", listener);
+  },
+  onOrchestratorEscalation: (callback: (data: unknown) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: unknown) => callback(data);
+    ipcRenderer.on("orchestrator:escalation", listener);
+    return () => ipcRenderer.removeListener("orchestrator:escalation", listener);
+  },
+
+  // Business Context
+  getBusinessContext: () => ipcRenderer.invoke("context:get-business"),
+  refreshBusinessContext: () => ipcRenderer.invoke("context:refresh-business"),
+  saveBusinessContext: (content: string) => ipcRenderer.invoke("context:save-business", content),
+  onBusinessContextDraft: (callback: (content: string) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, content: string) => callback(content);
+    ipcRenderer.on("business-context:draft", listener);
+    return () => ipcRenderer.removeListener("business-context:draft", listener);
+  },
+
+  // Coach
+  getDailyBrief: () => ipcRenderer.invoke("coach:daily-brief"),
+  getWorkPatterns: (days?: number) => ipcRenderer.invoke("coach:work-patterns", days),
+  getOutputScore: () => ipcRenderer.invoke("coach:output-score"),
+
+  // Setup Agent (auto-discovery, re-runnable)
+  runSetupAgent: (name: string, email: string) => ipcRenderer.invoke("setup:run", name, email),
+  onSetupProgress: (callback: (msg: string) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, msg: string) => callback(msg);
+    ipcRenderer.on("setup:progress", listener);
+    return () => ipcRenderer.removeListener("setup:progress", listener);
+  },
+
+  // Agent Memory
+  getMemoryStats: () => ipcRenderer.invoke("memory:stats"),
+  getMemories: (scope?: string) => ipcRenderer.invoke("memory:list", scope),
+  searchMemories: (query: string, scope?: string) => ipcRenderer.invoke("memory:search", query, scope),
+  learnFromAction: (action: string, details: string) => ipcRenderer.invoke("memory:learn-action", action, details),
+  deleteMemory: (id: string) => ipcRenderer.invoke("memory:delete", id),
+  clearMemories: () => ipcRenderer.invoke("memory:clear"),
 } as const;
 
 export type DeckAPI = typeof api;

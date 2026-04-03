@@ -12,7 +12,7 @@ import os from "node:os";
 
 interface TrackedProcess {
   pid: number;
-  type: "poll-bridge" | "planning" | "ephemeral" | "work" | "gh";
+  type: "poll-bridge" | "planning" | "ephemeral" | "work" | "gh" | "judge";
   label: string;
   startTime: number;
   lastRssKb: number | null;

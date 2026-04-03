@@ -1,0 +1,46 @@
+/**
+ * Shared global refresh state — single source of truth for whether
+ * any data refresh is in progress. All pages import this hook.
+ */
+
+import { useState, useEffect, useCallback } from "react";
+
+// Module-level state so all hook instances share it
+let _isRefreshing = false;
+const listeners = new Set<(v: boolean) => void>();
+
+function setGlobalRefreshing(v: boolean) {
+  _isRefreshing = v;
+  for (const fn of listeners) fn(v);
+}
+
+// Wire up IPC listeners once (on first import in renderer)
+let wired = false;
+function wireIpc() {
+  if (wired) return;
+  wired = true;
+  // Both manual global refresh AND automatic poll-on-startup trigger the loading state
+  window.deck?.onGlobalRefreshStart?.(() => setGlobalRefreshing(true));
+  window.deck?.onPollingStarted?.(() => setGlobalRefreshing(true));
+  window.deck?.onPollingFinished?.(() => setGlobalRefreshing(false));
+}
+
+export function useGlobalRefresh() {
+  const [isRefreshing, setLocal] = useState(_isRefreshing);
+
+  useEffect(() => {
+    wireIpc();
+    listeners.add(setLocal);
+    // Sync in case state changed before mount
+    setLocal(_isRefreshing);
+    return () => { listeners.delete(setLocal); };
+  }, []);
+
+  const refresh = useCallback(async () => {
+    setGlobalRefreshing(true);
+    try { await window.deck?.globalRefresh?.(); } catch {}
+    // Don't set false here — polling-finished event handles it
+  }, []);
+
+  return { isRefreshing, refresh };
+}

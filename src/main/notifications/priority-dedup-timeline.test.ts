@@ -330,7 +330,7 @@ describe("Post-Triage Consolidation", () => {
 
 describe("Config-Driven Poll Service", () => {
   it("should skip sources with missing config", () => {
-    const integrations = { slack: true, linear: true, gmail: false, calendar: false, notion: false, github: true };
+    const integrations = { slack: true, linear: true, gmail: false, calendar: false, notion: false, github: true, gong: false };
     const slackUserId = "";
     const linearUser = "kwilliams";
 

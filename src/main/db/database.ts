@@ -105,12 +105,59 @@ function createTables(): void {
       FOREIGN KEY (agentId) REFERENCES agents(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS memories (
+      id TEXT PRIMARY KEY,
+      scope TEXT NOT NULL,
+      type TEXT NOT NULL,
+      category TEXT NOT NULL,
+      content TEXT NOT NULL,
+      confidence REAL NOT NULL DEFAULT 0.5,
+      source TEXT,
+      accessCount INTEGER NOT NULL DEFAULT 0,
+      lastAccessedAt TEXT,
+      createdAt TEXT NOT NULL DEFAULT (datetime('now')),
+      updatedAt TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS memory_embeddings (
+      memoryId TEXT PRIMARY KEY,
+      embedding BLOB NOT NULL,
+      FOREIGN KEY (memoryId) REFERENCES memories(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS insights (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      sourcesJson TEXT,
+      relevanceScore REAL NOT NULL DEFAULT 0.5,
+      impactEstimate TEXT NOT NULL DEFAULT 'medium',
+      frequency INTEGER NOT NULL DEFAULT 1,
+      firstSeenAt TEXT NOT NULL DEFAULT (datetime('now')),
+      lastSeenAt TEXT NOT NULL DEFAULT (datetime('now')),
+      status TEXT NOT NULL DEFAULT 'new',
+      convertedToTaskId TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS insight_sources (
+      channelId TEXT PRIMARY KEY,
+      channelName TEXT NOT NULL,
+      usefulness REAL NOT NULL DEFAULT 0.5,
+      lastScannedAt TEXT
+    );
+
     CREATE INDEX IF NOT EXISTS idx_messages_agentId ON messages(agentId);
     CREATE INDEX IF NOT EXISTS idx_approvals_agentId ON approvals(agentId);
     CREATE INDEX IF NOT EXISTS idx_approvals_status ON approvals(status);
     CREATE INDEX IF NOT EXISTS idx_context_refs_agentId ON context_refs(agentId);
     CREATE INDEX IF NOT EXISTS idx_events_agentId ON events(agentId);
     CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_memories_scope ON memories(scope);
+    CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
+    CREATE INDEX IF NOT EXISTS idx_memories_confidence ON memories(confidence);
+    CREATE INDEX IF NOT EXISTS idx_insights_status ON insights(status);
+    CREATE INDEX IF NOT EXISTS idx_insights_type ON insights(type);
   `);
 }
 
@@ -367,6 +414,123 @@ export function getRecentEvents(limit = 50): AgentEvent[] {
     .prepare("SELECT * FROM events ORDER BY timestamp DESC LIMIT ?")
     .all(limit) as AgentEvent[];
 }
+
+// --- Memory CRUD ---
+
+export function insertMemory(
+  id: string, scope: string, type: string, category: string,
+  content: string, confidence: number, source?: string,
+): void {
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO memories (id, scope, type, category, content, confidence, source, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(id, scope, type, category, content, confidence, source ?? null, now, now);
+}
+
+export function getMemoryById(id: string): Record<string, unknown> | undefined {
+  return db.prepare("SELECT * FROM memories WHERE id = ?").get(id) as Record<string, unknown> | undefined;
+}
+
+export function getAllMemories(scope?: string, category?: string): Array<Record<string, unknown>> {
+  let sql = "SELECT * FROM memories WHERE 1=1";
+  const params: unknown[] = [];
+  if (scope) { sql += " AND scope = ?"; params.push(scope); }
+  if (category) { sql += " AND category = ?"; params.push(category); }
+  sql += " ORDER BY confidence DESC, updatedAt DESC";
+  return db.prepare(sql).all(...params) as Array<Record<string, unknown>>;
+}
+
+export function updateMemory(id: string, changes: { confidence?: number; content?: string; accessCount?: number }): void {
+  const now = new Date().toISOString();
+  const sets: string[] = ["updatedAt = ?"];
+  const params: unknown[] = [now];
+  if (changes.confidence !== undefined) { sets.push("confidence = ?"); params.push(changes.confidence); }
+  if (changes.content !== undefined) { sets.push("content = ?"); params.push(changes.content); }
+  if (changes.accessCount !== undefined) { sets.push("accessCount = ?, lastAccessedAt = ?"); params.push(changes.accessCount, now); }
+  params.push(id);
+  db.prepare(`UPDATE memories SET ${sets.join(", ")} WHERE id = ?`).run(...params);
+}
+
+export function deleteMemory(id: string): void {
+  db.prepare("DELETE FROM memories WHERE id = ?").run(id);
+}
+
+export function insertMemoryEmbedding(memoryId: string, embedding: Buffer): void {
+  db.prepare("INSERT OR REPLACE INTO memory_embeddings (memoryId, embedding) VALUES (?, ?)").run(memoryId, embedding);
+}
+
+export function getMemoryEmbedding(memoryId: string): Buffer | undefined {
+  const row = db.prepare("SELECT embedding FROM memory_embeddings WHERE memoryId = ?").get(memoryId) as { embedding: Buffer } | undefined;
+  return row?.embedding;
+}
+
+export function getAllMemoryEmbeddings(): Array<{ memoryId: string; embedding: Buffer }> {
+  return db.prepare("SELECT memoryId, embedding FROM memory_embeddings").all() as Array<{ memoryId: string; embedding: Buffer }>;
+}
+
+export function decayMemories(daysThreshold: number, decayFactor: number): number {
+  const cutoff = new Date(Date.now() - daysThreshold * 86400000).toISOString();
+  const result = db.prepare(
+    `UPDATE memories SET confidence = MAX(0.1, confidence * ?), updatedAt = datetime('now')
+     WHERE (lastAccessedAt IS NULL OR lastAccessedAt < ?) AND confidence > 0.1`,
+  ).run(decayFactor, cutoff);
+  return result.changes;
+}
+
+export function getMemoryStats(): { total: number; byScope: Record<string, number>; byCategory: Record<string, number> } {
+  const total = (db.prepare("SELECT COUNT(*) as c FROM memories").get() as { c: number }).c;
+  const byScope = Object.fromEntries(
+    (db.prepare("SELECT scope, COUNT(*) as c FROM memories GROUP BY scope").all() as Array<{ scope: string; c: number }>).map(r => [r.scope, r.c]),
+  );
+  const byCategory = Object.fromEntries(
+    (db.prepare("SELECT category, COUNT(*) as c FROM memories GROUP BY category").all() as Array<{ category: string; c: number }>).map(r => [r.category, r.c]),
+  );
+  return { total, byScope, byCategory };
+}
+
+// --- Insight CRUD ---
+
+export function insertInsight(insight: {
+  id: string; type: string; title: string; description: string;
+  sourcesJson?: string; relevanceScore?: number; impactEstimate?: string; frequency?: number;
+}): void {
+  db.prepare(
+    `INSERT INTO insights (id, type, title, description, sourcesJson, relevanceScore, impactEstimate, frequency)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(insight.id, insight.type, insight.title, insight.description,
+    insight.sourcesJson ?? null, insight.relevanceScore ?? 0.5, insight.impactEstimate ?? "medium", insight.frequency ?? 1);
+}
+
+export function getInsights(status?: string): Array<Record<string, unknown>> {
+  if (status) return db.prepare("SELECT * FROM insights WHERE status = ? ORDER BY relevanceScore DESC").all(status) as Array<Record<string, unknown>>;
+  return db.prepare("SELECT * FROM insights ORDER BY relevanceScore DESC").all() as Array<Record<string, unknown>>;
+}
+
+export function updateInsight(id: string, changes: Record<string, unknown>): void {
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  for (const [key, value] of Object.entries(changes)) {
+    sets.push(`${key} = ?`);
+    params.push(value);
+  }
+  if (sets.length === 0) return;
+  params.push(id);
+  db.prepare(`UPDATE insights SET ${sets.join(", ")} WHERE id = ?`).run(...params);
+}
+
+export function upsertInsightSource(channelId: string, channelName: string, usefulness?: number): void {
+  db.prepare(
+    `INSERT INTO insight_sources (channelId, channelName, usefulness, lastScannedAt) VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT(channelId) DO UPDATE SET channelName = ?, usefulness = COALESCE(?, usefulness), lastScannedAt = datetime('now')`,
+  ).run(channelId, channelName, usefulness ?? 0.5, channelName, usefulness ?? null);
+}
+
+export function getInsightSources(): Array<{ channelId: string; channelName: string; usefulness: number; lastScannedAt: string | null }> {
+  return db.prepare("SELECT * FROM insight_sources ORDER BY usefulness DESC").all() as Array<{ channelId: string; channelName: string; usefulness: number; lastScannedAt: string | null }>;
+}
+
+export function getDb(): Database.Database { return db; }
 
 export function closeDatabase(): void {
   db?.close();

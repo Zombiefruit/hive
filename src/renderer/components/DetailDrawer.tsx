@@ -82,6 +82,7 @@ export function DetailDrawer({
   const [activity, setActivity] = useState<Array<{ type: string; content: string; timestamp: string }>>([]);
   const [fetchedContext, setFetchedContext] = useState<Array<{ type: string; content: string; timestamp: string }>>([]);
   const [planText, setPlanText] = useState<string | null>(null);
+  const [planVerdict, setPlanVerdict] = useState<{ status: string; confidence: number; summary: string; concerns: Array<{ severity: string; category: string; description: string; suggestion?: string }>; feasibilityScore: number; completenessScore: number; risks: string[]; missingSteps: string[]; durationMs: number; type: "plan"; judgedAt: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [skillRunning, setSkillRunning] = useState(false);
   const [startWorkOpen, setStartWorkOpen] = useState(false);
@@ -100,10 +101,11 @@ export function DetailDrawer({
         const plan = await window.deck.getPlan?.(n.id);
         if (cancelled) return;
         if (plan) {
-          const p = plan as { conversationHistory?: Array<{ role: string; content: string }>; plan?: string; fetchedContext?: typeof fetchedContext };
+          const p = plan as { conversationHistory?: Array<{ role: string; content: string }>; plan?: string; fetchedContext?: typeof fetchedContext; verdict?: typeof planVerdict };
           if (p.conversationHistory) setConversation(p.conversationHistory);
           if (p.plan) setPlanText(p.plan);
           if (p.fetchedContext) setFetchedContext(p.fetchedContext);
+          if (p.verdict) setPlanVerdict(p.verdict);
           onPlanReady?.();
         }
       } catch {}
@@ -405,7 +407,7 @@ export function DetailDrawer({
         </Tabs.Panel>
 
         <Tabs.Panel value="plan" style={{ flex: 1, overflow: "auto" }}>
-          <PlanTab planText={planText} />
+          <PlanTab planText={planText} verdict={planVerdict as import("../../shared/judge-types").PlanVerdict | null} />
         </Tabs.Panel>
 
         <Tabs.Panel value="context" style={{ flex: 1, overflow: "auto" }}>

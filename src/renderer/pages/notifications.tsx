@@ -3,15 +3,16 @@ import {
   IconInbox, IconSparkles, IconPlayerPlay, IconGitPullRequest, IconCircleCheck,
   IconBrandGithub, IconHash, IconMail, IconFileText, IconChevronRight, IconChevronDown,
   IconGripVertical, IconEyeOff, IconPlus, IconPencil, IconArchive, IconEye,
+  IconShieldCheck, IconAlertTriangle, IconShieldX,
 } from "@tabler/icons-react";
 import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { usePollStatus } from "../hooks/usePollStatus";
-import { PollStatusIndicator } from "../components/PollStatusIndicator";
 import { AddToManagerButton } from "../components/AddToManagerButton";
 import { AddTaskModal } from "../components/AddTaskModal";
 import { AppHeader } from "../components/AppHeader";
+import { GlobalLoadingBanner } from "../components/GlobalLoadingBanner";
 import { DetailDrawer } from "../components/DetailDrawer";
 import { buildSlackArchiveUrl, computeParentStage } from "../../shared/task-utils";
 import { STAGE_META, SOURCE_COLORS } from "../../shared/ui-constants";
@@ -41,6 +42,7 @@ interface NotificationItem {
   branch?: string;
   parentTaskId?: string;
   subtaskIds?: string[];
+  verdict?: { status: "approved" | "concerns" | "rejected"; summary: string };
 }
 
 // Agent-actionable: an agent can do the actual work
@@ -242,12 +244,16 @@ export function Notifications() {
 
   // Move card visually + persist. Always call this first so the card doesn't freeze.
   const moveCardToStage = useCallback((id: string, newStage: string) => {
-    let movedItem: NotificationItem | undefined;
+    let movedTitle = "";
+    let oldStage = "new";
+    let movedParentTaskId: string | undefined;
     setNotifications(prev => {
       const updated = prev.map(n => {
         if (n.id === id) {
-          movedItem = { ...n, stage: newStage };
-          return movedItem;
+          movedTitle = n.title;
+          oldStage = n.stage ?? "new";
+          movedParentTaskId = n.parentTaskId;
+          return { ...n, stage: newStage };
         }
         return n;
       });
@@ -258,9 +264,14 @@ export function Notifications() {
     window.deck.updateNotificationById?.(id, { stage: newStage })
       .catch(() => {});
 
+    // Learn from user's manual stage change
+    if (movedTitle && oldStage !== newStage) {
+      window.deck.learnFromAction?.("priority_change", `Moved "${movedTitle}" from ${oldStage} to ${newStage}`).catch(() => {});
+    }
+
     // Stage cascade: if this is a subtask, recompute and update the parent stage
-    if (movedItem?.parentTaskId) {
-      const parentId = movedItem.parentTaskId;
+    if (movedParentTaskId) {
+      const parentId = movedParentTaskId;
       setNotifications(prev => {
         const parent = prev.find(n => n.id === parentId);
         if (!parent?.subtaskIds) return prev;
@@ -337,7 +348,7 @@ export function Notifications() {
 
   const [showDebug, setShowDebug] = useState(false);
   const [addTaskOpen, setAddTaskOpen] = useState(false);
-  const [lookbackHours, setLookbackHours] = useState(168);
+  // lookbackHours removed — global refresh handles cadence
   const [debugEntries, setDebugEntries] = useState<Array<{ timestamp: string; direction: string; content: string }>>([]);
   useEffect(() => {
     if (!showDebug) return;
@@ -429,41 +440,12 @@ export function Notifications() {
       <AppHeader
         rightContent={
           <>
-            <PollStatusIndicator
-              fetching={pollStatus.fetching}
-              pollProgress={pollStatus.pollProgress}
-              lastRefreshed={pollStatus.lastRefreshed}
-              itemCount={notifications.length}
-              itemLabel="items"
-            />
+            <Text size="xs" c="dimmed">{notifications.filter(n => n.stage !== "skipped").length} items</Text>
             {!pollStatus.fetching && notifications.some(n => n.pollCycle && (!seenCycle.has(n.id) || (seenCycle.get(n.id) ?? 0) < n.pollCycle)) && (
               <UnstyledButton onClick={markAllSeen} aria-label="Mark all as read" style={{ fontSize: "0.6rem", color: "var(--mantine-color-blue-4)", padding: "2px 6px", borderRadius: 4, backgroundColor: "color-mix(in srgb, var(--mantine-color-blue-9) 15%, transparent)" }}>
                 Mark all read
               </UnstyledButton>
             )}
-            <select
-              value={lookbackHours}
-              onChange={(e) => setLookbackHours(Number(e.target.value))}
-              style={{
-                padding: "2px 6px", borderRadius: 4, fontSize: "0.65rem",
-                backgroundColor: "var(--mantine-color-default-hover)", color: "var(--mantine-color-dimmed)",
-                border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
-                outline: "none", cursor: "pointer",
-              }}
-            >
-              <option value={2}>Last 2h</option>
-              <option value={6}>Last 6h</option>
-              <option value={12}>Last 12h</option>
-              <option value={24}>Last 24h</option>
-              <option value={48}>Last 2 days</option>
-              <option value={168}>Last week</option>
-            </select>
-            <UnstyledButton
-              onClick={() => { setFetching(true); setPollProgress(null); window.deck.refreshNotifications?.(lookbackHours); }}
-              style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, backgroundColor: "var(--mantine-color-default-hover)", color: "var(--mantine-color-dimmed)" }}
-            >
-              Refresh
-            </UnstyledButton>
             <UnstyledButton
               onClick={() => setShowDebug(!showDebug)}
               style={{ padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 500, color: showDebug ? "var(--mantine-color-blue-4)" : "var(--mantine-color-dimmed)" }}
@@ -473,6 +455,7 @@ export function Notifications() {
           </>
         }
       />
+      <GlobalLoadingBanner />
 
       {/* Two-section kanban board */}
         <div style={{ flex: 1, overflowX: "auto", overflowY: "auto" }}>
@@ -621,6 +604,15 @@ export function Notifications() {
                                   >
                                     {n.priority}
                                   </Badge>
+                                )}
+                                {n.verdict && (
+                                  <Tooltip label={n.verdict.summary} withArrow>
+                                    <span style={{ display: "inline-flex", alignItems: "center" }}>
+                                      {n.verdict.status === "approved" ? <IconShieldCheck size={12} color="var(--mantine-color-green-5)" />
+                                        : n.verdict.status === "concerns" ? <IconAlertTriangle size={12} color="var(--mantine-color-yellow-5)" />
+                                        : <IconShieldX size={12} color="var(--mantine-color-red-5)" />}
+                                    </span>
+                                  </Tooltip>
                                 )}
                                 <Badge
                                   size="xs"

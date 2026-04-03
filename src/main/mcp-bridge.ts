@@ -520,7 +520,7 @@ export function askMcpPlanningAgent(
 }
 
 // Legacy ephemeral process (no MCP tools — used for plan iteration and work prompt composition)
-export function askEphemeralProcess(prompt: string, timeoutMs = 180000): Promise<string> {
+export function askEphemeralProcess(prompt: string, timeoutMs = 180000, model = "claude-opus-4-6[1m]"): Promise<string> {
   return new Promise((resolve) => {
     const claudePath = getClaudeCodePath();
 
@@ -529,7 +529,7 @@ export function askEphemeralProcess(prompt: string, timeoutMs = 180000): Promise
       "--verbose",
       "--input-format", "stream-json",
       "--no-chrome",
-      "--model", "claude-opus-4-6[1m]",
+      "--model", model,
       "--no-session-persistence",
       "--disallowedTools", "Write,Edit,Bash,NotebookEdit,Agent,EnterWorktree,ExitWorktree",
       "--system-prompt", "You are a planning assistant for work tasks (NOT for the current repo/directory). All context has been provided in your prompt. Do NOT read local files, do NOT explore the filesystem, do NOT assume the task is about the current directory. Just analyze the provided context and create a plan. Return ONLY the plan or a JSON context request — no narration.",

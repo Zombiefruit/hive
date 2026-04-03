@@ -1,7 +1,8 @@
-import { Group, Text, UnstyledButton, useMantineColorScheme } from "@mantine/core";
-import { IconSettings, IconSun, IconMoon, IconDeviceDesktop } from "@tabler/icons-react";
+import { Group, Loader, Text, Tooltip, UnstyledButton, useMantineColorScheme } from "@mantine/core";
+import { IconSettings, IconSun, IconMoon, IconDeviceDesktop, IconRefresh } from "@tabler/icons-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { useGlobalRefresh } from "../hooks/useGlobalRefresh";
 
 // Shared constants — match HEADER_HEIGHT in src/main/index.ts
 export const TITLEBAR_HEIGHT = 44;
@@ -13,7 +14,10 @@ const TABS = [
   { path: "/notifications", label: "Inbox" },
   { path: "/projects", label: "Projects" },
   { path: "/schedule", label: "Schedule" },
-  { path: "/standup", label: "Standup" },
+  { path: "/coach", label: "Coach" },
+  { path: "/insights", label: "Insights" },
+  { path: "/memories", label: "Memories" },
+  { path: "/context", label: "Context" },
 ];
 
 interface AppHeaderProps {
@@ -51,6 +55,7 @@ export function AppHeader({ rightContent }: AppHeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const isFullscreen = useIsFullscreen();
+  const { isRefreshing: refreshing, refresh: handleGlobalRefresh } = useGlobalRefresh();
 
   return (
     <div
@@ -99,6 +104,18 @@ export function AppHeader({ rightContent }: AppHeaderProps) {
       {/* Right side */}
       <Group gap={8} style={{ WebkitAppRegion: "no-drag", marginLeft: "auto" }}>
         {rightContent}
+        <Tooltip label="Refresh all data sources" withArrow>
+          <UnstyledButton
+            onClick={handleGlobalRefresh}
+            disabled={refreshing}
+            style={{
+              padding: 4, borderRadius: 4,
+              color: refreshing ? "var(--mantine-color-blue-4)" : "var(--mantine-color-dimmed)",
+            }}
+          >
+            {refreshing ? <Loader size={14} /> : <IconRefresh size={16} />}
+          </UnstyledButton>
+        </Tooltip>
         <ThemeToggle />
         <UnstyledButton
           onClick={() => navigate("/settings")}

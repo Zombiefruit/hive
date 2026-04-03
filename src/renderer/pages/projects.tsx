@@ -1,10 +1,10 @@
-import { Badge, Group, Stack, Text, UnstyledButton, Loader, Tooltip } from "@mantine/core";
-import { IconFolder, IconChevronRight, IconChevronLeft, IconRefresh, IconBrandGithub, IconHash, IconMail, IconFileText, IconExternalLink, IconCheck } from "@tabler/icons-react";
+import { Badge, Group, Stack, Text, UnstyledButton, Tooltip } from "@mantine/core";
+import { IconFolder, IconChevronRight, IconChevronLeft, IconBrandGithub, IconHash, IconMail, IconFileText, IconExternalLink, IconCheck } from "@tabler/icons-react";
 import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppHeader } from "../components/AppHeader";
-import { PollStatusIndicator } from "../components/PollStatusIndicator";
+import { GlobalLoadingBanner } from "../components/GlobalLoadingBanner";
 import { usePollStatus } from "../hooks/usePollStatus";
 import type { Project } from "../../shared/project-model";
 import { STAGE_ORDER } from "../../shared/task-utils";
@@ -101,36 +101,7 @@ export default function ProjectsPage() {
 
   // --- Header right content ---
   const headerRight = (
-    <Group gap={8} align="center">
-      <PollStatusIndicator
-        fetching={pollStatus.fetching}
-        pollProgress={pollStatus.pollProgress}
-        lastRefreshed={pollStatus.lastRefreshed}
-        itemCount={projects.length}
-        itemLabel={projects.length === 1 ? "project" : "projects"}
-      />
-      <Tooltip label="Refresh projects" position="bottom" withArrow>
-        <UnstyledButton
-          onClick={() => fetchData()}
-          disabled={pollStatus.fetching}
-          aria-label="Refresh projects"
-          style={{
-            padding: "2px 8px",
-            borderRadius: 4,
-            fontSize: "0.65rem",
-            fontWeight: 500,
-            backgroundColor: "var(--mantine-color-default-hover)",
-            color: "var(--mantine-color-dimmed)",
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-          }}
-        >
-          {pollStatus.fetching ? <Loader size={12} /> : <IconRefresh size={12} />}
-          Refresh
-        </UnstyledButton>
-      </Tooltip>
-    </Group>
+    <Text size="xs" c="dimmed">{projects.length} {projects.length === 1 ? "project" : "projects"}</Text>
   );
 
   // --- Detail view: find project + tasks grouped by stage ---
@@ -354,6 +325,7 @@ export default function ProjectsPage() {
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--mantine-color-body)" }}>
       <AppHeader rightContent={headerRight} />
+      <GlobalLoadingBanner />
 
       {showDetail ? renderDetail(selectedProject) : (
         <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
@@ -361,23 +333,20 @@ export default function ProjectsPage() {
             <Text size="lg" fw={600}>Projects</Text>
           </Group>
 
-          {loading ? (
-            <Group gap={8} py="xl" justify="center">
-              <Loader size="sm" />
-              <Text size="sm" c="dimmed">Loading projects...</Text>
-            </Group>
-          ) : projects.length === 0 ? (
-            <EmptyState icon={IconFolder} message="No projects detected yet." detail="Projects are auto-created when the triage agent groups related tasks." />
-          ) : (
+          {(() => {
+            const visibleProjects = projects.filter(proj => {
+              const relevantTasks = proj.tasks.filter(id => {
+                const n = notifByTaskId.get(id);
+                return n && n.stage !== "skipped";
+              });
+              return relevantTasks.length > 0;
+            });
+            if (visibleProjects.length === 0) {
+              return <EmptyState icon={IconFolder} message="No projects yet." detail="Projects are auto-created when the triage agent groups related tasks. Hit the refresh button to fetch your data." />;
+            }
+            return (
             <Stack gap={8}>
-              {projects.filter(proj => {
-                // Show projects that have any non-skipped tasks (including done)
-                const relevantTasks = proj.tasks.filter(id => {
-                  const n = notifByTaskId.get(id);
-                  return n && n.stage !== "skipped";
-                });
-                return relevantTasks.length > 0;
-              }).map(proj => {
+              {visibleProjects.map(proj => {
                 // Count all non-skipped tasks (including done)
                 const projNotifs = proj.tasks.map(id => notifByTaskId.get(id)).filter((n): n is NotificationItem => !!n && n.stage !== "skipped");
                 const taskCount = projNotifs.length;
@@ -493,7 +462,8 @@ export default function ProjectsPage() {
                 );
               })}
             </Stack>
-          )}
+            );
+          })()}
         </div>
       )}
     </div>
