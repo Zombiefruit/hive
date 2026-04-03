@@ -3,7 +3,6 @@ import "@mantine/core/styles.css";
 import { Routes } from "./routes";
 import { theme } from "./theme";
 import { useIpcSync } from "./hooks/useIpcSync";
-import { FloatingTrigger, FloatingPanel } from "./components/ManagerChat";
 import { OrchestratorOrbiter } from "./components/Orbiter/OrchestratorOrbiter";
 import { useManagerStore } from "./stores/manager-store";
 
@@ -18,8 +17,6 @@ function AppInner() {
       <div style={{ flex: 1, minWidth: 0, transition: "margin-right 0.2s ease", marginRight: isPinned ? DOCKED_WIDTH : 0 }}>
         <Routes />
       </div>
-      <FloatingTrigger />
-      <FloatingPanel dockedWidth={DOCKED_WIDTH} />
       <OrchestratorOrbiter />
     </div>
   );

@@ -9,6 +9,7 @@ class PortalMaterial extends THREE.ShaderMaterial {
       uniforms: {
         uIntensity: { value: 0 },
         uEscalationMix: { value: 0 },
+        uTime: { value: 0 },
       },
       vertexShader: `
         varying vec3 vLocalDir;
@@ -30,6 +31,7 @@ class PortalMaterial extends THREE.ShaderMaterial {
 
         uniform float uIntensity;
         uniform float uEscalationMix;
+        uniform float uTime;
 
         float hash31(vec3 p) {
           p = fract(p * vec3(0.1031, 0.1030, 0.0973));
@@ -132,6 +134,11 @@ class PortalMaterial extends THREE.ShaderMaterial {
           starField += projectedStarLayer(portalUv, 10.0, vec2(3.2, 5.6), 0.82, 0.065, 1.1) * centerMask * 1.45;
           starField += projectedStarLayer(portalUv * 1.42, 15.0, vec2(8.4, 1.9), 0.89, 0.042, 0.82) * centerMask * 1.2;
           starField *= mix(1.24, 0.98, smoothstep(0.48, 0.98, projectedRadius));
+
+          // Twinkle: modulate brightness per-star using time
+          float twinkle = sin(hash31(floor(dir * 6.0)) * 6.28 + uTime * 2.5) * 0.5 + 0.5;
+          starField *= mix(0.7, 1.0, twinkle);
+
           starField = min(starField, 9.8);
 
           float colorHash = hash31(floor(dir * 18.0));
@@ -344,12 +351,13 @@ declare module "@react-three/fiber" {
 const PortalCore = ({ intensity, isEscalation }: { intensity: number; isEscalation: boolean }) => {
   const materialRef = useRef<PortalMaterial>(null!);
 
-  useFrame(() => {
+  useFrame((state) => {
     if (!materialRef.current) return;
     const targetIntensity = isEscalation ? 1.5 : intensity;
     materialRef.current.uniforms.uIntensity.value += (targetIntensity - materialRef.current.uniforms.uIntensity.value) * 0.05;
     const escalationTarget = isEscalation ? 1 : 0;
     materialRef.current.uniforms.uEscalationMix.value += (escalationTarget - materialRef.current.uniforms.uEscalationMix.value) * 0.05;
+    materialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
   });
 
   return (
