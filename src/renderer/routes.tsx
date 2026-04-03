@@ -15,6 +15,7 @@ import InsightsPage from "./pages/insights";
 import CoachPage from "./pages/coach";
 import MemoriesPage from "./pages/memories";
 import BusinessContextPage from "./pages/context";
+import { AppSidebar } from "./components/AppSidebar";
 
 /**
  * Guard that redirects to /onboarding if no config exists.
@@ -52,24 +53,44 @@ function ConfigGuard() {
   return <Outlet />;
 }
 
+/**
+ * Layout that renders the sidebar alongside page content.
+ * Used for all authenticated routes (everything except onboarding).
+ */
+function SidebarLayout() {
+  return (
+    <div style={{ display: "flex", minHeight: "100vh" }}>
+      <AppSidebar />
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+        <Outlet />
+      </div>
+    </div>
+  );
+}
+
 const router = createHashRouter([
   {
-    element: <ConfigGuard />,
+    element: <SidebarLayout />,
     children: [
-      { path: "/", element: <Dashboard /> },
-      { path: "/agent/:agentId", element: <AgentDetail /> },
-      { path: "/history", element: <History /> },
-      { path: "/notifications", element: <Notifications /> },
-      { path: "/schedule", element: <Schedule /> },
-      { path: "/projects", element: <ProjectsPage /> },
-      { path: "/projects/:projectId", element: <ProjectsPage /> },
-      { path: "/task/:taskId", element: <TaskDetail /> },
-      { path: "/coach", element: <CoachPage /> },
-      { path: "/memories", element: <MemoriesPage /> },
-      { path: "/context", element: <BusinessContextPage /> },
-      { path: "/insights", element: <InsightsPage /> },
-      { path: "/debug", element: <Debug /> },
-      { path: "/settings", element: <Settings /> },
+      {
+        element: <ConfigGuard />,
+        children: [
+          { path: "/", element: <Dashboard /> },
+          { path: "/agent/:agentId", element: <AgentDetail /> },
+          { path: "/history", element: <History /> },
+          { path: "/notifications", element: <Notifications /> },
+          { path: "/schedule", element: <Schedule /> },
+          { path: "/projects", element: <ProjectsPage /> },
+          { path: "/projects/:projectId", element: <ProjectsPage /> },
+          { path: "/task/:taskId", element: <TaskDetail /> },
+          { path: "/coach", element: <CoachPage /> },
+          { path: "/memories", element: <MemoriesPage /> },
+          { path: "/context", element: <BusinessContextPage /> },
+          { path: "/insights", element: <InsightsPage /> },
+          { path: "/debug", element: <Debug /> },
+          { path: "/settings", element: <Settings /> },
+        ],
+      },
     ],
   },
   { path: "/onboarding", element: <Onboarding /> },
