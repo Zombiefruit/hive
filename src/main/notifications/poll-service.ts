@@ -1196,9 +1196,13 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
     }
     for (const [key, taskIds] of urlToTasks) {
       if (taskIds.length >= 2) {
-        // Check if any of these tasks already have a project name hint
+        // Resolve channel ID to a human-readable name from config
         const firstTask = notifications.find(n => n.id === taskIds[0]);
-        const projName = firstTask?.title?.match(/^([A-Z]+-\d+)/)?.[0] ?? `${key.slice(0, 8)} Group`;
+        const ticketPrefix = firstTask?.title?.match(/^([A-Z]+-\d+)/)?.[0];
+        const channelName = channels.find(ch => ch.id === key)?.name?.replace(/^#/, "");
+        // Only create a project if we have a meaningful name — no raw IDs
+        const projName = ticketPrefix ?? (channelName ? `${channelName} discussions` : null);
+        if (!projName) continue;
         let proj = findProjectByName(projName);
         if (!proj) {
           proj = createProject(projName, "ai", undefined, `Auto-grouped ${taskIds.length} tasks sharing source ${key}`);
