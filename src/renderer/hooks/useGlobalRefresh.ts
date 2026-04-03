@@ -6,7 +6,9 @@
 import { useState, useEffect, useCallback } from "react";
 
 // Module-level state so all hook instances share it
-let _isRefreshing = false;
+// Default to true — the app always starts by fetching data.
+// Set to false only when polling-finished fires.
+let _isRefreshing = true;
 const listeners = new Set<(v: boolean) => void>();
 
 function setGlobalRefreshing(v: boolean) {
