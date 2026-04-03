@@ -66,7 +66,7 @@ const SCROLLBAR_CSS = `
 
 export function App() {
   return (
-    <MantineProvider theme={theme} forceColorScheme="dark">
+    <MantineProvider theme={theme} defaultColorScheme="dark">
       <style>{SCROLLBAR_CSS}</style>
       <AppInner />
     </MantineProvider>

@@ -612,6 +612,10 @@ RULES:
           total: 2,
         });
       }
+      // Also emit as orchestrator thought every 30s
+      if (elapsed > 0 && elapsed % 30 === 0) {
+        emitThought(`still ${phase.toLowerCase()}... (${elapsed}s)`);
+      }
     };
     const fetchTicker = setInterval(() => broadcastElapsed("Fetching", fetchStart), 10000);
 

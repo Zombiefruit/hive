@@ -27,10 +27,10 @@ const ORB_CENTER_Y = CONTAINER_HEIGHT - ORB_RADIUS;
 const CONNECTOR_RADIUS = ORB_RADIUS + 13;
 
 const THOUGHT_SLOTS: ThoughtSlot[] = [
-  { left: 100, top: 160, width: 195, attachAngle: 225 },
-  { left: 88, top: 214, width: 200, attachAngle: 212 },
-  { left: 82, top: 264, width: 190, attachAngle: 198 },
-  { left: 112, top: 126, width: 185, attachAngle: 238 },
+  { left: 160, top: 200, width: 195, attachAngle: 225 },
+  { left: 148, top: 250, width: 200, attachAngle: 212 },
+  { left: 142, top: 300, width: 190, attachAngle: 198 },
+  { left: 172, top: 166, width: 185, attachAngle: 238 },
 ];
 
 const BUBBLE_MIDLINE_Y = 30;
