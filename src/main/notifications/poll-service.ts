@@ -436,7 +436,7 @@ async function poll(): Promise<void> {
 
     if (integrations.slack && userSlackId) {
       enabledSourceNames.push("Slack");
-      const slackLimit = 100;
+      const slackLimit = hours <= 24 ? 200 : hours <= 48 ? 150 : 100;
       const channelList = channels.map(ch => `- slack_read_channel: channel_id "${ch.id}" (${ch.name}), limit ${slackLimit}`).join("\n");
       const slackSearches = [
         `- slack_search_public_and_private: query "<@${userSlackId}> after:${slackAfter}"`,
@@ -501,7 +501,47 @@ async function poll(): Promise<void> {
       } catch {}
     }
 
-    const fetchPrompt = `Fetch data from ALL of these sources. Execute all API calls — do not skip any. Call tools in parallel where possible.
+    // For long lookbacks (>48h), batch Slack fetches by day for better coverage.
+    // Other sources (Linear, Calendar, Gmail, Notion) handle their own date filtering.
+    const needsBatchedSlack = hours > 48 && integrations.slack && userSlackId;
+
+    let fetchPrompt: string;
+    if (needsBatchedSlack) {
+      // Build day-by-day Slack instructions
+      const days = Math.min(Math.ceil(hours / 24), 7);
+      const slackDayInstructions: string[] = [];
+      for (let d = days - 1; d >= 0; d--) {
+        const dayStart = new Date(Date.now() - (d + 1) * 86400000);
+        const dayEnd = new Date(Date.now() - d * 86400000);
+        const afterDate = dayStart.toISOString().split("T")[0];
+        const beforeDate = dayEnd.toISOString().split("T")[0];
+        const dayLabel = dayStart.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+        slackDayInstructions.push(`### ${dayLabel}
+- slack_search_public_and_private: query "<@${userSlackId}> after:${afterDate} before:${beforeDate}"
+- slack_search_public_and_private: query "to:${userSlackId} after:${afterDate} before:${beforeDate}"
+${channels.map(ch => `- slack_read_channel: channel_id "${ch.id}" (${ch.name}), limit 50, oldest="${dayStart.getTime() / 1000}", latest="${dayEnd.getTime() / 1000}"`).join("\n")}
+For each thread where ${userName} is mentioned or tagged, also read the FULL thread with slack_read_thread to check if ${userName} already replied.`);
+      }
+
+      const nonSlackSections = fetchSections.filter(s => !s.startsWith("## SLACK"));
+      fetchPrompt = `Fetch data from ALL sources. Execute ALL API calls — do not skip any day.
+
+## SLACK — Fetch EACH DAY separately for complete coverage
+${slackDayInstructions.join("\n\n")}
+
+## CRITICAL: For EVERY thread where ${userName} is mentioned, use slack_read_thread to check if ${userName} (${userSlackId}) already replied. If they did, note "USER ALREADY REPLIED" next to that thread.
+
+${nonSlackSections.join("\n\n")}
+
+RULES:
+- Execute EVERY search and channel read listed above — do NOT skip any day or channel
+- For Slack: include the FULL thread context for any thread mentioning ${userName}
+- Return ALL results as plain text, organized by source with ## headers
+- NEVER add commentary — return ONLY the data itself`;
+
+      logPoll(`  Batched Slack fetch: ${days} days × ${channels.length} channels + searches`);
+    } else {
+      fetchPrompt = `Fetch data from ALL of these sources. Execute all API calls — do not skip any. Call tools in parallel where possible.
 
 ${fetchSections.join("\n\n")}
 
@@ -510,6 +550,7 @@ RULES:
 - Return ALL results as plain text, organized by source with ## headers
 - Be thorough and complete — include everything relevant
 - NEVER add commentary like "Let me compile..." or "I have enough data..." — return ONLY the data itself`;
+    }
 
     // Pre-fetch: get GitHub PR status directly via gh CLI (fast, no MCP needed)
     // This gives triage ground truth about PR states — prevents stale Slack threads from creating false review tasks
@@ -565,6 +606,11 @@ RULES:
     try {
       rawData = await askBridge(fetchPrompt, fetchTimeout);
       logPoll(`  Fetch complete: ${rawData.length} chars`);
+      // Log data volume per source for debugging coverage
+      const slackLines = (rawData.match(/## SLACK/gi) || []).length;
+      const slackMentions = (rawData.match(new RegExp(userSlackId, "g")) || []).length;
+      const threadCount = (rawData.match(/slack_read_thread|thread_ts|in thread/gi) || []).length;
+      logPoll(`  Data breakdown: ${slackMentions} user mentions, ~${threadCount} threads referenced`);
       addDebugEntry("out", `✅ All sources: ${rawData.length} chars`, "fetch");
     } catch (err) {
       logPoll(`  Fetch ERROR: ${String(err).slice(0, 100)}`);
