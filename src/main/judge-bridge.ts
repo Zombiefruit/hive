@@ -10,8 +10,8 @@ import { getClaudeCodePath } from "./claude-path";
 import { trackProcess, untrackProcess } from "./process-monitor";
 import { addDebugEntry } from "./mcp-bridge";
 import { loadSkills } from "../shared/skill-loader";
-import { parseTriageVerdict, parsePlanVerdict, parseWorkVerdict } from "../shared/judge-parser";
-import type { TriageVerdict, PlanVerdict, WorkVerdict } from "../shared/judge-types";
+import { parseTriageVerdict, parsePlanVerdict, parseWorkVerdict, parseBusinessContextVerdict } from "../shared/judge-parser";
+import type { TriageVerdict, PlanVerdict, WorkVerdict, BusinessContextVerdict } from "../shared/judge-types";
 import type { TriageResult } from "../shared/triage-parser";
 import { getRelevantMemories, formatMemoriesForPrompt } from "./memory/service";
 import { getBusinessContextForPrompt } from "./business-context";
@@ -241,6 +241,44 @@ Produce your verdict as a JSON object.`;
     return verdict;
   } catch (err) {
     addDebugEntry("out", `❌ [JUDGE:work] Error: ${String(err).slice(0, 100)}`, "judge");
+    return null;
+  }
+}
+
+export async function judgeBusinessContext(
+  contextJson: string,
+  knownTeam: { name: string; managerName?: string; coworkers: Array<{ name: string; role: string }> },
+): Promise<BusinessContextVerdict | null> {
+  const startTime = Date.now();
+  try {
+    const skill = loadSkills(["judge-business-context"]);
+    const knownPeople = [
+      ...(knownTeam.managerName ? [`- ${knownTeam.managerName} (manager)`] : []),
+      ...knownTeam.coworkers.map(c => `- ${c.name} (${c.role})`),
+    ].join("\n");
+
+    const prompt = `${skill}
+
+## KNOWN TEAM (ground truth from user's config)
+${knownPeople || "(No team configured — skip team validation)"}
+
+## Business Context to Verify
+\`\`\`json
+${contextJson.slice(0, 15000)}
+\`\`\`
+
+Produce your verdict as a JSON object. Be strict about departed employees — if someone is NOT in the known team list, flag them.`;
+
+    const response = await askJudgeProcess(prompt, "business-context", 90000);
+    const verdict = parseBusinessContextVerdict(response);
+    if (verdict) {
+      verdict.durationMs = Date.now() - startTime;
+      verdict.judgedAt = new Date().toISOString();
+    }
+    addDebugEntry("out", `⚖️ [JUDGE:context] Verdict: ${verdict?.status ?? "parse_failed"} (${Date.now() - startTime}ms)`, "judge");
+    return verdict;
+  } catch (err) {
+    addDebugEntry("out", `❌ [JUDGE:context] Error: ${String(err).slice(0, 100)}`, "judge");
     return null;
   }
 }

@@ -3,7 +3,7 @@
  * Follows the same pattern as triage-parser.ts.
  */
 
-import type { TriageVerdict, PlanVerdict, WorkVerdict, VerdictStatus, JudgeConcern } from "./judge-types";
+import type { TriageVerdict, PlanVerdict, WorkVerdict, BusinessContextVerdict, VerdictStatus, JudgeConcern } from "./judge-types";
 
 const VALID_STATUSES: VerdictStatus[] = ["approved", "concerns", "rejected"];
 
@@ -130,6 +130,34 @@ export function parseWorkVerdict(raw: string): WorkVerdict | null {
       completionScore: clamp(p.completionScore, 1, 10, 5),
       codeQualityConcerns: safeStringArray(p.codeQualityConcerns),
       unfinishedSteps: safeStringArray(p.unfinishedSteps),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function parseBusinessContextVerdict(raw: string): BusinessContextVerdict | null {
+  if (!raw?.trim()) return null;
+  try {
+    const stripped = stripCodeFences(raw);
+    const jsonStr = extractJsonObject(stripped);
+    if (!jsonStr) return null;
+
+    const p = JSON.parse(jsonStr);
+    if (!p || typeof p !== "object") return null;
+
+    return {
+      type: "business_context",
+      status: normalizeStatus(p.status),
+      confidence: clamp(p.confidence, 1, 10, 5),
+      summary: String(p.summary ?? ""),
+      concerns: parseConcerns(p.concerns),
+      judgedAt: typeof p.judgedAt === "string" ? p.judgedAt : new Date().toISOString(),
+      durationMs: typeof p.durationMs === "number" ? p.durationMs : 0,
+      staleTeamMembers: Array.isArray(p.staleTeamMembers) ? p.staleTeamMembers : [],
+      missingPeople: Array.isArray(p.missingPeople) ? p.missingPeople : [],
+      staleReferences: Array.isArray(p.staleReferences) ? p.staleReferences : [],
+      completenessScore: clamp(p.completenessScore, 1, 10, 5),
     };
   } catch {
     return null;

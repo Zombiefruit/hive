@@ -144,6 +144,52 @@ export async function refreshBusinessContext(
 
     addDebugEntry("out", `🏢 [CONTEXT] Generated: ${context.length} chars`, "context");
     log(`🏢 [CONTEXT] Final context: ${context.length} chars`);
+    onProgress?.("Verifying context...");
+
+    // Run business context judge to validate team members and flag stale info
+    try {
+      const { judgeBusinessContext } = await import("./judge-bridge");
+      const verdict = await judgeBusinessContext(context, {
+        name: userName,
+        managerName: config?.managerName,
+        coworkers: config?.coworkers ?? [],
+      });
+
+      if (verdict) {
+        log(`🏢 [CONTEXT] Judge verdict: ${verdict.status} (${verdict.confidence}/10, ${verdict.staleTeamMembers.length} stale, ${verdict.missingPeople.length} missing)`);
+
+        // Auto-fix: remove stale team members from the context
+        if (verdict.staleTeamMembers.length > 0) {
+          try {
+            const parsed = JSON.parse(context);
+            if (parsed.team) {
+              const staleNames = new Set(verdict.staleTeamMembers.map((s: { name: string }) => s.name.toLowerCase()));
+              parsed.team = parsed.team.filter((t: { name: string }) => !staleNames.has(t.name.toLowerCase()));
+              log(`🏢 [CONTEXT] Removed ${staleNames.size} stale team members: ${[...staleNames].join(", ")}`);
+              context = JSON.stringify(parsed, null, 2);
+            }
+          } catch {}
+        }
+
+        // Auto-fix: add missing people
+        if (verdict.missingPeople.length > 0) {
+          try {
+            const parsed = JSON.parse(context);
+            if (!parsed.team) parsed.team = [];
+            for (const missing of verdict.missingPeople) {
+              if (!parsed.team.some((t: { name: string }) => t.name.toLowerCase() === missing.name.toLowerCase())) {
+                parsed.team.push({ name: missing.name, role: missing.role, focus: `Added by judge — was missing from context` });
+                log(`🏢 [CONTEXT] Added missing person: ${missing.name} (${missing.role})`);
+              }
+            }
+            context = JSON.stringify(parsed, null, 2);
+          } catch {}
+        }
+      }
+    } catch (err) {
+      log(`🏢 [CONTEXT] Judge error (non-fatal): ${String(err).slice(0, 100)}`);
+    }
+
     onProgress?.("Business context ready.");
 
     // Save automatically
@@ -152,7 +198,7 @@ export async function refreshBusinessContext(
       log("🏢 [CONTEXT] Auto-saved to disk");
     }
 
-    // Broadcast to UI for review
+    // Broadcast to UI
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) {
         win.webContents.send("business-context:draft", context);

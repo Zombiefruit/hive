@@ -44,4 +44,12 @@ export interface WorkVerdict extends BaseVerdict {
   unfinishedSteps: string[];
 }
 
-export type Verdict = TriageVerdict | PlanVerdict | WorkVerdict;
+export interface BusinessContextVerdict extends BaseVerdict {
+  type: "business_context";
+  staleTeamMembers: Array<{ name: string; reason: string }>;
+  missingPeople: Array<{ name: string; role: string; source: string }>;
+  staleReferences: Array<{ section: string; item: string; reason: string }>;
+  completenessScore: number;
+}
+
+export type Verdict = TriageVerdict | PlanVerdict | WorkVerdict | BusinessContextVerdict;
