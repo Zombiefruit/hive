@@ -550,7 +550,7 @@ export function Notifications() {
                             <div
                               draggable
                               onMouseDown={() => { wasDragging.current = false; }}
-                              onDragStart={(e) => { if (isParent) { e.preventDefault(); return; } e.dataTransfer.setData("text/plain", n.id); setDraggingId(n.id); wasDragging.current = true; }}
+                              onDragStart={(e) => { e.dataTransfer.setData("text/plain", n.id); setDraggingId(n.id); wasDragging.current = true; }}
                               onDragEnd={() => { setDraggingId(null); setDragOverStage(null); }}
                               onClick={() => {
                                 if (wasDragging.current) { wasDragging.current = false; return; }
@@ -559,7 +559,7 @@ export function Notifications() {
                               }}
                               className="notif-card"
                               style={{
-                                padding: "10px 12px", borderRadius: 6, cursor: isParent ? "pointer" : "grab", userSelect: "none",
+                                padding: "10px 12px", borderRadius: 6, cursor: "grab", userSelect: "none",
                                 border: `1px solid ${
                                   n.id === selectedId ? "var(--mantine-color-blue-5)"
                                   : "color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)"
@@ -571,7 +571,7 @@ export function Notifications() {
                             >
                               <Group gap={6} mb={2} justify="space-between">
                                 <Group gap={4}>
-                                  {!isParent && <IconGripVertical size={10} color="var(--mantine-color-dimmed)" style={{ opacity: 0.3 }} />}
+                                  <IconGripVertical size={10} color="var(--mantine-color-dimmed)" style={{ opacity: 0.3 }} />
                                   {isParent && (
                                     <UnstyledButton
                                       onClick={(e) => { e.stopPropagation(); toggleParentExpanded(n.id); }}

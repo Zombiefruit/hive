@@ -119,9 +119,16 @@ export default function InsightsPage() {
     setInsights(prev => prev.map(i => i.id === id ? { ...i, status: "converted" as Insight["status"] } : i));
   }, []);
 
+  const IMPACT_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
   const filtered = insights
     .filter(i => i.status === "new" || i.status === "acknowledged")
-    .filter(i => !filter || i.type === filter);
+    .filter(i => !filter || i.type === filter)
+    .sort((a, b) => {
+      // Sort by impact (high first), then by relevance score (highest first)
+      const impactDiff = (IMPACT_ORDER[a.impactEstimate] ?? 1) - (IMPACT_ORDER[b.impactEstimate] ?? 1);
+      if (impactDiff !== 0) return impactDiff;
+      return b.relevanceScore - a.relevanceScore;
+    });
 
   const filterTypes = Object.entries(TYPE_CONFIG);
 

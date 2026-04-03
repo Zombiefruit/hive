@@ -60,3 +60,5 @@ Return a JSON array of insights:
 - Be specific: "3 customers asked about CSV export in the last week" not "some people want exports"
 - Maximum 15 insights per extraction
 - Prioritize by impact: high-impact items first
+- **RELEVANCE FILTER**: Only include insights relevant to the user's team and area of work. Do NOT include insights about areas the user doesn't work on (e.g., sales ops, marketing campaigns, HR). Focus on engineering, product, and customer-facing feature work.
+- **IMPACT BAR**: Every insight must be something the user could proactively work on or suggest to gain visibility. "Nice to know" items are NOT insights. Only include items where action would be visible and impactful.
