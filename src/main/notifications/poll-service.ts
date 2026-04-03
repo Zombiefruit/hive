@@ -840,13 +840,34 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
         }
       }
 
-      // 3. Check if action_needed suggests it's already done
-      const actionLower = (item.action_needed ?? "").toLowerCase();
-      if (actionLower.includes("already replied") || actionLower.includes("already reviewed") ||
-          actionLower.includes("already responded") || actionLower.includes("already handled") ||
-          actionLower.includes("may have been") || actionLower.includes("likely reviewed")) {
-        logPoll(`  SKIPPED (pre-validation): "${item.title}" — action_needed suggests already handled: "${item.action_needed?.slice(0, 80)}"`);
+      // 3. Check if ANY text field (action_needed, summary, title) suggests it's already done
+      const allText = `${item.action_needed ?? ""} ${item.summary ?? ""} ${item.title ?? ""}`.toLowerCase();
+      const DONE_SIGNALS = [
+        "already replied", "already reviewed", "already responded", "already handled",
+        "already merged", "already resolved", "already addressed", "already fixed",
+        "already approved", "already completed", "already done",
+        "may have been", "likely reviewed", "likely resolved",
+        "confirm whether", "confirm if",  // hedging — agent isn't sure, shouldn't create task
+        "no action needed", "no action required", "no response needed",
+      ];
+      const matchedSignal = DONE_SIGNALS.find(s => allText.includes(s));
+      if (matchedSignal) {
+        logPoll(`  SKIPPED (pre-validation): "${item.title}" — text contains "${matchedSignal}": "${(item.action_needed ?? item.summary ?? "").slice(0, 80)}"`);
         continue;
+      }
+
+      // 4. Cross-check: if this item's URL appears in the skipped items with a resolution signal
+      if (item.url || item.links?.length) {
+        const itemUrls = [item.url, ...(item.links?.map((l: { url: string }) => l.url) ?? [])].filter(Boolean);
+        const wasSkipped = skippedItems.some(s => {
+          const skipReason = (s.reason ?? "").toLowerCase();
+          return (skipReason.includes("resolved") || skipReason.includes("merged") || skipReason.includes("already")) &&
+            itemUrls.some(u => s.url && u?.includes(s.url.split("/").pop()!));
+        });
+        if (wasSkipped) {
+          logPoll(`  SKIPPED (pre-validation): "${item.title}" — same URL was skipped as resolved`);
+          continue;
+        }
       }
 
       validated.push(item);

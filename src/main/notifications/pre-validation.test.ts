@@ -5,37 +5,53 @@ import { describe, it, expect } from "vitest";
  * These verify that stale/invalid tasks are caught before entering the inbox.
  */
 
-describe("Pre-creation validation: action_needed signals", () => {
-  const SKIP_PHRASES = [
-    "already replied",
-    "already reviewed",
-    "already responded",
-    "already handled",
-    "may have been",
-    "likely reviewed",
+describe("Pre-creation validation: done signals in text", () => {
+  const DONE_SIGNALS = [
+    "already replied", "already reviewed", "already responded", "already handled",
+    "already merged", "already resolved", "already addressed", "already fixed",
+    "already approved", "already completed", "already done",
+    "may have been", "likely reviewed", "likely resolved",
+    "confirm whether", "confirm if",
+    "no action needed", "no action required", "no response needed",
   ];
 
-  for (const phrase of SKIP_PHRASES) {
-    it(`should skip items where action_needed contains "${phrase}"`, () => {
-      const actionNeeded = `Review PR #12610 if not ${phrase} — reactions suggest completion`;
-      const lower = actionNeeded.toLowerCase();
-      const shouldSkip = SKIP_PHRASES.some(p => lower.includes(p));
-      expect(shouldSkip).toBe(true);
+  for (const signal of DONE_SIGNALS) {
+    it(`should skip items containing "${signal}"`, () => {
+      const text = `Some task context — ${signal} — more text`;
+      const lower = text.toLowerCase();
+      const match = DONE_SIGNALS.find(s => lower.includes(s));
+      expect(match).toBeTruthy();
     });
   }
 
-  it("should NOT skip items with clear action needed", () => {
-    const actionNeeded = "Review PR #12700 — assigned via random rotation, no reactions yet";
-    const lower = actionNeeded.toLowerCase();
-    const shouldSkip = SKIP_PHRASES.some(p => lower.includes(p));
-    expect(shouldSkip).toBe(false);
+  it("should catch 'already merged' in action_needed (the PR #12613 regression)", () => {
+    const actionNeeded = "Reply in thread — Kieran already merged PR #12613 on Mar 31.";
+    const match = DONE_SIGNALS.find(s => actionNeeded.toLowerCase().includes(s));
+    expect(match).toBe("already merged");
   });
 
-  it("should NOT skip items with empty action_needed", () => {
-    const actionNeeded = "";
-    const lower = actionNeeded.toLowerCase();
-    const shouldSkip = SKIP_PHRASES.some(p => lower.includes(p));
-    expect(shouldSkip).toBe(false);
+  it("should catch 'confirm whether' hedging", () => {
+    const actionNeeded = "Confirm whether that fix resolved Lior's issue or if there's a remaining edge case.";
+    const match = DONE_SIGNALS.find(s => actionNeeded.toLowerCase().includes(s));
+    expect(match).toBe("confirm whether");
+  });
+
+  it("should check summary AND action_needed combined", () => {
+    const allText = "Some action needed. Bug was already fixed last week.".toLowerCase();
+    const match = DONE_SIGNALS.find(s => allText.includes(s));
+    expect(match).toBe("already fixed");
+  });
+
+  it("should NOT skip items with clear action needed", () => {
+    const actionNeeded = "Review PR #12700 — assigned via random rotation, no reactions yet";
+    const match = DONE_SIGNALS.find(s => actionNeeded.toLowerCase().includes(s));
+    expect(match).toBeUndefined();
+  });
+
+  it("should NOT skip items with empty text", () => {
+    const allText = "  ".toLowerCase();
+    const match = DONE_SIGNALS.find(s => allText.includes(s));
+    expect(match).toBeUndefined();
   });
 });
 
