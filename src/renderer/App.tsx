@@ -1,5 +1,6 @@
 import { MantineProvider } from "@mantine/core";
 import "@mantine/core/styles.css";
+import "./aegen.css";
 import { Routes } from "./routes";
 import { theme } from "./theme";
 import { useIpcSync } from "./hooks/useIpcSync";
@@ -65,7 +66,7 @@ const SCROLLBAR_CSS = `
 
 export function App() {
   return (
-    <MantineProvider theme={theme} defaultColorScheme="auto">
+    <MantineProvider theme={theme} forceColorScheme="dark">
       <style>{SCROLLBAR_CSS}</style>
       <AppInner />
     </MantineProvider>

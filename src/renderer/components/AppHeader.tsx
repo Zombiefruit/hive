@@ -1,5 +1,5 @@
-import { Group, Loader, Text, Tooltip, UnstyledButton, useMantineColorScheme } from "@mantine/core";
-import { IconSettings, IconSun, IconMoon, IconDeviceDesktop, IconRefresh } from "@tabler/icons-react";
+import { Group, Loader, Text, Tooltip, UnstyledButton } from "@mantine/core";
+import { IconSettings, IconRefresh } from "@tabler/icons-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useGlobalRefresh } from "../hooks/useGlobalRefresh";
@@ -25,22 +25,7 @@ interface AppHeaderProps {
   rightContent?: React.ReactNode;
 }
 
-function ThemeToggle() {
-  const { colorScheme, setColorScheme } = useMantineColorScheme();
-  const next = colorScheme === "auto" ? "dark" : colorScheme === "dark" ? "light" : "auto";
-  const Icon = colorScheme === "auto" ? IconDeviceDesktop : colorScheme === "dark" ? IconMoon : IconSun;
-  const label = colorScheme === "auto" ? "System theme" : colorScheme === "dark" ? "Dark theme" : "Light theme";
-
-  return (
-    <UnstyledButton
-      onClick={() => setColorScheme(next)}
-      aria-label={`${label} — click to switch`}
-      style={{ padding: 4, borderRadius: 4, color: "var(--mantine-color-dimmed)" }}
-    >
-      <Icon size={16} />
-    </UnstyledButton>
-  );
-}
+// ThemeToggle removed — Aegen is dark-only
 
 export function useIsFullscreen(): boolean {
   const [fs, setFs] = useState(false);
@@ -116,7 +101,7 @@ export function AppHeader({ rightContent }: AppHeaderProps) {
             {refreshing ? <Loader size={14} /> : <IconRefresh size={16} />}
           </UnstyledButton>
         </Tooltip>
-        <ThemeToggle />
+        {/* Dark mode only — no theme toggle */}
         <UnstyledButton
           onClick={() => navigate("/settings")}
           style={{ padding: 4, borderRadius: 4, color: location.pathname === "/settings" ? "var(--mantine-color-blue-4)" : "var(--mantine-color-dimmed)" }}

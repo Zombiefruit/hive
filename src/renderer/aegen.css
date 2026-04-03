@@ -1,0 +1,277 @@
+/**
+ * Aegen Design System — CSS Custom Properties & Global Styles
+ * Cosmic, ambient, intelligence-forward design language.
+ */
+
+/* ── Color Tokens ── */
+:root {
+  --aegen-void: #050810;
+  --aegen-deep-space: #101520;
+  --aegen-nebula-dark: #1a1625;
+  --aegen-cosmic-blue: #4a7dff;
+  --aegen-stellar-purple: #a855f7;
+  --aegen-plasma-cyan: #38bdf8;
+  --aegen-star-white: #d3d8e4;
+  --aegen-dust-gray: #74788a;
+  --aegen-dim-gray: #444955;
+
+  /* Alert / Escalation */
+  --aegen-alert-warm: #ff6b3d;
+  --aegen-alert-deep: #d94b1a;
+  --aegen-alert-gold: #ffaa33;
+  --aegen-success: hsl(150 60% 45%);
+
+  /* Typography */
+  --aegen-font-primary: 'Inter', -apple-system, system-ui, sans-serif;
+  --aegen-font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+
+  /* Animation */
+  --aegen-ease-cosmic: cubic-bezier(0.23, 1, 0.32, 1);
+  --aegen-duration-whisper: 0.4s;
+  --aegen-duration-breathe: 3.5s;
+  --aegen-duration-pulse: 2s;
+
+  /* Glassmorphism base values */
+  --aegen-glass-bg: rgba(16, 21, 32, 0.72);
+  --aegen-glass-blur: blur(20px) saturate(1.3);
+  --aegen-glass-border: rgba(68, 73, 85, 0.2);
+  --aegen-glass-shadow: 0 0 12px rgba(74, 125, 255, 0.1), inset 0 0 12px rgba(74, 125, 255, 0.03);
+  --aegen-glass-shadow-elevated: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(74, 125, 255, 0.05);
+
+  /* Gradient presets */
+  --aegen-gradient-void: linear-gradient(180deg, #050810, #0d1018);
+  --aegen-gradient-surface: linear-gradient(135deg, rgba(16, 21, 32, 0.9), rgba(26, 22, 37, 0.82));
+  --aegen-gradient-cosmic: linear-gradient(135deg, #4a7dff, #a855f7, #38bdf8);
+  --aegen-gradient-glow-blue: radial-gradient(circle, rgba(74, 125, 255, 0.12) 0%, transparent 70%);
+  --aegen-gradient-glow-warm: radial-gradient(circle, rgba(255, 107, 61, 0.15) 0%, transparent 70%);
+}
+
+/* ── Global Base Styles ── */
+html, body {
+  background-color: var(--aegen-void) !important;
+  color: var(--aegen-star-white);
+  font-family: var(--aegen-font-primary);
+}
+
+/* ── Scrollbar Styling ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(68, 73, 85, 0.5) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(68, 73, 85, 0.5);
+  border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(116, 120, 138, 0.5);
+}
+
+/* ── Glassmorphism Surface Classes ── */
+.aegen-glass {
+  background: var(--aegen-glass-bg);
+  backdrop-filter: var(--aegen-glass-blur);
+  -webkit-backdrop-filter: var(--aegen-glass-blur);
+  border: 1px solid var(--aegen-glass-border);
+  border-radius: 14px;
+  box-shadow: var(--aegen-glass-shadow);
+}
+
+.aegen-glass-elevated {
+  background: var(--aegen-gradient-surface);
+  backdrop-filter: var(--aegen-glass-blur);
+  -webkit-backdrop-filter: var(--aegen-glass-blur);
+  border: 1px solid var(--aegen-glass-border);
+  border-radius: 14px;
+  box-shadow: var(--aegen-glass-shadow-elevated);
+}
+
+.aegen-glass-header {
+  background: rgba(16, 21, 32, 0.8);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  border-bottom: 1px solid rgba(68, 73, 85, 0.2);
+}
+
+/* ── Inner Glow Accent ── */
+.aegen-inner-glow {
+  position: relative;
+}
+
+.aegen-inner-glow::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle at top right, rgba(74, 125, 255, 0.08) 0%, transparent 60%);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ── Glow Effects ── */
+.aegen-glow-blue {
+  box-shadow: 0 0 16px rgba(74, 125, 255, 0.15);
+}
+
+.aegen-glow-purple {
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.15);
+}
+
+.aegen-glow-cyan {
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.15);
+}
+
+.aegen-glow-warm {
+  box-shadow: 0 0 16px rgba(255, 107, 61, 0.15), inset 0 0 12px rgba(255, 107, 61, 0.05);
+}
+
+/* ── Text Glow ── */
+.aegen-text-glow-blue {
+  text-shadow: 0 0 8px rgba(74, 125, 255, 0.2);
+}
+
+.aegen-text-glow-warm {
+  text-shadow: 0 0 8px rgba(255, 107, 61, 0.3);
+}
+
+/* ── Animation Keyframes ── */
+@keyframes aegen-breathing {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+}
+
+@keyframes aegen-blur-in {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateY(0);
+  }
+}
+
+@keyframes aegen-blur-out {
+  from {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    filter: blur(4px);
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes aegen-cosmic-pulse {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(74, 125, 255, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(74, 125, 255, 0.2);
+  }
+}
+
+@keyframes aegen-cosmic-strip {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes aegen-slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+    filter: blur(4px);
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+    filter: blur(0px);
+  }
+}
+
+/* ── Utility Animation Classes ── */
+.aegen-animate-breathing {
+  animation: aegen-breathing var(--aegen-duration-breathe) ease-in-out infinite;
+}
+
+.aegen-animate-blur-in {
+  animation: aegen-blur-in var(--aegen-duration-whisper) var(--aegen-ease-cosmic) both;
+}
+
+.aegen-animate-pulse {
+  animation: aegen-cosmic-pulse var(--aegen-duration-pulse) ease-in-out infinite;
+}
+
+/* ── Interactive Element Overrides ── */
+
+/* Card hover effect */
+.deck-card:hover,
+.notif-card:hover {
+  transform: scale(1.01);
+  box-shadow: 0 0 16px rgba(74, 125, 255, 0.12) !important;
+  border-color: rgba(74, 125, 255, 0.2) !important;
+  transition: all 0.2s var(--aegen-ease-cosmic) !important;
+}
+
+.deck-card:focus-visible,
+.notif-card:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(74, 125, 255, 0.4) !important;
+}
+
+/* ── Cosmic Loading Strip ── */
+.aegen-loading-strip {
+  position: relative;
+  height: 2px;
+  overflow: hidden;
+  background: rgba(68, 73, 85, 0.15);
+}
+
+.aegen-loading-strip::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, var(--aegen-cosmic-blue), var(--aegen-stellar-purple), transparent);
+  animation: aegen-cosmic-strip 2s var(--aegen-ease-cosmic) infinite;
+}
+
+/* ── Highlight Line (top edge accent on glass cards) ── */
+.aegen-highlight-line {
+  position: relative;
+}
+
+.aegen-highlight-line::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(74, 125, 255, 0.5), transparent);
+  border-radius: 1px;
+}

@@ -6,10 +6,10 @@ import {
 } from "@mantine/core";
 
 /**
- * Claude Deck theme — adapted from Monte Carlo frontend.
- * Keeps the same color palette, spacing, and typography for visual consistency.
+ * Aegen Design System — Mantine Theme Override
+ * Dark-only cosmic design language with glassmorphism surfaces.
  */
-const deckTheme = createTheme({
+const aeGenTheme = createTheme({
   cursorType: "pointer",
 
   spacing: {
@@ -23,9 +23,9 @@ const deckTheme = createTheme({
   },
 
   fontFamily:
-    "-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif, Apple Color Emoji, Segoe UI Emoji",
+    "'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
   fontFamilyMonospace:
-    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace",
+    "'JetBrains Mono', 'SF Mono', 'Fira Code', ui-monospace, monospace",
 
   lineHeights: {
     xs: "1.4285714286",
@@ -37,6 +37,8 @@ const deckTheme = createTheme({
 
   headings: {
     fontWeight: "500",
+    fontFamily:
+      "'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
     sizes: {
       h1: { fontSize: "1.5rem", lineHeight: "1.333", fontWeight: "600" },
       h2: { fontSize: "1.25rem", lineHeight: "1.5", fontWeight: "600" },
@@ -45,91 +47,376 @@ const deckTheme = createTheme({
     },
   },
 
-  black: "#273139",
+  black: "#d3d8e4", // Star White — primary text in dark
   primaryShade: 5,
   autoContrast: true,
   luminanceThreshold: 0.2,
 
   colors: {
-    red: [
-      "#fee9e9", "#fcc8c8", "#faa7a7", "#f88282", "#f55150",
-      "#dc2322", "#bb1d1d", "#971817", "#711211", "#5c0b0a",
-    ],
+    // Cosmic Blue shades
     blue: [
-      "#f3f9ff", "#d7ebfe", "#b0d6fc", "#78b9f9", "#469ef6",
-      "#1576d8", "#0b5fb2", "#064381", "#032446", "#021c37",
+      "#e6efff", "#c4d7ff", "#99bcff", "#6e9fff", "#4a7dff",
+      "#3a6ae6", "#2d55cc", "#1f3da3", "#13287a", "#0a1752",
     ],
-    gray: [
-      "#f5f8fb", "#e5ecf2", "#d7e1ea", "#d1dbe4", "#bdcbd6",
-      "#a8b8c5", "#91a2b0", "#748492", "#515f6a", "#273139",
-    ],
+    // Stellar Purple shades
     violet: [
-      "#f4f3ff", "#eee3fe", "#d6bfff", "#c39deb", "#ab7ae7",
-      "#9455dd", "#783cb5", "#54278e", "#38215d", "#291648",
+      "#f3e8fe", "#e2c6fd", "#c89dfb", "#ae74f9", "#a855f7",
+      "#8e3de0", "#7428c9", "#5a1ea3", "#40147d", "#2a0c57",
     ],
+    // Plasma Cyan shades
+    cyan: [
+      "#e4f6fe", "#bfe9fd", "#8dd7fb", "#5bc5f9", "#38bdf8",
+      "#2da5de", "#228cc4", "#17699b", "#0d4872", "#063049",
+    ],
+    // Alert Warm shades
+    red: [
+      "#ffe8e0", "#ffc9b8", "#ffa48a", "#ff805c", "#ff6b3d",
+      "#e65a2f", "#cc4921", "#a33718", "#7a280f", "#521a08",
+    ],
+    // Alert Gold shades
+    yellow: [
+      "#fff3dc", "#ffe4b0", "#ffd180", "#ffbe50", "#ffaa33",
+      "#e69929", "#cc871f", "#a36b18", "#7a5011", "#52360a",
+    ],
+    // Success green shades
+    green: [
+      "#e0f7eb", "#b3ecd0", "#80ddb3", "#4dce96", "#26bf7e",
+      "#1fa86c", "#18905b", "#117249", "#0a5437", "#053625",
+    ],
+    // Deep Space / UI gray shades
+    gray: [
+      "#d3d8e4", "#b4b9c7", "#969cac", "#74788a", "#5a5f6f",
+      "#444955", "#2e3240", "#1d2130", "#101520", "#050810",
+    ],
+    // Dark (Mantine dark scheme tokens)
     dark: [
-      "#c9d0d7", "#96a2ad", "#6c7a87", "#53606c", "#3a444d",
-      "#2b333b", "#22292f", "#1b2126", "#14181c", "#0e1114",
+      "#d3d8e4", "#b4b9c7", "#969cac", "#74788a", "#5a5f6f",
+      "#444955", "#2e3240", "#1d2130", "#101520", "#050810",
     ],
     ok: virtualColor({ name: "ok", dark: "green", light: "green" }),
     warning: virtualColor({ name: "warning", dark: "yellow", light: "yellow" }),
-    attention: virtualColor({ name: "attention", dark: "orange", light: "orange" }),
+    attention: virtualColor({
+      name: "attention",
+      dark: "yellow",
+      light: "yellow",
+    }),
     error: virtualColor({ name: "error", dark: "red", light: "red" }),
     neutral: virtualColor({ name: "neutral", dark: "gray", light: "gray" }),
   },
 
   components: {
-    Button: { defaultProps: { variant: "filled" } },
-    Modal: { defaultProps: { centered: true } },
-    Drawer: { defaultProps: { position: "right" } },
-    ActionIcon: { defaultProps: { variant: "subtle" } },
-    Text: { defaultProps: { size: "sm" } },
-    Select: {
-      defaultProps: { checkIconPosition: "right", allowDeselect: false },
-      styles: {
-        dropdown: {
-          backgroundColor: "var(--mantine-color-body)",
-          borderColor: "var(--mantine-color-default-border)",
+    // Paper — glass surface
+    Paper: {
+      defaultProps: { radius: "md" },
+      styles: () => ({
+        root: {
+          background: "rgba(16, 21, 32, 0.72)",
+          backdropFilter: "blur(20px) saturate(1.3)",
+          WebkitBackdropFilter: "blur(20px) saturate(1.3)",
+          border: "1px solid rgba(68, 73, 85, 0.2)",
+          boxShadow:
+            "0 0 12px rgba(74, 125, 255, 0.1), inset 0 0 12px rgba(74, 125, 255, 0.03)",
         },
-        option: {
-          borderRadius: 4,
-        },
-      },
+      }),
     },
-    Radio: {
-      styles: {
-        radio: {
-          borderColor: "var(--mantine-color-default-border)",
+
+    // Card — glass elevated surface
+    Card: {
+      defaultProps: { radius: "md", padding: "lg" },
+      styles: () => ({
+        root: {
+          background:
+            "linear-gradient(135deg, rgba(16, 21, 32, 0.9), rgba(26, 22, 37, 0.82))",
+          backdropFilter: "blur(20px) saturate(1.3)",
+          WebkitBackdropFilter: "blur(20px) saturate(1.3)",
+          border: "1px solid rgba(68, 73, 85, 0.2)",
+          borderRadius: 14,
+          boxShadow:
+            "0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(74, 125, 255, 0.05)",
         },
-      },
+      }),
     },
-    Switch: {
-      styles: {
-        track: {
-          borderColor: "var(--mantine-color-default-border)",
+
+    // Badge — Aegen styled
+    Badge: {
+      styles: () => ({
+        root: {
+          borderRadius: 20,
+          fontFamily:
+            "'JetBrains Mono', 'SF Mono', 'Fira Code', ui-monospace, monospace",
+          fontSize: "0.6rem",
+          letterSpacing: "0.05em",
+          textTransform: "uppercase" as const,
         },
-      },
+      }),
     },
-    Tabs: {
-      styles: {
-        tab: {
-          "&[dataActive]": {
-            borderColor: "var(--mantine-color-blue-filled)",
+
+    // Button — glass buttons with glow
+    Button: {
+      defaultProps: { variant: "filled", radius: "md" },
+      styles: () => ({
+        root: {
+          borderRadius: 10,
+          transition: "all 0.2s cubic-bezier(0.23, 1, 0.32, 1)",
+          "&:hover": {
+            transform: "scale(1.03)",
           },
         },
-      },
+      }),
     },
+
+    // Accordion — glass panels
+    Accordion: {
+      styles: () => ({
+        item: {
+          background: "rgba(16, 21, 32, 0.72)",
+          backdropFilter: "blur(16px) saturate(1.2)",
+          border: "1px solid rgba(68, 73, 85, 0.2)",
+          borderRadius: 14,
+          marginBottom: 8,
+        },
+        control: {
+          color: "#d3d8e4",
+          "&:hover": {
+            background: "rgba(74, 125, 255, 0.05)",
+          },
+        },
+        content: {
+          color: "#b4b9c7",
+        },
+      }),
+    },
+
+    // TextInput — deep space input
+    TextInput: {
+      styles: () => ({
+        input: {
+          background: "rgba(16, 21, 32, 0.7)",
+          border: "1px solid rgba(68, 73, 85, 0.3)",
+          color: "#d3d8e4",
+          borderRadius: 10,
+          "&::placeholder": {
+            color: "#74788a",
+          },
+          "&:focus": {
+            borderColor: "rgba(74, 125, 255, 0.4)",
+            boxShadow: "0 0 0 2px rgba(74, 125, 255, 0.15)",
+          },
+        },
+        label: {
+          color: "#d3d8e4",
+        },
+        description: {
+          color: "#74788a",
+        },
+      }),
+    },
+
+    // Textarea — same as TextInput
+    Textarea: {
+      styles: () => ({
+        input: {
+          background: "rgba(16, 21, 32, 0.7)",
+          border: "1px solid rgba(68, 73, 85, 0.3)",
+          color: "#d3d8e4",
+          borderRadius: 10,
+          "&::placeholder": {
+            color: "#74788a",
+          },
+          "&:focus": {
+            borderColor: "rgba(74, 125, 255, 0.4)",
+            boxShadow: "0 0 0 2px rgba(74, 125, 255, 0.15)",
+          },
+        },
+      }),
+    },
+
+    // Select — glass dropdown
+    Select: {
+      defaultProps: { checkIconPosition: "right", allowDeselect: false },
+      styles: () => ({
+        input: {
+          background: "rgba(16, 21, 32, 0.7)",
+          border: "1px solid rgba(68, 73, 85, 0.3)",
+          color: "#d3d8e4",
+          borderRadius: 10,
+          "&:focus": {
+            borderColor: "rgba(74, 125, 255, 0.4)",
+          },
+        },
+        dropdown: {
+          background: "rgba(26, 22, 37, 0.95)",
+          backdropFilter: "blur(20px) saturate(1.3)",
+          border: "1px solid rgba(68, 73, 85, 0.3)",
+          borderRadius: 12,
+        },
+        option: {
+          borderRadius: 8,
+          color: "#d3d8e4",
+          "&[dataChecked]": {
+            background: "rgba(74, 125, 255, 0.15)",
+          },
+          "&:hover": {
+            background: "rgba(74, 125, 255, 0.1)",
+          },
+        },
+      }),
+    },
+
+    // Radio — Aegen styled
+    Radio: {
+      styles: () => ({
+        radio: {
+          borderColor: "rgba(68, 73, 85, 0.4)",
+          backgroundColor: "rgba(16, 21, 32, 0.7)",
+        },
+        label: {
+          color: "#d3d8e4",
+        },
+      }),
+    },
+
+    // Switch — Aegen styled
+    Switch: {
+      styles: () => ({
+        track: {
+          borderColor: "rgba(68, 73, 85, 0.4)",
+          backgroundColor: "rgba(16, 21, 32, 0.5)",
+        },
+        label: {
+          color: "#d3d8e4",
+        },
+        description: {
+          color: "#74788a",
+        },
+      }),
+    },
+
+    // Tabs — glass tabs
+    Tabs: {
+      styles: () => ({
+        tab: {
+          color: "#74788a",
+          borderRadius: 8,
+          "&[dataActive]": {
+            color: "#d3d8e4",
+            borderColor: "#4a7dff",
+            background: "rgba(74, 125, 255, 0.08)",
+          },
+          "&:hover": {
+            background: "rgba(74, 125, 255, 0.05)",
+          },
+        },
+        list: {
+          borderColor: "rgba(68, 73, 85, 0.2)",
+        },
+      }),
+    },
+
+    // Stepper — cosmic stepper
     Stepper: {
-      styles: {
+      styles: () => ({
         stepIcon: {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          backgroundColor: "rgba(16, 21, 32, 0.7)",
+          borderColor: "rgba(68, 73, 85, 0.3)",
         },
-      },
+        separator: {
+          backgroundColor: "rgba(68, 73, 85, 0.3)",
+        },
+      }),
     },
-    Tooltip: { defaultProps: { events: { hover: true, focus: true, touch: false } } },
+
+    // Modal — glass overlay
+    Modal: {
+      defaultProps: { centered: true },
+      styles: () => ({
+        content: {
+          background:
+            "linear-gradient(135deg, rgba(16, 21, 32, 0.95), rgba(26, 22, 37, 0.9))",
+          backdropFilter: "blur(24px) saturate(1.4)",
+          border: "1px solid rgba(68, 73, 85, 0.2)",
+          borderRadius: 16,
+        },
+        header: {
+          background: "transparent",
+        },
+        overlay: {
+          background: "rgba(5, 8, 16, 0.7)",
+        },
+      }),
+    },
+
+    // Drawer — glass drawer
+    Drawer: {
+      defaultProps: { position: "right" },
+      styles: () => ({
+        content: {
+          background:
+            "linear-gradient(135deg, rgba(16, 21, 32, 0.95), rgba(26, 22, 37, 0.9))",
+          backdropFilter: "blur(24px) saturate(1.4)",
+          border: "1px solid rgba(68, 73, 85, 0.2)",
+        },
+        header: {
+          background: "transparent",
+        },
+      }),
+    },
+
+    // Tooltip — glass tooltip
+    Tooltip: {
+      defaultProps: {
+        events: { hover: true, focus: true, touch: false },
+      },
+      styles: () => ({
+        tooltip: {
+          background: "rgba(16, 21, 32, 0.9)",
+          backdropFilter: "blur(12px)",
+          border: "1px solid rgba(68, 73, 85, 0.2)",
+          borderRadius: 8,
+          color: "#d3d8e4",
+          fontSize: "0.75rem",
+        },
+      }),
+    },
+
+    // ActionIcon — subtle with glow hover
+    ActionIcon: {
+      defaultProps: { variant: "subtle" },
+      styles: () => ({
+        root: {
+          color: "#74788a",
+          borderRadius: 8,
+          "&:hover": {
+            background: "rgba(74, 125, 255, 0.08)",
+            color: "#d3d8e4",
+          },
+        },
+      }),
+    },
+
+    // Text
+    Text: {
+      defaultProps: { size: "sm" },
+    },
+
+    // Loader — cosmic blue
+    Loader: {
+      defaultProps: { color: "#4a7dff" },
+    },
+
+    // Progress — cosmic gradient
+    Progress: {
+      styles: () => ({
+        root: {
+          backgroundColor: "rgba(68, 73, 85, 0.2)",
+          borderRadius: 6,
+        },
+      }),
+    },
   },
 });
 
-export const theme = mergeMantineTheme(DEFAULT_THEME, deckTheme);
+export const theme = mergeMantineTheme(DEFAULT_THEME, aeGenTheme);
