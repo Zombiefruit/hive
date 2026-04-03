@@ -548,7 +548,7 @@ export function Notifications() {
                           return (
                             <div key={n.id}>
                             <div
-                              draggable={!isParent}
+                              draggable
                               onMouseDown={() => { wasDragging.current = false; }}
                               onDragStart={(e) => { if (isParent) { e.preventDefault(); return; } e.dataTransfer.setData("text/plain", n.id); setDraggingId(n.id); wasDragging.current = true; }}
                               onDragEnd={() => { setDraggingId(null); setDragOverStage(null); }}

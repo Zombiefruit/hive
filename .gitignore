@@ -105,3 +105,4 @@ dist/
 .prompts/working/
 .work/
 local_cache/
+.claude/worktrees/

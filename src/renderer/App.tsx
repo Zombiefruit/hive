@@ -4,6 +4,7 @@ import { Routes } from "./routes";
 import { theme } from "./theme";
 import { useIpcSync } from "./hooks/useIpcSync";
 import { FloatingTrigger, FloatingPanel } from "./components/ManagerChat";
+import { OrchestratorOrbiter } from "./components/Orbiter/OrchestratorOrbiter";
 import { useManagerStore } from "./stores/manager-store";
 
 const DOCKED_WIDTH = 480;
@@ -19,6 +20,7 @@ function AppInner() {
       </div>
       <FloatingTrigger />
       <FloatingPanel dockedWidth={DOCKED_WIDTH} />
+      <OrchestratorOrbiter />
     </div>
   );
 }
