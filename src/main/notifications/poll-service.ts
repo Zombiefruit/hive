@@ -1322,11 +1322,13 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
     if (projectsChanged) saveProjects();
 
     // POST-TRIAGE CONSOLIDATION: merge duplicate notifications that share the same key
-    // CRITICAL: Never remove a task that's in an active stage (user has started working on it)
+    // CRITICAL: Never remove a task that's in an active stage, is a parent, or is a subtask
     const PROTECTED_STAGES = new Set(["start_work", "plan_review", "hack", "ship", "code_review", "pr_feedback", "preparing", "ready"]);
     const keyToFirst = new Map<string, number>();
     const toRemove = new Set<number>();
     for (let i = 0; i < notifications.length; i++) {
+      // Never consolidate subtasks or parent tasks — they're linked by ID
+      if (notifications[i].parentTaskId || notifications[i].subtaskIds?.length) continue;
       const key = extractKeyUtil({
         source: notifications[i].source,
         title: notifications[i].title,

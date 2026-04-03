@@ -158,15 +158,30 @@ export async function refreshBusinessContext(
       if (verdict) {
         log(`🏢 [CONTEXT] Judge verdict: ${verdict.status} (${verdict.confidence}/10, ${verdict.staleTeamMembers.length} stale, ${verdict.missingPeople.length} missing)`);
 
-        // Auto-fix: remove stale team members from the context
+        // Auto-fix: remove stale team members — but NEVER remove executives/leadership
+        // The config only has immediate team, so C-suite/VPs won't be there.
+        // Only remove people the judge flagged AND who have non-leadership roles.
+        const PROTECTED_ROLES = /ceo|cto|cfo|coo|cpo|vp|vice president|chief|founder|co-founder|president|director|head of/i;
         if (verdict.staleTeamMembers.length > 0) {
           try {
             const parsed = JSON.parse(context);
             if (parsed.team) {
               const staleNames = new Set(verdict.staleTeamMembers.map((s: { name: string }) => s.name.toLowerCase()));
-              parsed.team = parsed.team.filter((t: { name: string }) => !staleNames.has(t.name.toLowerCase()));
-              log(`🏢 [CONTEXT] Removed ${staleNames.size} stale team members: ${[...staleNames].join(", ")}`);
-              context = JSON.stringify(parsed, null, 2);
+              const before = parsed.team.length;
+              parsed.team = parsed.team.filter((t: { name: string; role?: string }) => {
+                if (!staleNames.has(t.name.toLowerCase())) return true;
+                // Keep executives even if not in config
+                if (t.role && PROTECTED_ROLES.test(t.role)) {
+                  log(`🏢 [CONTEXT] Kept ${t.name} (${t.role}) — protected leadership role`);
+                  return true;
+                }
+                return false;
+              });
+              const removed = before - parsed.team.length;
+              if (removed > 0) {
+                log(`🏢 [CONTEXT] Removed ${removed} stale team members`);
+                context = JSON.stringify(parsed, null, 2);
+              }
             }
           } catch {}
         }
