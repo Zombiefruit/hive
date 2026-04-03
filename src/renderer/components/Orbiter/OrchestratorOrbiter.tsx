@@ -157,7 +157,7 @@ export function OrchestratorOrbiter() {
         <div
           style={{
             position: "fixed",
-            bottom: 20,
+            bottom: 40,
             right: 32,
             zIndex: 50,
             pointerEvents: "none",

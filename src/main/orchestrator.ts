@@ -28,12 +28,17 @@ function think(thought: string): void {
   recentThoughts.push(entry);
   if (recentThoughts.length > 50) recentThoughts.shift();
 
-  for (const win of BrowserWindow.getAllWindows()) {
+  const windows = BrowserWindow.getAllWindows();
+  let sent = 0;
+  for (const win of windows) {
     if (!win.isDestroyed()) {
-      win.webContents.send("orchestrator:thought", entry);
+      try {
+        win.webContents.send("orchestrator:thought", entry);
+        sent++;
+      } catch {}
     }
   }
-  addDebugEntry("out", `🧠 [ORCH] ${thought}`, "orchestrator");
+  addDebugEntry("out", `🧠 [ORCH] (${sent}/${windows.length} windows) ${thought}`, "orchestrator");
 }
 
 // ── Core loop ──
