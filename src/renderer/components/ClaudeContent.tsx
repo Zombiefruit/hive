@@ -46,6 +46,50 @@ export function ClaudeContent({ content, role }: ClaudeContentProps) {
   return <Markdown content={cleaned} />;
 }
 
+/** Strip JSON action blocks by walking brace depth — handles nested objects. */
+function stripJsonActionBlocks(text: string): string {
+  const marker = '"action"';
+  let result = text;
+  let safety = 0;
+  while (safety++ < 10) {
+    const idx = result.indexOf(marker);
+    if (idx === -1) break;
+    let start = idx;
+    while (start > 0 && result[start] !== "{") start--;
+    if (result[start] !== "{") break;
+    let depth = 0;
+    let end = start;
+    for (let i = start; i < result.length; i++) {
+      if (result[i] === "{") depth++;
+      else if (result[i] === "}") depth--;
+      if (depth === 0) { end = i + 1; break; }
+    }
+    const before = result.slice(0, start).replace(/\n+$/, "");
+    const after = result.slice(end).replace(/^\n+/, "");
+    result = before + (after ? "\n" + after : "");
+  }
+  return result;
+}
+
+/** Strip [Context: ...] blocks — handles nested brackets. */
+function stripContextBlocks(text: string): string {
+  let result = text;
+  let safety = 0;
+  while (safety++ < 10) {
+    const idx = result.indexOf("[Context:");
+    if (idx === -1) break;
+    let depth = 0;
+    let end = idx;
+    for (let i = idx; i < result.length; i++) {
+      if (result[i] === "[") depth++;
+      else if (result[i] === "]") depth--;
+      if (depth === 0) { end = i + 1; break; }
+    }
+    result = result.slice(0, idx) + result.slice(end);
+  }
+  return result.replace(/^\n+/, "");
+}
+
 function cleanClaudeOutput(raw: string): string {
   let text = raw;
 
@@ -53,13 +97,11 @@ function cleanClaudeOutput(raw: string): string {
   for (const tag of STRIP_TAGS) {
     const regex = new RegExp(`<${tag}[^>]*>[\\s\\S]*?</${tag}>`, "gi");
     text = text.replace(regex, "");
-    // Also handle self-closing
     text = text.replace(new RegExp(`<${tag}[^>]*/?>`, "gi"), "");
   }
 
   // Convert block tags to readable format
   for (const tag of BLOCK_TAGS) {
-    // Opening + content + closing → just the content
     const regex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "gi");
     text = text.replace(regex, "$1");
   }
@@ -67,12 +109,14 @@ function cleanClaudeOutput(raw: string): string {
   // Strip any remaining XML-like tags that look like Claude internals
   text = text.replace(/<\/?(?:tool-use|tool-result|artifact|antArtifact)[^>]*>/gi, "");
 
-  // Strip raw JSON action blocks that the manager outputs ({"action": "update_task", ...})
-  // These are machine-readable actions, not for human display
-  text = text.replace(/\n?\{[\s\n]*"action"\s*:\s*"[^"]+?"[\s\S]*?\}\n?/g, "");
-
-  // Also strip standalone JSON blocks wrapped in code fences that contain action fields
+  // Strip JSON action blocks in code fences
   text = text.replace(/```(?:json)?\s*\n?\{[\s\n]*"action"\s*:[\s\S]*?\}\n?\s*```/g, "");
+
+  // Strip raw JSON action blocks (brace-depth matching for nested objects)
+  text = stripJsonActionBlocks(text);
+
+  // Strip [Context: ...] blocks injected by the manager chat
+  text = stripContextBlocks(text);
 
   // Clean up excessive whitespace from tag removal
   text = text.replace(/\n{3,}/g, "\n\n");

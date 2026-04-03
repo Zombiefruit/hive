@@ -87,15 +87,21 @@ export function startPolling(): void {
   const cadence = config?.fetchCadence ?? "manual";
   const intervalMs = cadenceToMs(cadence);
 
-  // Initial poll after bridge initializes, then schedule recurring AFTER it completes
+  // Start polling immediately — poll() itself waits for the bridge to be ready.
+  // Broadcast "connecting" state so the UI shows a loading indicator from the start.
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send("notifications:polling-started");
+      win.webContents.send("notifications:polling-progress", { source: "Connecting to tools...", current: 0, total: 2 });
+    }
+  }
   startPollTimeout = setTimeout(async () => {
     await poll();
-    // Start recurring interval only after first poll finishes
     if (intervalMs && !pollInterval) {
       logPoll(`Setting up poll interval: ${cadence} (${intervalMs / 60000}min) — starting after first poll`);
       pollInterval = setInterval(() => poll(), intervalMs);
     }
-  }, 20000);
+  }, 1000);
 
   if (!intervalMs) {
     logPoll("Poll cadence: manual — no auto-polling");
@@ -348,7 +354,13 @@ async function poll(): Promise<void> {
     logPoll("Bridge not ready, waiting up to 60s...");
     const waitStart = Date.now();
     while (!isBridgeReady() && Date.now() - waitStart < 60000) {
-      await new Promise(r => setTimeout(r, 1000));
+      const elapsed = Math.round((Date.now() - waitStart) / 1000);
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", {
+          source: `Connecting to tools... (${elapsed}s)`, current: 0, total: 2,
+        });
+      }
+      await new Promise(r => setTimeout(r, 2000));
     }
     if (!isBridgeReady()) {
       logPoll("Bridge still not ready after 60s — restarting bridge and retrying");
