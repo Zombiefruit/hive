@@ -14,6 +14,7 @@ import { createProject, addTaskToProject, detectProjectFromSource, findProjectBy
 import { judgeTriage } from "../judge-bridge";
 import { parseTriageResponse } from "../../shared/triage-parser";
 import type { TriageVerdict } from "../../shared/judge-types";
+import { emitThought as orchEmitThought } from "../orchestrator";
 
 export interface PollNotification {
   id: string;
@@ -347,7 +348,10 @@ async function poll(): Promise<void> {
 
   // Emit orchestrator thoughts during fetch so the orb shows activity
   const emitThought = (thought: string) => {
-    import("../orchestrator").then(m => m.emitThought(thought)).catch(() => {});
+    try {
+      orchEmitThought(thought);
+      logPoll(`  💭 ${thought}`);
+    } catch {}
   };
 
   emitThought("starting data fetch...");

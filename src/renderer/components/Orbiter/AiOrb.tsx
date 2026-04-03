@@ -427,10 +427,10 @@ const GlowLayers = ({ isEscalation }: { isEscalation: boolean }) => {
 
   return (
     <>
-      <Sphere ref={innerRef} args={[1, 32, 32]}>
+      <Sphere ref={innerRef} args={[1, 32, 32]} renderOrder={-1}>
         <glowRimMaterial ref={innerMaterialRef} />
       </Sphere>
-      <Sphere ref={outerRef} args={[1, 32, 32]}>
+      <Sphere ref={outerRef} args={[1, 32, 32]} renderOrder={-2}>
         <glowRimMaterial ref={outerMaterialRef} />
       </Sphere>
     </>
@@ -444,14 +444,21 @@ interface AiOrbProps {
 }
 
 const AiOrb: React.FC<AiOrbProps> = ({ intensity, isEscalation, size = 120 }) => {
+  // Canvas is 35% larger than the requested size to give room for glow layers.
+  // Negative margins keep it centered at the original size footprint.
+  const canvasSize = Math.round(size * 1.35);
+  const offset = Math.round((canvasSize - size) / 2);
+  const cameraZ = 3.2 * (canvasSize / size);
+
   return (
-    <div style={{ width: size, height: size, pointerEvents: "auto" }}>
-      <Canvas
-        camera={{ position: [0, 0, 3.2], fov: 45 }}
-        gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
-        style={{ background: "transparent", width: "100%", height: "100%" }}
-        dpr={[1, 2]}
-      >
+    <div style={{ width: size, height: size, pointerEvents: "auto", overflow: "visible" }}>
+      <div style={{ width: canvasSize, height: canvasSize, margin: -offset }}>
+        <Canvas
+          camera={{ position: [0, 0, cameraZ], fov: 45 }}
+          gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
+          style={{ background: "transparent", width: "100%", height: "100%" }}
+          dpr={[1, 2]}
+        >
         <ambientLight intensity={0.25} />
         <pointLight position={[2, 2, 4]} intensity={1.4} color="hsl(0, 0%, 100%)" />
         <pointLight position={[-2, -1, 3]} intensity={0.65} color={isEscalation ? "hsl(18, 100%, 62%)" : "hsl(222, 100%, 64%)"} />
@@ -459,6 +466,7 @@ const AiOrb: React.FC<AiOrbProps> = ({ intensity, isEscalation, size = 120 }) =>
         <NebulaShell intensity={intensity} isEscalation={isEscalation} />
         <GlowLayers isEscalation={isEscalation} />
       </Canvas>
+      </div>
     </div>
   );
 };
