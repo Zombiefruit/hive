@@ -98,8 +98,8 @@ function ErrorRecoveryBanner({
     <div
       style={{
         padding: "var(--mantine-spacing-sm) var(--mantine-spacing-md)",
-        borderBottom: "1px solid var(--mantine-color-red-9)",
-        backgroundColor: "color-mix(in srgb, var(--mantine-color-red-9) 15%, transparent)",
+        borderBottom: "1px solid rgba(204, 73, 33, 0.3)",
+        backgroundColor: "rgba(204, 73, 33, 0.1)",
       }}
     >
       <Group gap="sm" align="flex-start" wrap="nowrap">
@@ -209,7 +209,7 @@ export function AgentDetail() {
           gridColumn: "1 / -1",
           padding: "var(--mantine-spacing-sm) var(--mantine-spacing-md)",
           paddingLeft: 80, // Clear macOS traffic lights
-          borderBottom: "1px solid var(--mantine-color-default-border)",
+          borderBottom: "1px solid rgba(68, 73, 85, 0.2)",
           WebkitAppRegion: "drag",
         }}
       >
@@ -257,7 +257,7 @@ export function AgentDetail() {
       {/* Left sidebar: Info + Timeline */}
       <div
         style={{
-          borderRight: "1px solid var(--mantine-color-default-border)",
+          borderRight: "1px solid rgba(68, 73, 85, 0.2)",
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
@@ -321,8 +321,8 @@ export function AgentDetail() {
             gap="xs"
             p="xs"
             style={{
-              borderBottom: "1px solid var(--mantine-color-default-border)",
-              backgroundColor: "var(--mantine-color-default)",
+              borderBottom: "1px solid rgba(68, 73, 85, 0.2)",
+              background: "rgba(16, 21, 32, 0.65)",
             }}
           >
             <IconExternalLink size={14} color="var(--mantine-color-dimmed)" />
@@ -350,7 +350,7 @@ export function AgentDetail() {
       {/* Right panel: Context */}
       <div
         style={{
-          borderLeft: "1px solid var(--mantine-color-default-border)",
+          borderLeft: "1px solid rgba(68, 73, 85, 0.2)",
           overflow: "auto",
         }}
       >

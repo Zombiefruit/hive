@@ -25,11 +25,11 @@ export function ChatBubble({ role, content }: ChatBubbleProps) {
       marginLeft: isUser ? "auto" : 0,
       marginBottom: 8,
       backgroundColor: isUser
-        ? "color-mix(in srgb, var(--mantine-color-blue-5) 15%, transparent)"
-        : "var(--mantine-color-default)",
+        ? "rgba(74, 125, 255, 0.1)"
+        : "rgba(16, 21, 32, 0.65)",
       border: question
-        ? "1px solid color-mix(in srgb, var(--mantine-color-yellow-5) 40%, transparent)"
-        : isUser ? "none" : "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
+        ? "1px solid rgba(255, 170, 51, 0.25)"
+        : isUser ? "none" : "1px solid rgba(68, 73, 85, 0.2)",
     }}>
       <Text size="sm" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
         {content}

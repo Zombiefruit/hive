@@ -15,17 +15,21 @@ export function GlobalLoadingBanner() {
   return (
     <div
       style={{
+        position: "relative",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         padding: "6px 16px",
-        backgroundColor: "color-mix(in srgb, var(--mantine-color-blue-light) 40%, transparent)",
-        borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-blue-4) 20%, transparent)",
+        background: "rgba(74, 125, 255, 0.06)",
+        borderBottom: "1px solid rgba(74, 125, 255, 0.12)",
         flexShrink: 0,
+        overflow: "hidden",
       }}
     >
+      {/* Cosmic strip animation */}
+      <div className="aegen-loading-strip" style={{ position: "absolute", bottom: 0, left: 0, right: 0 }} />
       <Group gap={8}>
-        <Loader size={12} color="var(--mantine-color-blue-5)" />
+        <Loader size={12} color="var(--aegen-cosmic-blue)" />
         <Text size="xs" c="blue.5" fw={500}>
           Refreshing...
         </Text>

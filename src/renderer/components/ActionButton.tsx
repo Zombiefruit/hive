@@ -23,7 +23,7 @@ export function ActionButton({ label, description, onClick, color = "var(--manti
           display: "flex", alignItems: "center", gap: 6,
           backgroundColor: isPrimary ? color : "transparent",
           color: isPrimary ? "var(--mantine-color-white)" : "var(--mantine-color-text)",
-          border: isPrimary ? "none" : "1px solid var(--mantine-color-default-border)",
+          border: isPrimary ? "none" : "1px solid rgba(68, 73, 85, 0.2)",
           opacity: disabled ? 0.5 : 1,
           cursor: disabled ? "not-allowed" : "pointer",
         }}

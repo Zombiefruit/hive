@@ -345,6 +345,13 @@ async function poll(): Promise<void> {
   currentPollCycle++;
   logPoll(`poll starting (cycle ${currentPollCycle})`);
 
+  // Emit orchestrator thoughts during fetch so the orb shows activity
+  const emitThought = (thought: string) => {
+    import("../orchestrator").then(m => m.emitThought(thought)).catch(() => {});
+  };
+
+  emitThought("starting data fetch...");
+
   // Broadcast that polling started so UI shows loading
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send("notifications:polling-started");
@@ -352,6 +359,7 @@ async function poll(): Promise<void> {
 
   if (!isBridgeReady()) {
     logPoll("Bridge not ready, waiting up to 60s...");
+    emitThought("waiting for MCP tools to connect...");
     const waitStart = Date.now();
     while (!isBridgeReady() && Date.now() - waitStart < 60000) {
       const elapsed = Math.round((Date.now() - waitStart) / 1000);
@@ -382,6 +390,7 @@ async function poll(): Promise<void> {
       logPoll("Bridge recovered after restart");
     }
     logPoll("Bridge became ready after waiting");
+    emitThought("connected — fetching from Slack, Linear, Calendar...");
   }
 
   // Don't seed from context refs — only use real triage results
@@ -606,6 +615,7 @@ RULES:
     try {
       rawData = await askBridge(fetchPrompt, fetchTimeout);
       logPoll(`  Fetch complete: ${rawData.length} chars`);
+      emitThought(`fetched ${Math.round(rawData.length / 1000)}K chars — now triaging...`);
       // Log data volume per source for debugging coverage
       const slackLines = (rawData.match(/## SLACK/gi) || []).length;
       const slackMentions = (rawData.match(new RegExp(userSlackId, "g")) || []).length;
@@ -1076,6 +1086,7 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
 
     if (added > 0 || updated > 0) {
       logPoll(`Added ${added} new, updated ${updated} existing`);
+      emitThought(`triage complete — ${added} new tasks, ${updated} updates`);
       saveCacheToFile();
     }
 
@@ -1403,6 +1414,7 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
     if (triageVerdict) {
       lastTriageVerdict = triageVerdict;
       logPoll(`Triage judge: ${triageVerdict.status} (confidence ${triageVerdict.confidence}/10, ${triageVerdict.durationMs}ms)`);
+      emitThought(`judge reviewed triage: ${triageVerdict.status} (${triageVerdict.confidence}/10)`);
 
       // Apply priority corrections
       for (const correction of triageVerdict.priorityCorrections) {

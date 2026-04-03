@@ -27,8 +27,9 @@ function InsightCard({ insight, onAcknowledge, onDismiss, onConvert }: {
   return (
     <div style={{
       padding: "14px 16px", borderRadius: 10, marginBottom: 10,
-      backgroundColor: "var(--mantine-color-default)",
-      border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
+      background: "rgba(16, 21, 32, 0.65)",
+      backdropFilter: "blur(16px) saturate(1.2)",
+      border: "1px solid rgba(68, 73, 85, 0.2)",
     }}>
       <Group gap={8} mb={6} wrap="nowrap">
         <Badge size="xs" variant="light" color={config.color} leftSection={<config.Icon size={10} />}>
@@ -133,7 +134,7 @@ export default function InsightsPage() {
   const filterTypes = Object.entries(TYPE_CONFIG);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--aegen-void)" }}>
       <AppHeader rightContent={
         <UnstyledButton
           onClick={handleRefresh}
@@ -155,8 +156,8 @@ export default function InsightsPage() {
             onClick={() => setFilter(null)}
             style={{
               padding: "4px 10px", borderRadius: 6, fontSize: "0.7rem", fontWeight: 500,
-              backgroundColor: !filter ? "var(--mantine-color-default-hover)" : "transparent",
-              color: !filter ? "var(--mantine-color-text)" : "var(--mantine-color-dimmed)",
+              backgroundColor: !filter ? "rgba(74, 125, 255, 0.08)" : "transparent",
+              color: !filter ? "var(--aegen-star-white)" : "var(--aegen-dust-gray)",
             }}
           >
             All ({filtered.length})
@@ -169,8 +170,8 @@ export default function InsightsPage() {
                 onClick={() => setFilter(filter === key ? null : key)}
                 style={{
                   padding: "4px 10px", borderRadius: 6, fontSize: "0.7rem", fontWeight: 500,
-                  backgroundColor: filter === key ? "var(--mantine-color-default-hover)" : "transparent",
-                  color: filter === key ? "var(--mantine-color-text)" : "var(--mantine-color-dimmed)",
+                  backgroundColor: filter === key ? "rgba(74, 125, 255, 0.08)" : "transparent",
+                  color: filter === key ? "var(--aegen-star-white)" : "var(--aegen-dust-gray)",
                 }}
               >
                 {cfg.label} ({count})
@@ -182,7 +183,7 @@ export default function InsightsPage() {
         {/* Empty state */}
         {filtered.length === 0 && !localLoading && (
           <Stack align="center" py="xl" gap="sm">
-            <IconBulb size={32} color="var(--mantine-color-dimmed)" />
+            <IconBulb size={32} color="var(--aegen-dust-gray)" />
             <Text size="sm" c="dimmed">No insights yet.</Text>
             <Text size="xs" c="dimmed">Click Refresh to scan your Slack channels, Gong calls, and Linear for proactive ideas.</Text>
           </Stack>

@@ -159,8 +159,9 @@ export function AgentTab({
             return (
               <div key={i} style={{
                 padding: "10px 14px", borderRadius: 8, marginBottom: 8,
-                backgroundColor: "var(--mantine-color-default)",
-                border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
+                background: "rgba(16, 21, 32, 0.65)",
+                backdropFilter: "blur(16px) saturate(1.2)",
+                border: "1px solid rgba(68, 73, 85, 0.2)",
               }}>
                 <Markdown content={tldr} />
                 {details && (
@@ -180,10 +181,11 @@ export function AgentTab({
           return (
             <div key={i} style={{
               padding: "10px 14px", borderRadius: 8, marginBottom: 8,
-              backgroundColor: "var(--mantine-color-default)",
+              background: "rgba(16, 21, 32, 0.65)",
+              backdropFilter: "blur(16px) saturate(1.2)",
               border: isQuestion(content)
-                ? "1px solid color-mix(in srgb, var(--mantine-color-yellow-5) 40%, transparent)"
-                : "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
+                ? "1px solid rgba(255, 170, 51, 0.25)"
+                : "1px solid rgba(68, 73, 85, 0.2)",
             }}>
               <Markdown content={content} />
             </div>
@@ -208,7 +210,7 @@ export function AgentTab({
 
       {/* Zone 3: Activity log (collapsible) */}
       {activity.length > 0 && (
-        <div style={{ borderTop: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)" }}>
+        <div style={{ borderTop: "1px solid rgba(68, 73, 85, 0.2)" }}>
           <UnstyledButton
             onClick={() => setShowActivity(!showActivity)}
             aria-label={showActivity ? "Collapse activity" : "Expand activity"}
@@ -253,7 +255,7 @@ export function AgentTab({
       {/* Zone 4: Sticky input */}
       <div style={{
         padding: "10px 20px",
-        borderTop: "1px solid var(--mantine-color-default-border)",
+        borderTop: "1px solid rgba(68, 73, 85, 0.2)",
         flexShrink: 0,
       }}>
         <Group gap="xs">
@@ -266,9 +268,9 @@ export function AgentTab({
             disabled={inputDisabled || loading}
             style={{
               flex: 1, padding: "8px 12px", borderRadius: 6, fontSize: "0.8rem",
-              backgroundColor: "var(--mantine-color-default-hover)",
-              border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
-              color: "var(--mantine-color-text)", outline: "none",
+              backgroundColor: "rgba(16, 21, 32, 0.7)",
+              border: "1px solid rgba(68, 73, 85, 0.3)",
+              color: "var(--aegen-star-white)", outline: "none",
               fontFamily: "inherit",
               opacity: inputDisabled ? 0.5 : 1,
             }}
@@ -279,7 +281,7 @@ export function AgentTab({
             aria-label="Send message"
             style={{
               padding: "8px", borderRadius: 6,
-              backgroundColor: feedback.trim() && !inputDisabled ? "var(--mantine-color-blue-5)" : "var(--mantine-color-default-hover)",
+              backgroundColor: feedback.trim() && !inputDisabled ? "var(--aegen-cosmic-blue)" : "rgba(16, 21, 32, 0.7)",
               color: feedback.trim() && !inputDisabled ? "white" : "var(--mantine-color-dimmed)",
             }}
           >

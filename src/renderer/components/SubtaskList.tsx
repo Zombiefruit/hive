@@ -36,7 +36,7 @@ export function SubtaskList({ subtasks, onSelect }: SubtaskListProps) {
             borderRadius: 2,
             overflow: "hidden",
             flex: 1,
-            backgroundColor: "var(--mantine-color-default-hover)",
+            backgroundColor: "rgba(74, 125, 255, 0.08)",
           }}
         >
           <div
@@ -71,7 +71,7 @@ export function SubtaskList({ subtasks, onSelect }: SubtaskListProps) {
               width: "100%",
               transition: "background-color 0.1s ease",
             }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.backgroundColor = "var(--mantine-color-default-hover)"; }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.backgroundColor = "rgba(74, 125, 255, 0.08)"; }}
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.backgroundColor = "transparent"; }}
           >
             <Tooltip label={meta.label} withArrow position="left" fz="xs">

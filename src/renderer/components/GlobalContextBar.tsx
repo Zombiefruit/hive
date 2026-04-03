@@ -65,15 +65,15 @@ export function GlobalContextBar() {
     <div
       style={{
         borderRadius: 8,
-        border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
-        backgroundColor: "var(--mantine-color-default)",
+        border: "1px solid rgba(68, 73, 85, 0.3)",
+        background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
         overflow: "hidden",
       }}
     >
       <Group
         gap="xs"
         p="sm"
-        style={{ borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)" }}
+        style={{ borderBottom: "1px solid rgba(68, 73, 85, 0.2)" }}
       >
         <div>
           <Text size="sm" fw={600}>Active Context</Text>
@@ -99,7 +99,7 @@ export function GlobalContextBar() {
                     gap: 8,
                     width: "100%",
                     padding: "8px 12px",
-                    borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 20%, transparent)",
+                    borderBottom: "1px solid rgba(68, 73, 85, 0.12)",
                   }}
                 >
                   {isOpen ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />}

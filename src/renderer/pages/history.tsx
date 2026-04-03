@@ -42,7 +42,7 @@ export function History() {
   }, []);
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "var(--mantine-color-body)" }}>
+    <div style={{ minHeight: "100vh", background: "var(--aegen-void)" }}>
       <div style={{ position: "sticky", top: 0, zIndex: 10 }}>
         <AppHeader
           rightContent={
@@ -71,27 +71,28 @@ export function History() {
                   gap: 12,
                   padding: "12px 16px",
                   borderRadius: 8,
-                  border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
-                  backgroundColor: "var(--mantine-color-default)",
+                  border: "1px solid rgba(68, 73, 85, 0.2)",
+                  background: "rgba(16, 21, 32, 0.65)",
+                  backdropFilter: "blur(16px) saturate(1.2)",
                   transition: "border-color 0.1s ease",
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--mantine-color-default-border)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)"; }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(74, 125, 255, 0.2)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(68, 73, 85, 0.2)"; }}
               >
-                <IconFileText size={16} color="var(--mantine-color-dimmed)" style={{ marginTop: 2, flexShrink: 0 }} />
+                <IconFileText size={16} color="var(--aegen-dust-gray)" style={{ marginTop: 2, flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <Text size="sm" fw={500} lineClamp={1}>
                     {session.firstPrompt}
                   </Text>
                   <Group gap="md" mt={4}>
                     <Group gap={4}>
-                      <IconTerminal2 size={11} color="var(--mantine-color-dimmed)" />
+                      <IconTerminal2 size={11} color="var(--aegen-dust-gray)" />
                       <Text size="xs" c="dimmed" ff="monospace">
                         {session.cwd.replace(/^\/Users\/\w+\//, "~/")}
                       </Text>
                     </Group>
                     <Group gap={4}>
-                      <IconClock size={11} color="var(--mantine-color-dimmed)" />
+                      <IconClock size={11} color="var(--aegen-dust-gray)" />
                       <Text size="xs" c="dimmed">{formatAge(session.lastModified)}</Text>
                     </Group>
                     <Text size="xs" c="dimmed">{session.messageCount}+ messages</Text>

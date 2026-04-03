@@ -18,8 +18,8 @@ interface ThoughtSlot {
   attachAngle: number;
 }
 
-const CONTAINER_WIDTH = 440;
-const CONTAINER_HEIGHT = 390;
+const CONTAINER_WIDTH = 500;
+const CONTAINER_HEIGHT = 420;
 const ORB_SIZE = 110;
 const ORB_RADIUS = ORB_SIZE / 2;
 const ORB_CENTER_X = CONTAINER_WIDTH - ORB_RADIUS;

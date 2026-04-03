@@ -77,10 +77,10 @@ export function StartWorkModal({
       centered
       overlayProps={{ backgroundOpacity: 0.4, blur: 4 }}
       styles={{
-        content: { backgroundColor: "var(--mantine-color-default)" },
+        content: { background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)" },
         header: {
-          backgroundColor: "var(--mantine-color-default)",
-          borderBottom: "1px solid var(--mantine-color-default-hover)",
+          background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
+          borderBottom: "1px solid rgba(74, 125, 255, 0.08)",
         },
       }}
     >
@@ -115,8 +115,8 @@ export function StartWorkModal({
           searchable
           required
           styles={{
-            input: { backgroundColor: "var(--mantine-color-default-hover)" },
-            dropdown: { backgroundColor: "var(--mantine-color-default-hover)" },
+            input: { backgroundColor: "rgba(74, 125, 255, 0.08)" },
+            dropdown: { backgroundColor: "rgba(74, 125, 255, 0.08)" },
           }}
         />
 
@@ -128,7 +128,7 @@ export function StartWorkModal({
           placeholder="username/ticket-description"
           styles={{
             input: {
-              backgroundColor: "var(--mantine-color-default-hover)",
+              backgroundColor: "rgba(74, 125, 255, 0.08)",
               fontFamily: "var(--mantine-font-family-monospace)",
               fontSize: "0.85rem",
             },

@@ -8,7 +8,7 @@ import type { BusinessContext } from "../../shared/business-context-types";
 
 function StatCard({ label, value, color }: { label: string; value: number | string; color: string }) {
   return (
-    <Paper p="sm" radius="md" style={{ border: `1px solid color-mix(in srgb, var(--mantine-color-${color}-5) 20%, transparent)` }}>
+    <Paper p="sm" radius="md" style={{ background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)", border: `1px solid rgba(68, 73, 85, 0.2)` }}>
       <Text size="xl" fw={700} c={`${color}.5`}>{value}</Text>
       <Text size="xs" c="dimmed">{label}</Text>
     </Paper>
@@ -66,7 +66,7 @@ export default function BusinessContextPage() {
   const statusColor = (s: string) => s === "active" || s === "in-flight" ? "green" : s === "shipped" || s === "completed" ? "blue" : "gray";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--aegen-void)" }}>
       <AppHeader rightContent={
         <Button size="xs" variant="filled" color="blue"
           leftSection={localRefreshing ? <Loader size={12} color="white" /> : <IconRefresh size={14} />}
@@ -80,7 +80,7 @@ export default function BusinessContextPage() {
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", paddingTop: 8 }}>
         {!context && !raw && !localRefreshing && (
           <Stack align="center" py="xl" gap="sm">
-            <IconBuilding size={32} color="var(--mantine-color-dimmed)" />
+            <IconBuilding size={32} color="var(--aegen-dust-gray)" />
             <Text size="sm" c="dimmed">No business context yet.</Text>
             <Text size="xs" c="dimmed">Click Generate to scan your workspace.</Text>
           </Stack>

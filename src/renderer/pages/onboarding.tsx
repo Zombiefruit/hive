@@ -281,7 +281,7 @@ export function Onboarding() {
         height: "100vh",
         display: "flex",
         flexDirection: "column",
-        backgroundColor: "var(--mantine-color-body)",
+        background: "var(--aegen-void)",
       }}
     >
       {/* Header with drag region */}
@@ -291,10 +291,8 @@ export function Onboarding() {
           alignItems: "center",
           padding: "8px 24px",
           paddingLeft: 90,
-          borderBottom:
-            "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-          backgroundColor:
-            "color-mix(in srgb, var(--mantine-color-body) 80%, transparent)",
+          borderBottom: "1px solid rgba(68, 73, 85, 0.2)",
+          background: "rgba(16, 21, 32, 0.8)",
           backdropFilter: "blur(8px)",
           WebkitAppRegion: "drag",
           flexShrink: 0,
@@ -341,7 +339,7 @@ export function Onboarding() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                borderColor: "var(--mantine-color-default-border)",
+                borderColor: "rgba(68, 73, 85, 0.3)",
               },
             }}
           >
@@ -501,7 +499,7 @@ export function Onboarding() {
                           border: `1px solid ${
                             selected
                               ? "var(--mantine-color-blue-7)"
-                              : "color-mix(in srgb, var(--mantine-color-default-border) 50%, transparent)"
+                              : "rgba(68, 73, 85, 0.25)"
                           }`,
                           backgroundColor: selected
                             ? "var(--mantine-color-blue-light)"
@@ -517,7 +515,7 @@ export function Onboarding() {
                             border: `2px solid ${
                               selected
                                 ? "var(--mantine-color-blue-5)"
-                                : "var(--mantine-color-default-border)"
+                                : "rgba(68, 73, 85, 0.2)"
                             }`,
                             backgroundColor: selected
                               ? "var(--mantine-color-blue-5)"
@@ -615,7 +613,7 @@ export function Onboarding() {
                         border: `1px solid ${
                           integrations[key]
                             ? "var(--mantine-color-blue-7)"
-                            : "color-mix(in srgb, var(--mantine-color-default-border) 50%, transparent)"
+                            : "rgba(68, 73, 85, 0.25)"
                         }`,
                         backgroundColor: integrations[key]
                           ? "var(--mantine-color-blue-light)"
@@ -694,9 +692,9 @@ export function Onboarding() {
                     padding: "12px 16px",
                     borderRadius: 8,
                     backgroundColor:
-                      "color-mix(in srgb, var(--mantine-color-default-hover) 60%, transparent)",
+                      "rgba(74, 125, 255, 0.06)",
                     border:
-                      "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
+                      "1px solid rgba(68, 73, 85, 0.2)",
                   }}
                 >
                   <Text size="xs" c="dimmed">

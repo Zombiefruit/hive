@@ -80,7 +80,7 @@ export function Debug() {
   }, []);
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "var(--mantine-color-body)" }}>
+    <div style={{ minHeight: "100vh", background: "var(--aegen-void)" }}>
       <div
         style={{
           position: "sticky",
@@ -91,9 +91,9 @@ export function Debug() {
           padding: "8px 24px",
           paddingLeft: 80,
           gap: 12,
-          borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-          backgroundColor: "color-mix(in srgb, var(--mantine-color-body) 80%, transparent)",
-          backdropFilter: "blur(8px)",
+          borderBottom: "1px solid rgba(68, 73, 85, 0.2)",
+          background: "rgba(16, 21, 32, 0.8)",
+          backdropFilter: "blur(16px) saturate(1.2)",
           WebkitAppRegion: "drag",
         }}
       >
@@ -189,8 +189,8 @@ export function Debug() {
                 style={{
                   padding: "8px 12px",
                   borderRadius: 6,
-                  backgroundColor: entry.direction === "in" ? "color-mix(in srgb, var(--mantine-color-blue-5) 10%, transparent)" : "var(--mantine-color-default)",
-                  border: `1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)`,
+                  background: entry.direction === "in" ? "rgba(74, 125, 255, 0.08)" : "rgba(16, 21, 32, 0.65)",
+                  border: "1px solid rgba(68, 73, 85, 0.2)",
                 }}
               >
                 <Group gap="xs" mb={4}>

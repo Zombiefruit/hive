@@ -89,17 +89,17 @@ export function ContextPicker({ onSelect, onClose }: ContextPickerProps) {
     <div style={{
       position: "fixed", inset: 0, zIndex: 200,
       display: "flex", alignItems: "center", justifyContent: "center",
-      backgroundColor: "color-mix(in srgb, var(--mantine-color-body) 50%, transparent)", backdropFilter: "blur(4px)",
+      backgroundColor: "rgba(5, 8, 16, 0.5)", backdropFilter: "blur(4px)",
     }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{
         width: 520, maxHeight: "70vh", display: "flex", flexDirection: "column",
         borderRadius: 12, overflow: "hidden",
-        backgroundColor: "var(--mantine-color-default)",
-        border: "1px solid var(--mantine-color-default-border)",
-        boxShadow: "0 16px 48px color-mix(in srgb, var(--mantine-color-body) 60%, transparent)",
+        background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
+        border: "1px solid rgba(68, 73, 85, 0.2)",
+        boxShadow: "0 16px 48px rgba(5, 8, 16, 0.6)",
       }}>
         {/* Header with tabs */}
-        <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--mantine-color-default-border)" }}>
+        <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(68, 73, 85, 0.2)" }}>
           <Group justify="space-between" mb={10}>
             <Text size="sm" fw={600}>Add Context</Text>
             <UnstyledButton onClick={onClose}><IconX size={16} color="var(--mantine-color-dimmed)" /></UnstyledButton>
@@ -112,7 +112,7 @@ export function ContextPicker({ onSelect, onClose }: ContextPickerProps) {
                 style={{
                   padding: "4px 12px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 500,
                   display: "flex", alignItems: "center", gap: 6,
-                  backgroundColor: activeTab === c.key ? "var(--mantine-color-default-hover)" : "transparent",
+                  backgroundColor: activeTab === c.key ? "rgba(74, 125, 255, 0.08)" : "transparent",
                   color: activeTab === c.key ? "var(--mantine-color-text)" : "var(--mantine-color-dimmed)",
                 }}
               >
@@ -124,8 +124,8 @@ export function ContextPicker({ onSelect, onClose }: ContextPickerProps) {
         </div>
 
         {/* Search input */}
-        <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--mantine-color-default-border)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 6, backgroundColor: "var(--mantine-color-default-hover)" }}>
+        <div style={{ padding: "8px 16px", borderBottom: "1px solid rgba(68, 73, 85, 0.2)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 6, backgroundColor: "rgba(74, 125, 255, 0.08)" }}>
             <IconSearch size={14} color="var(--mantine-color-dimmed)" />
             <input
               type="text"
@@ -159,7 +159,7 @@ export function ContextPicker({ onSelect, onClose }: ContextPickerProps) {
                 style={{
                   display: "flex", alignItems: "center", gap: 10,
                   padding: "8px 10px", borderRadius: 6,
-                  backgroundColor: selected.has(r.id) ? `color-mix(in srgb, ${connector.color} 15%, transparent)` : "var(--mantine-color-default-hover)",
+                  backgroundColor: selected.has(r.id) ? `color-mix(in srgb, ${connector.color} 15%, transparent)` : "rgba(74, 125, 255, 0.08)",
                   border: `1px solid ${selected.has(r.id) ? connector.color : "transparent"}`,
                 }}
               >
@@ -183,7 +183,7 @@ export function ContextPicker({ onSelect, onClose }: ContextPickerProps) {
 
         {/* Footer */}
         {selected.size > 0 && (
-          <div style={{ padding: "10px 16px", borderTop: "1px solid var(--mantine-color-default-border)" }}>
+          <div style={{ padding: "10px 16px", borderTop: "1px solid rgba(68, 73, 85, 0.2)" }}>
             <Group justify="space-between">
               <Text size="xs" c="dimmed">{selected.size} selected</Text>
               <UnstyledButton onClick={handleAttach} style={{

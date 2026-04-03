@@ -63,8 +63,8 @@ function RecentHistory() {
               style={{
                 padding: "10px 14px",
                 borderRadius: 8,
-                border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-                backgroundColor: "var(--mantine-color-default)",
+                border: "1px solid rgba(68, 73, 85, 0.2)",
+                background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
                 opacity: 0.7,
               }}
             >
@@ -116,7 +116,7 @@ export function Dashboard() {
       <div
         style={{
           minHeight: "100vh",
-          backgroundColor: "var(--mantine-color-body)",
+          background: "var(--aegen-void)",
           overflowY: "auto",
         }}
       >
@@ -190,8 +190,8 @@ export function Dashboard() {
                   padding: 48,
                   textAlign: "center",
                   borderRadius: 8,
-                  border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
-                  backgroundColor: "var(--mantine-color-default)",
+                  border: "1px solid rgba(68, 73, 85, 0.3)",
+                  background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
                 }}
               >
                 <ThemeIcon variant="light" color="gray" size="xl" radius="xl" mx="auto" mb="sm">
@@ -219,15 +219,15 @@ export function Dashboard() {
             <div
               style={{
                 borderRadius: 8,
-                border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
-                backgroundColor: "var(--mantine-color-default)",
+                border: "1px solid rgba(68, 73, 85, 0.3)",
+                background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
                 overflow: "hidden",
               }}
             >
               <Group
                 justify="space-between"
                 p="sm"
-                style={{ borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)" }}
+                style={{ borderBottom: "1px solid rgba(68, 73, 85, 0.2)" }}
               >
                 <Group gap="xs">
                   <IconShieldCheck size={14} stroke={1.5} />
@@ -254,14 +254,14 @@ export function Dashboard() {
             <div
               style={{
                 borderRadius: 8,
-                border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
-                backgroundColor: "var(--mantine-color-default)",
+                border: "1px solid rgba(68, 73, 85, 0.3)",
+                background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
                 overflow: "hidden",
               }}
             >
               <Group
                 p="sm"
-                style={{ borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)" }}
+                style={{ borderBottom: "1px solid rgba(68, 73, 85, 0.2)" }}
               >
                 <IconActivity size={14} stroke={1.5} />
                 <Text size="sm" fw={600}>Activity</Text>

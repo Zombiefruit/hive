@@ -34,8 +34,8 @@ export function RepoDetectionBanner({ repoPath, branch, source, onChangeRepo }: 
     <div style={{
       padding: "8px 14px",
       borderRadius: 8,
-      backgroundColor: "color-mix(in srgb, var(--mantine-color-green-5) 8%, transparent)",
-      border: "1px solid color-mix(in srgb, var(--mantine-color-green-5) 25%, transparent)",
+      backgroundColor: "rgba(38, 191, 126, 0.06)",
+      border: "1px solid rgba(38, 191, 126, 0.15)",
       marginBottom: 8,
     }}>
       <Group justify="space-between" wrap="nowrap">

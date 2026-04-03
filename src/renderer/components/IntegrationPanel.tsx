@@ -17,14 +17,14 @@ export function IntegrationPanel() {
     <div
       style={{
         borderRadius: 8,
-        border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
-        backgroundColor: "var(--mantine-color-default)",
+        border: "1px solid rgba(68, 73, 85, 0.3)",
+        background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
         overflow: "hidden",
       }}
     >
       <Group
         p="sm"
-        style={{ borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)" }}
+        style={{ borderBottom: "1px solid rgba(68, 73, 85, 0.2)" }}
       >
         <Text size="sm" fw={600}>Connectors</Text>
         <Text size="xs" c="dimmed">via Claude Code MCP</Text>
@@ -39,7 +39,7 @@ export function IntegrationPanel() {
               gap: 10,
               padding: "8px 12px",
               borderBottom: i < integrations.length - 1
-                ? "1px solid color-mix(in srgb, var(--mantine-color-default-border) 20%, transparent)"
+                ? "1px solid rgba(68, 73, 85, 0.12)"
                 : undefined,
             }}
           >

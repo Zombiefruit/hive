@@ -109,7 +109,7 @@ export function ReviewView({ review, onFixSelected, onPostToPR }: ReviewViewProp
               {finding.suggestion && (
                 <div style={{
                   padding: "6px 10px", borderRadius: 4, marginTop: 4,
-                  backgroundColor: "var(--mantine-color-default-hover)",
+                  backgroundColor: "rgba(74, 125, 255, 0.08)",
                   borderLeft: `3px solid ${config.color}`,
                   fontSize: "0.7rem",
                 }}>
@@ -130,7 +130,7 @@ export function ReviewView({ review, onFixSelected, onPostToPR }: ReviewViewProp
               onClick={() => onFixSelected(Array.from(selectedIds))}
               style={{
                 padding: "8px 16px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 600,
-                backgroundColor: selectedIds.size > 0 ? "var(--mantine-color-blue-filled)" : "var(--mantine-color-default-hover)",
+                backgroundColor: selectedIds.size > 0 ? "var(--mantine-color-blue-filled)" : "rgba(74, 125, 255, 0.08)",
                 color: selectedIds.size > 0 ? "var(--mantine-color-white)" : "var(--mantine-color-text)", display: "flex", alignItems: "center", gap: 6,
                 opacity: selectedIds.size > 0 ? 1 : 0.5,
               }}
@@ -142,7 +142,7 @@ export function ReviewView({ review, onFixSelected, onPostToPR }: ReviewViewProp
           {onPostToPR && (
             <UnstyledButton onClick={onPostToPR} style={{
               padding: "8px 16px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500,
-              border: "1px solid var(--mantine-color-default-border)", color: "var(--mantine-color-text)",
+              border: "1px solid rgba(68, 73, 85, 0.2)", color: "var(--mantine-color-text)",
               display: "flex", alignItems: "center", gap: 6,
             }}>
               <IconMessageCircle size={14} /> Post to PR

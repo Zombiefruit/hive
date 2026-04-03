@@ -52,9 +52,9 @@ export function AppHeader({ rightContent }: AppHeaderProps) {
         paddingLeft: isFullscreen ? TITLEBAR_PADDING_LEFT_FULLSCREEN : TITLEBAR_PADDING_LEFT,
         transition: "padding-left 0.2s ease",
         gap: 12,
-        borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-        backgroundColor: "color-mix(in srgb, var(--mantine-color-body) 80%, transparent)",
-        backdropFilter: "blur(8px)",
+        borderBottom: "1px solid rgba(68, 73, 85, 0.2)",
+        background: "rgba(16, 21, 32, 0.8)",
+        backdropFilter: "blur(16px) saturate(1.2)",
         WebkitAppRegion: "drag",
         flexShrink: 0,
       }}
@@ -76,8 +76,9 @@ export function AppHeader({ rightContent }: AppHeaderProps) {
                 borderRadius: 6,
                 fontSize: "0.8rem",
                 fontWeight: 500,
-                backgroundColor: isActive ? "var(--mantine-color-default-hover)" : "transparent",
-                color: isActive ? "var(--mantine-color-text)" : "var(--mantine-color-dimmed)",
+                backgroundColor: isActive ? "rgba(74, 125, 255, 0.08)" : "transparent",
+                color: isActive ? "var(--aegen-star-white)" : "var(--aegen-dust-gray)",
+                boxShadow: isActive ? "0 0 12px rgba(74, 125, 255, 0.15)" : "none",
               }}
             >
               {tab.label}
@@ -95,7 +96,7 @@ export function AppHeader({ rightContent }: AppHeaderProps) {
             disabled={refreshing}
             style={{
               padding: 4, borderRadius: 4,
-              color: refreshing ? "var(--mantine-color-blue-4)" : "var(--mantine-color-dimmed)",
+              color: refreshing ? "var(--aegen-cosmic-blue)" : "var(--aegen-dust-gray)",
             }}
           >
             {refreshing ? <Loader size={14} /> : <IconRefresh size={16} />}
@@ -104,7 +105,7 @@ export function AppHeader({ rightContent }: AppHeaderProps) {
         {/* Dark mode only — no theme toggle */}
         <UnstyledButton
           onClick={() => navigate("/settings")}
-          style={{ padding: 4, borderRadius: 4, color: location.pathname === "/settings" ? "var(--mantine-color-blue-4)" : "var(--mantine-color-dimmed)" }}
+          style={{ padding: 4, borderRadius: 4, color: location.pathname === "/settings" ? "var(--aegen-cosmic-blue)" : "var(--aegen-dust-gray)" }}
         >
           <IconSettings size={16} />
         </UnstyledButton>

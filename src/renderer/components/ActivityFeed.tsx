@@ -48,7 +48,7 @@ export function ActivityFeed() {
             py="xs"
             style={{
               borderBottom: i < events.length - 1
-                ? "1px solid color-mix(in srgb, var(--mantine-color-default-border) 20%, transparent)"
+                ? "1px solid rgba(68, 73, 85, 0.12)"
                 : undefined,
             }}
           >

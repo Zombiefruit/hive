@@ -426,7 +426,7 @@ export function Notifications() {
   [notifications]);
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--mantine-color-body)" }}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--aegen-void)" }}>
       <style>{`
         .notif-card:hover .drag-handle { opacity: 1 !important; }
         .notif-action-btn { transition: filter 0.15s ease; }
@@ -442,7 +442,7 @@ export function Notifications() {
           <>
             <Text size="xs" c="dimmed">{notifications.filter(n => n.stage !== "skipped").length} items</Text>
             {!pollStatus.fetching && notifications.some(n => n.pollCycle && (!seenCycle.has(n.id) || (seenCycle.get(n.id) ?? 0) < n.pollCycle)) && (
-              <UnstyledButton onClick={markAllSeen} aria-label="Mark all as read" style={{ fontSize: "0.6rem", color: "var(--mantine-color-blue-4)", padding: "2px 6px", borderRadius: 4, backgroundColor: "color-mix(in srgb, var(--mantine-color-blue-9) 15%, transparent)" }}>
+              <UnstyledButton onClick={markAllSeen} aria-label="Mark all as read" style={{ fontSize: "0.6rem", color: "var(--mantine-color-blue-4)", padding: "2px 6px", borderRadius: 4, backgroundColor: "rgba(74, 125, 255, 0.1)" }}>
                 Mark all read
               </UnstyledButton>
             )}
@@ -534,7 +534,7 @@ export function Notifications() {
                         {items.length === 0 && (
                           <div style={{
                             padding: 16, borderRadius: 6, textAlign: "center",
-                            border: "1px dashed color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
+                            border: "1px dashed rgba(68, 73, 85, 0.2)",
                           }}>
                             <Text size="xs" c="dimmed">{isOver ? "Drop here" : "Empty"}</Text>
                           </div>
@@ -562,9 +562,9 @@ export function Notifications() {
                                 padding: "10px 12px", borderRadius: 6, cursor: "grab", userSelect: "none",
                                 border: `1px solid ${
                                   n.id === selectedId ? "var(--mantine-color-blue-5)"
-                                  : "color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)"
+                                  : "rgba(68, 73, 85, 0.2)"
                                 }`,
-                                backgroundColor: (n.stage === "done" || n.stage === "backlog") ? "var(--mantine-color-body)" : "var(--mantine-color-default)",
+                                background: (n.stage === "done" || n.stage === "backlog") ? "var(--aegen-void)" : "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
                                 opacity: isDragging ? 0.4 : (n.stage === "done" || n.stage === "backlog") ? 0.5 : 1,
                                 transition: "opacity 0.15s ease, background-color 0.15s ease",
                               }}
@@ -749,7 +749,7 @@ export function Notifications() {
                     }}>
                       <Stack gap={6}>
                         {items.length === 0 && (
-                          <div style={{ padding: 12, borderRadius: 6, textAlign: "center", border: "1px dashed color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)" }}>
+                          <div style={{ padding: 12, borderRadius: 6, textAlign: "center", border: "1px dashed rgba(68, 73, 85, 0.2)" }}>
                             <Text size="xs" c="dimmed">{isOver ? "Drop here" : "Empty"}</Text>
                           </div>
                         )}
@@ -771,8 +771,8 @@ export function Notifications() {
                               className="notif-card"
                               style={{
                                 padding: "10px 12px", borderRadius: 6, cursor: "grab", userSelect: "none",
-                                border: `1px solid ${n.id === selectedId ? "var(--mantine-color-blue-5)" : "color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)"}`,
-                                backgroundColor: (n.stage === "done" || n.stage === "backlog") ? "var(--mantine-color-body)" : "var(--mantine-color-default)",
+                                border: `1px solid ${n.id === selectedId ? "var(--mantine-color-blue-5)" : "rgba(68, 73, 85, 0.2)"}`,
+                                background: (n.stage === "done" || n.stage === "backlog") ? "var(--aegen-void)" : "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
                                 opacity: draggingId === n.id ? 0.4 : (n.stage === "done" || n.stage === "backlog") ? 0.5 : 1,
                               }}
                             >
@@ -875,8 +875,8 @@ export function Notifications() {
                           onClick={() => setSelectedId(n.id === selectedId ? null : n.id)}
                           style={{
                             padding: "6px 10px", borderRadius: 6, cursor: "grab",
-                            border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
-                            backgroundColor: "var(--mantine-color-body)",
+                            border: "1px solid rgba(68, 73, 85, 0.2)",
+                            background: "var(--aegen-void)",
                             opacity: 0.6, maxWidth: 250,
                           }}
                         >
@@ -907,8 +907,8 @@ export function Notifications() {
               position: "fixed", top: 42, right: 0, bottom: 0,
               width: 520, maxWidth: "60vw",
               zIndex: 100,
-              backgroundColor: "var(--mantine-color-body)",
-              borderLeft: "1px solid var(--mantine-color-default-border)",
+              background: "var(--aegen-void)",
+              borderLeft: "1px solid rgba(68, 73, 85, 0.2)",
               boxShadow: "-4px 0 20px rgba(0,0,0,0.3)",
               animation: "slideInRight 0.2s ease-out",
             }}
@@ -932,12 +932,12 @@ export function Notifications() {
       {showDebug && (
         <div style={{
           position: "fixed", top: 42, right: 0, bottom: 0, width: 400,
-          backgroundColor: "var(--mantine-color-body)",
-          borderLeft: "1px solid var(--mantine-color-default-border)",
+          background: "var(--aegen-void)",
+          borderLeft: "1px solid rgba(68, 73, 85, 0.2)",
           zIndex: 50, display: "flex", flexDirection: "column",
           fontSize: "0.7rem", fontFamily: "var(--mantine-font-family-monospace)",
         }}>
-          <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--mantine-color-default-border)", flexShrink: 0 }}>
+          <div style={{ padding: "8px 12px", borderBottom: "1px solid rgba(68, 73, 85, 0.2)", flexShrink: 0 }}>
             <Group justify="space-between">
               <Text size="xs" fw={600}>Bridge Activity</Text>
               <Text size="xs" c="dimmed">{debugEntries.length} entries</Text>
@@ -955,8 +955,8 @@ export function Notifications() {
                 <div key={i} style={{
                   padding: "4px 8px", marginBottom: 4, borderRadius: 4,
                   backgroundColor: entry.direction === "in"
-                    ? "color-mix(in srgb, var(--mantine-color-blue-5) 10%, transparent)"
-                    : "var(--mantine-color-default)",
+                    ? "rgba(74, 125, 255, 0.08)"
+                    : "rgba(16, 21, 32, 0.65)",
                   borderLeft: `2px solid ${entry.direction === "in" ? "var(--mantine-color-blue-5)" : "var(--mantine-color-green-5)"}`,
                 }}>
                   <Group gap={4} mb={2}>

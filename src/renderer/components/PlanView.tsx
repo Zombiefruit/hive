@@ -95,7 +95,7 @@ export function PlanView({ plan, onStartHack, onReviewPlan }: PlanViewProps) {
                 marginTop: 6,
                 padding: "8px 12px",
                 borderRadius: 6,
-                backgroundColor: "var(--mantine-color-default)",
+                background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
                 fontSize: "0.7rem",
               }}
             >
@@ -130,7 +130,7 @@ export function PlanView({ plan, onStartHack, onReviewPlan }: PlanViewProps) {
             <div
               key={phase.number}
               style={{
-                border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
+                border: "1px solid rgba(68, 73, 85, 0.2)",
                 borderRadius: 8,
                 overflow: "hidden",
               }}
@@ -144,7 +144,7 @@ export function PlanView({ plan, onStartHack, onReviewPlan }: PlanViewProps) {
                   alignItems: "center",
                   gap: 8,
                   backgroundColor: phaseComplete
-                    ? "color-mix(in srgb, var(--mantine-color-green-9) 8%, transparent)"
+                    ? "rgba(38, 191, 126, 0.06)"
                     : "transparent",
                 }}
               >
@@ -228,7 +228,7 @@ export function PlanView({ plan, onStartHack, onReviewPlan }: PlanViewProps) {
               borderRadius: 6,
               fontSize: "0.8rem",
               fontWeight: 500,
-              border: "1px solid var(--mantine-color-default-border)",
+              border: "1px solid rgba(68, 73, 85, 0.2)",
               color: "var(--mantine-color-text)",
               display: "flex",
               alignItems: "center",

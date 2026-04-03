@@ -67,8 +67,8 @@ export function ContextTab({ items, notificationLinks, onOpenUrl }: ContextTabPr
               onClick={() => onOpenUrl(link.url)}
               style={{
                 padding: "8px 12px", borderRadius: 8,
-                backgroundColor: "var(--mantine-color-default)",
-                border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
+                background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
+                border: "1px solid rgba(68, 73, 85, 0.2)",
                 display: "flex", alignItems: "center", gap: 8,
               }}
             >

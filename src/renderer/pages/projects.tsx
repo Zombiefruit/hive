@@ -165,7 +165,7 @@ export default function ProjectsPage() {
         {proj.reasoning && (
           <Text size="xs" c="dimmed" mb={20} style={{
             padding: "8px 12px", borderRadius: 6,
-            backgroundColor: "color-mix(in srgb, var(--mantine-color-blue-5) 8%, transparent)",
+            backgroundColor: "rgba(74, 125, 255, 0.08)",
             borderLeft: "3px solid var(--mantine-color-blue-5)",
           }}>
             {proj.reasoning}
@@ -176,8 +176,8 @@ export default function ProjectsPage() {
         {hasContext && (
           <div style={{
             padding: "14px 16px", borderRadius: 8, marginBottom: 20,
-            border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-            backgroundColor: "var(--mantine-color-body)",
+            border: "1px solid rgba(68, 73, 85, 0.2)",
+            background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
           }}>
             <Text size="sm" fw={600} mb={10}>Context</Text>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -188,7 +188,7 @@ export default function ProjectsPage() {
                   style={{
                     display: "flex", alignItems: "center", gap: 6,
                     padding: "4px 10px", borderRadius: 6,
-                    backgroundColor: "var(--mantine-color-default-hover)",
+                    background: "rgba(74, 125, 255, 0.08)",
                     color: "var(--mantine-color-blue-4)", fontSize: "0.75rem",
                   }}
                 >
@@ -204,7 +204,7 @@ export default function ProjectsPage() {
                   style={{
                     display: "flex", alignItems: "center", gap: 6,
                     padding: "4px 10px", borderRadius: 6,
-                    backgroundColor: "var(--mantine-color-default-hover)",
+                    background: "rgba(74, 125, 255, 0.08)",
                     color: "var(--mantine-color-blue-4)", fontSize: "0.75rem",
                   }}
                 >
@@ -220,7 +220,7 @@ export default function ProjectsPage() {
                   style={{
                     display: "flex", alignItems: "center", gap: 6,
                     padding: "4px 10px", borderRadius: 6,
-                    backgroundColor: "var(--mantine-color-default-hover)",
+                    background: "rgba(74, 125, 255, 0.08)",
                     color: "var(--mantine-color-blue-4)", fontSize: "0.75rem",
                   }}
                 >
@@ -236,7 +236,7 @@ export default function ProjectsPage() {
                   style={{
                     display: "flex", alignItems: "center", gap: 6,
                     padding: "4px 10px", borderRadius: 6,
-                    backgroundColor: "var(--mantine-color-default-hover)",
+                    background: "rgba(74, 125, 255, 0.08)",
                     color: "var(--mantine-color-blue-4)", fontSize: "0.75rem",
                   }}
                 >
@@ -275,8 +275,8 @@ export default function ProjectsPage() {
                           className="notif-card"
                           style={{
                             padding: "10px 14px", borderRadius: 6,
-                            border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-                            backgroundColor: "var(--mantine-color-default)",
+                            border: "1px solid rgba(68, 73, 85, 0.2)",
+                            background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
                             display: "flex", alignItems: "center", justifyContent: "space-between",
                             transition: "background-color 0.15s",
                           }}
@@ -305,7 +305,7 @@ export default function ProjectsPage() {
                               {n.author && <Text size="xs" c="dimmed" truncate style={{ maxWidth: 120, fontSize: "0.6rem" }}>{n.author}</Text>}
                             </Group>
                           </div>
-                          <IconChevronRight size={14} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
+                          <IconChevronRight size={14} color="var(--aegen-dust-gray)" style={{ flexShrink: 0 }} />
                         </UnstyledButton>
                       );
                     })}
@@ -323,7 +323,7 @@ export default function ProjectsPage() {
   const showDetail = projectId && selectedProject;
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--mantine-color-body)" }}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--aegen-void)" }}>
       <AppHeader rightContent={headerRight} />
       <GlobalLoadingBanner />
 
@@ -369,8 +369,8 @@ export default function ProjectsPage() {
                     aria-label={proj.name}
                     style={{
                       padding: "14px 16px", borderRadius: 8,
-                      border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-                      backgroundColor: "var(--mantine-color-default)",
+                      border: "1px solid rgba(68, 73, 85, 0.2)",
+                      background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
                       display: "flex", alignItems: "center", justifyContent: "space-between",
                       transition: "background-color 0.15s",
                     }}
@@ -408,7 +408,7 @@ export default function ProjectsPage() {
                             <div style={{
                               position: "relative", flex: 1, height: 6, borderRadius: 3,
                               overflow: "hidden",
-                              backgroundColor: "color-mix(in srgb, var(--mantine-color-default-border) 60%, transparent)",
+                              backgroundColor: "rgba(68, 73, 85, 0.3)",
                             }}>
                               <div style={{ display: "flex", height: "100%", width: `${(doneCount / taskCount) * 100}%`, minWidth: doneCount > 0 ? 4 : 0 }}>
                                 <Tooltip label={`Done: ${doneCount}`} withArrow position="top">
@@ -457,7 +457,7 @@ export default function ProjectsPage() {
                         </Text>
                       )}
                     </div>
-                    <IconChevronRight size={16} color="var(--mantine-color-dimmed)" style={{ flexShrink: 0 }} />
+                    <IconChevronRight size={16} color="var(--aegen-dust-gray)" style={{ flexShrink: 0 }} />
                   </UnstyledButton>
                 );
               })}

@@ -90,8 +90,8 @@ export function Card({ children, onClick, active, "aria-label": ariaLabel }: Car
         borderRadius: 8,
         border: `1px solid ${active
           ? "var(--mantine-color-blue-7)"
-          : "color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)"}`,
-        backgroundColor: active ? "var(--mantine-color-blue-light)" : "var(--mantine-color-default)",
+          : "rgba(68, 73, 85, 0.2)"}`,
+        backgroundColor: active ? "var(--mantine-color-blue-light)" : "rgba(16, 21, 32, 0.65)",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",

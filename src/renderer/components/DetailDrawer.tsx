@@ -275,9 +275,9 @@ export function DetailDrawer({
   const stageConfig = STAGE_META[n.stage as keyof typeof STAGE_META] ?? { label: n.stage ?? "new", color: "#6b7280" };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", backgroundColor: "var(--mantine-color-body)" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "linear-gradient(135deg, rgba(16, 21, 32, 0.95), rgba(26, 22, 37, 0.9))", backdropFilter: "blur(24px) saturate(1.4)" }}>
       {/* Header */}
-      <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--mantine-color-default-border)", flexShrink: 0 }}>
+      <div style={{ padding: "12px 20px", borderBottom: "1px solid rgba(68, 73, 85, 0.2)", flexShrink: 0 }}>
         <Group justify="space-between" mb={4}>
           <Group gap="xs">
             <Badge size="xs" style={{ backgroundColor: stageConfig.color, color: "white" }}>{stageConfig.label}</Badge>
@@ -323,7 +323,7 @@ export function DetailDrawer({
                   style={{
                     display: "flex", alignItems: "center", gap: 4,
                     padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem",
-                    backgroundColor: "var(--mantine-color-default-hover)",
+                    background: "rgba(74, 125, 255, 0.08)",
                     color: "var(--mantine-color-blue-4)",
                   }}
                 >
@@ -338,7 +338,7 @@ export function DetailDrawer({
                 style={{
                   display: "flex", alignItems: "center", gap: 4,
                   padding: "2px 8px", borderRadius: 4, fontSize: "0.65rem",
-                  backgroundColor: "var(--mantine-color-default-hover)",
+                  background: "rgba(74, 125, 255, 0.08)",
                   color: "var(--mantine-color-blue-4)",
                 }}
               >
@@ -362,7 +362,7 @@ export function DetailDrawer({
 
       {/* Parent task: subtask list */}
       {n.subtaskIds && n.subtaskIds.length > 0 && notificationMap && (
-        <div style={{ padding: "8px 20px", borderBottom: "1px solid var(--mantine-color-default-border)", flexShrink: 0 }}>
+        <div style={{ padding: "8px 20px", borderBottom: "1px solid rgba(68, 73, 85, 0.2)", flexShrink: 0 }}>
           <Text size="xs" fw={600} c="dimmed" mb={4}>
             {n.subtaskIds.filter(id => notificationMap.get(id)?.stage === "done").length} of {n.subtaskIds.length} subtasks done
           </Text>
@@ -423,7 +423,7 @@ export function DetailDrawer({
       {!loading && !(n.subtaskIds && n.subtaskIds.length > 0) && (n.stage === "new" || n.stage === "skipped") && conversation.length === 0 && (
         <div style={{
           padding: "8px 20px",
-          borderTop: "1px solid var(--mantine-color-default-border)",
+          borderTop: "1px solid rgba(68, 73, 85, 0.2)",
           flexShrink: 0,
           display: "flex", gap: 8,
         }}>
@@ -446,7 +446,7 @@ export function DetailDrawer({
       {!loading && !(n.subtaskIds && n.subtaskIds.length > 0) && (n.stage === "plan_review" || n.stage === "start_work") && planText && (
         <div style={{
           padding: "8px 20px",
-          borderTop: "1px solid var(--mantine-color-default-border)",
+          borderTop: "1px solid rgba(68, 73, 85, 0.2)",
           flexShrink: 0,
           display: "flex", gap: 8,
         }}>

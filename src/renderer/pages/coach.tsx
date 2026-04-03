@@ -60,8 +60,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <div style={{
       padding: "14px 16px", borderRadius: 10, marginBottom: 12,
-      backgroundColor: "var(--mantine-color-default)",
-      border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
+      background: "rgba(16, 21, 32, 0.65)",
+      backdropFilter: "blur(16px) saturate(1.2)",
+      border: "1px solid rgba(68, 73, 85, 0.2)",
     }}>
       <Text size="xs" fw={600} c="dimmed" mb={8} style={{ textTransform: "uppercase", letterSpacing: "0.5px" }}>{title}</Text>
       {children}
@@ -100,7 +101,7 @@ export default function CoachPage() {
   const totalTasks = patterns ? Object.values(patterns.tasksByType).reduce((a, b) => a + b, 0) : 0;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--aegen-void)" }}>
       <AppHeader />
       <GlobalLoadingBanner />
 
@@ -108,7 +109,7 @@ export default function CoachPage() {
         {/* Empty state */}
         {!localLoading && !score && !brief && !patterns && (
           <Stack align="center" py="xl" gap="sm">
-            <IconTrendingUp size={32} color="var(--mantine-color-dimmed)" />
+            <IconTrendingUp size={32} color="var(--aegen-dust-gray)" />
             <Text size="sm" c="dimmed">No coaching data yet.</Text>
             <Text size="xs" c="dimmed">Data will appear after your first poll cycle.</Text>
           </Stack>

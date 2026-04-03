@@ -76,10 +76,10 @@ export function AddTaskModal({ opened, onClose }: AddTaskModalProps) {
       centered
       overlayProps={{ backgroundOpacity: 0.4, blur: 4 }}
       styles={{
-        content: { backgroundColor: "var(--mantine-color-default)" },
+        content: { background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)" },
         header: {
-          backgroundColor: "var(--mantine-color-default)",
-          borderBottom: "1px solid var(--mantine-color-default-hover)",
+          background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
+          borderBottom: "1px solid rgba(74, 125, 255, 0.08)",
         },
       }}
     >
@@ -92,7 +92,7 @@ export function AddTaskModal({ opened, onClose }: AddTaskModalProps) {
           onChange={(e) => setTitle(e.currentTarget.value)}
           autoFocus
           styles={{
-            input: { backgroundColor: "var(--mantine-color-default-hover)" },
+            input: { backgroundColor: "rgba(74, 125, 255, 0.08)" },
           }}
         />
 
@@ -105,7 +105,7 @@ export function AddTaskModal({ opened, onClose }: AddTaskModalProps) {
           maxRows={6}
           autosize
           styles={{
-            input: { backgroundColor: "var(--mantine-color-default-hover)" },
+            input: { backgroundColor: "rgba(74, 125, 255, 0.08)" },
           }}
         />
 
@@ -117,8 +117,8 @@ export function AddTaskModal({ opened, onClose }: AddTaskModalProps) {
             onChange={(val) => val && setTaskType(val)}
             allowDeselect={false}
             styles={{
-              input: { backgroundColor: "var(--mantine-color-default-hover)" },
-              dropdown: { backgroundColor: "var(--mantine-color-default-hover)" },
+              input: { backgroundColor: "rgba(74, 125, 255, 0.08)" },
+              dropdown: { backgroundColor: "rgba(74, 125, 255, 0.08)" },
             }}
           />
 
@@ -129,8 +129,8 @@ export function AddTaskModal({ opened, onClose }: AddTaskModalProps) {
             onChange={(val) => val && setPriority(val)}
             allowDeselect={false}
             styles={{
-              input: { backgroundColor: "var(--mantine-color-default-hover)" },
-              dropdown: { backgroundColor: "var(--mantine-color-default-hover)" },
+              input: { backgroundColor: "rgba(74, 125, 255, 0.08)" },
+              dropdown: { backgroundColor: "rgba(74, 125, 255, 0.08)" },
             }}
           />
         </Group>
@@ -144,7 +144,7 @@ export function AddTaskModal({ opened, onClose }: AddTaskModalProps) {
           step={5}
           w={200}
           styles={{
-            input: { backgroundColor: "var(--mantine-color-default-hover)" },
+            input: { backgroundColor: "rgba(74, 125, 255, 0.08)" },
           }}
         />
 

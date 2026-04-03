@@ -21,8 +21,10 @@ function VerdictPanel({ verdict }: { verdict: PlanVerdict }) {
   return (
     <div style={{
       padding: "10px 14px", borderRadius: 8, marginBottom: 12,
-      backgroundColor: `color-mix(in srgb, var(--mantine-color-${statusColor}-light) 30%, transparent)`,
-      border: `1px solid color-mix(in srgb, var(--mantine-color-${statusColor}-5) 30%, transparent)`,
+      background: "rgba(16, 21, 32, 0.65)",
+      backdropFilter: "blur(16px) saturate(1.2)",
+      border: `1px solid rgba(68, 73, 85, 0.2)`,
+      boxShadow: statusColor === "green" ? "0 0 12px rgba(38, 191, 126, 0.1)" : statusColor === "yellow" ? "0 0 12px rgba(255, 170, 51, 0.1)" : "0 0 12px rgba(255, 107, 61, 0.1)",
     }}>
       <Group gap={8} mb={4}>
         <StatusIcon size={14} color={`var(--mantine-color-${statusColor}-5)`} />

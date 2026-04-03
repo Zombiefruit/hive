@@ -18,8 +18,9 @@ function MemoryCard({ memory, onDelete }: { memory: Memory; onDelete: () => void
   return (
     <div style={{
       padding: "12px 14px", borderRadius: 8, marginBottom: 8,
-      backgroundColor: "var(--mantine-color-default)",
-      border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
+      background: "rgba(16, 21, 32, 0.65)",
+      backdropFilter: "blur(16px) saturate(1.2)",
+      border: "1px solid rgba(68, 73, 85, 0.2)",
     }}>
       <Group gap={6} mb={6} wrap="nowrap">
         <Badge size="xs" variant="light" color={SCOPE_COLORS[memory.scope] ?? "gray"}>{memory.scope}</Badge>
@@ -89,7 +90,7 @@ export default function MemoriesPage() {
   const scopes = ["shared", "triage", "planning", "work"];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--aegen-void)" }}>
       <AppHeader />
       <GlobalLoadingBanner />
 
@@ -134,8 +135,8 @@ export default function MemoriesPage() {
             onClick={() => setScopeFilter(null)}
             style={{
               padding: "3px 10px", borderRadius: 6, fontSize: "0.7rem", fontWeight: 500,
-              backgroundColor: !scopeFilter ? "var(--mantine-color-default-hover)" : "transparent",
-              color: !scopeFilter ? "var(--mantine-color-text)" : "var(--mantine-color-dimmed)",
+              backgroundColor: !scopeFilter ? "rgba(74, 125, 255, 0.08)" : "transparent",
+              color: !scopeFilter ? "var(--aegen-star-white)" : "var(--aegen-dust-gray)",
             }}
           >
             All
@@ -146,8 +147,8 @@ export default function MemoriesPage() {
               onClick={() => setScopeFilter(scopeFilter === s ? null : s)}
               style={{
                 padding: "3px 10px", borderRadius: 6, fontSize: "0.7rem", fontWeight: 500,
-                backgroundColor: scopeFilter === s ? "var(--mantine-color-default-hover)" : "transparent",
-                color: scopeFilter === s ? "var(--mantine-color-text)" : "var(--mantine-color-dimmed)",
+                backgroundColor: scopeFilter === s ? "rgba(74, 125, 255, 0.08)" : "transparent",
+                color: scopeFilter === s ? "var(--aegen-star-white)" : "var(--aegen-dust-gray)",
               }}
             >
               {s}
@@ -167,7 +168,7 @@ export default function MemoriesPage() {
         {/* Empty state */}
         {!localLoading && memories.length === 0 && (
           <Stack align="center" py="xl" gap="sm">
-            <IconBrain size={32} color="var(--mantine-color-dimmed)" />
+            <IconBrain size={32} color="var(--aegen-dust-gray)" />
             <Text size="sm" c="dimmed">No memories yet.</Text>
             <Text size="xs" c="dimmed">Memories are created automatically as agents learn from your interactions.</Text>
           </Stack>

@@ -328,7 +328,7 @@ export function Settings() {
     <div
       style={{
         height: 1,
-        backgroundColor: "color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
+        backgroundColor: "rgba(68, 73, 85, 0.2)",
         margin: "8px 0",
       }}
     />
@@ -336,7 +336,7 @@ export function Settings() {
 
   if (loadStatus === "loading") {
     return (
-      <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "var(--mantine-color-body)" }}>
+      <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--aegen-void)" }}>
         <Loader size="sm" color="blue" />
       </div>
     );
@@ -348,7 +348,7 @@ export function Settings() {
         height: "100vh",
         display: "flex",
         flexDirection: "column",
-        backgroundColor: "var(--mantine-color-body)",
+        background: "var(--aegen-void)",
       }}
     >
       {/* Header */}
@@ -482,8 +482,8 @@ export function Settings() {
                     gap: 10,
                     padding: "8px 12px",
                     borderRadius: 8,
-                    border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 50%, transparent)",
-                    backgroundColor: "color-mix(in srgb, var(--mantine-color-default) 50%, transparent)",
+                    border: "1px solid rgba(68, 73, 85, 0.25)",
+                    backgroundColor: "rgba(16, 21, 32, 0.5)",
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -553,8 +553,8 @@ export function Settings() {
                   style={{ flex: 1 }}
                   allowDeselect={false}
                   styles={{
-                    input: { backgroundColor: "var(--mantine-color-default-hover)" },
-                    dropdown: { backgroundColor: "var(--mantine-color-default-hover)" },
+                    input: { backgroundColor: "rgba(74, 125, 255, 0.08)" },
+                    dropdown: { backgroundColor: "rgba(74, 125, 255, 0.08)" },
                   }}
                 />
                 <TextInput
@@ -607,8 +607,8 @@ export function Settings() {
                     gap: 10,
                     padding: "8px 12px",
                     borderRadius: 8,
-                    border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 50%, transparent)",
-                    backgroundColor: "color-mix(in srgb, var(--mantine-color-default) 50%, transparent)",
+                    border: "1px solid rgba(68, 73, 85, 0.25)",
+                    backgroundColor: "rgba(16, 21, 32, 0.5)",
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -686,7 +686,7 @@ export function Settings() {
                     border: `1px solid ${
                       integrations[key]
                         ? "var(--mantine-color-blue-7)"
-                        : "color-mix(in srgb, var(--mantine-color-default-border) 50%, transparent)"
+                        : "rgba(68, 73, 85, 0.25)"
                     }`,
                     backgroundColor: integrations[key]
                       ? "var(--mantine-color-blue-light)"
@@ -759,12 +759,12 @@ export function Settings() {
                           borderRadius: 8,
                           border: `1px solid ${
                             connected
-                              ? "color-mix(in srgb, var(--mantine-color-green-7) 40%, transparent)"
-                              : "color-mix(in srgb, var(--mantine-color-red-7) 40%, transparent)"
+                              ? "rgba(38, 191, 126, 0.25)"
+                              : "rgba(204, 73, 33, 0.25)"
                           }`,
                           backgroundColor: connected
-                            ? "color-mix(in srgb, var(--mantine-color-green-9) 10%, transparent)"
-                            : "color-mix(in srgb, var(--mantine-color-red-9) 10%, transparent)",
+                            ? "rgba(38, 191, 126, 0.08)"
+                            : "rgba(204, 73, 33, 0.08)",
                           display: "flex",
                           alignItems: "center",
                           gap: 8,
@@ -784,13 +784,13 @@ export function Settings() {
                 {skillStatus && !skillStatus.installed && (
                   <div style={{
                     padding: 12, borderRadius: 8, marginTop: 8,
-                    backgroundColor: "color-mix(in srgb, var(--mantine-color-yellow-9) 15%, transparent)",
-                    border: "1px solid color-mix(in srgb, var(--mantine-color-yellow-7) 40%, transparent)",
+                    backgroundColor: "rgba(255, 170, 51, 0.1)",
+                    border: "1px solid rgba(255, 170, 51, 0.25)",
                   }}>
                     <Text size="sm" fw={500} c="yellow.4">MC Engineering Skills Missing</Text>
                     <Text size="xs" c="dimmed" mt={4}>
                       Required skills not found: <strong>{skillStatus.missing.join(", ")}</strong>.
-                      Run <code style={{ backgroundColor: "var(--mantine-color-default-hover)", padding: "1px 4px", borderRadius: 3 }}>configure-claude</code> to install them.
+                      Run <code style={{ backgroundColor: "rgba(74, 125, 255, 0.08)", padding: "1px 4px", borderRadius: 3 }}>configure-claude</code> to install them.
                     </Text>
                   </div>
                 )}
@@ -863,7 +863,7 @@ export function Settings() {
 
             <Stack gap={6}>
               {(repoMappings ?? []).map((m, i) => (
-                <Group key={i} gap={8} style={{ padding: "6px 10px", borderRadius: 6, backgroundColor: "var(--mantine-color-default)" }}>
+                <Group key={i} gap={8} style={{ padding: "6px 10px", borderRadius: 6, background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)" }}>
                   <Badge size="xs" variant="light" color="teal">{m.pattern}</Badge>
                   <Text size="xs" style={{ fontFamily: "var(--mantine-font-family-monospace)", fontSize: "0.7rem", flex: 1 }}>{m.repoPath}</Text>
                   <ActionIcon size="sm" variant="subtle" color="red" aria-label="Remove repo mapping" onClick={() => setRepoMappings(prev => (prev ?? []).filter((_, j) => j !== i))}>
@@ -940,7 +940,7 @@ export function Settings() {
             {sectionDivider}
 
             {/* ── Danger Zone ── */}
-            <div style={{ padding: "16px 20px", borderRadius: 8, border: "1px solid color-mix(in srgb, var(--mantine-color-red-5) 30%, transparent)" }}>
+            <div style={{ padding: "16px 20px", borderRadius: 8, border: "1px solid rgba(255, 107, 61, 0.2)" }}>
               <Text size="sm" fw={600} c="red.4" mb={12}>Danger Zone</Text>
               <Group gap={8}>
                 <Button
@@ -982,8 +982,8 @@ export function Settings() {
           position: "sticky",
           bottom: 0,
           padding: "12px 24px",
-          borderTop: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
-          backgroundColor: "color-mix(in srgb, var(--mantine-color-body) 90%, transparent)",
+          borderTop: "1px solid rgba(68, 73, 85, 0.2)",
+          backgroundColor: "rgba(5, 8, 16, 0.9)",
           backdropFilter: "blur(8px)",
           display: "flex",
           alignItems: "center",

@@ -147,3 +147,8 @@ export function resolveEscalation(id: string, resolution: string): void {
 export function getRecentThoughts(limit = 10): Array<{ timestamp: string; thought: string }> {
   return recentThoughts.slice(-limit);
 }
+
+/** Emit a thought from outside the orchestrator (e.g., poll service, judges). */
+export function emitThought(thought: string): void {
+  think(thought);
+}

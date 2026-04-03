@@ -73,7 +73,7 @@ const MARKDOWN_STYLES = `
   width: 100%;
 }
 .md-content th, .md-content td {
-  border: 1px solid var(--mantine-color-default-border);
+  border: 1px solid rgba(68, 73, 85, 0.2);
   padding: 4px 8px;
   text-align: left;
 }
@@ -86,7 +86,7 @@ const MARKDOWN_STYLES = `
 }
 .md-content hr {
   border: none;
-  border-top: 1px solid var(--mantine-color-default-border);
+  border-top: 1px solid rgba(68, 73, 85, 0.2);
   margin: 12px 0;
 }
 `;

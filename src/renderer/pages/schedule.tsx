@@ -374,7 +374,7 @@ export function Schedule() {
   };
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--mantine-color-body)" }}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--aegen-void)" }}>
       {/* Header */}
       <AppHeader
         rightContent={
@@ -421,7 +421,7 @@ export function Schedule() {
         return (
           <div style={{
             padding: "12px 20px",
-            borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
+            borderBottom: "1px solid rgba(68, 73, 85, 0.2)",
             flexShrink: 0,
           }}>
             <Group justify="space-between" mb={8}>
@@ -455,8 +455,8 @@ export function Schedule() {
       {isStaleSchedule && (
         <div style={{
           padding: "8px 20px",
-          backgroundColor: "color-mix(in srgb, var(--mantine-color-yellow-9) 15%, transparent)",
-          borderBottom: "1px solid color-mix(in srgb, var(--mantine-color-yellow-6) 30%, transparent)",
+          backgroundColor: "rgba(255, 170, 51, 0.1)",
+          borderBottom: "1px solid rgba(255, 170, 51, 0.2)",
           display: "flex", alignItems: "center", justifyContent: "space-between",
           flexShrink: 0,
         }}>
@@ -481,7 +481,7 @@ export function Schedule() {
         {/* Scrollable calendar area */}
         <div ref={scrollContainerRef} style={{ flex: 1, overflow: "auto", display: "flex" }}>
         {/* Time gutter */}
-        <div style={{ width: 56, flexShrink: 0, borderRight: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)", paddingTop: 16, paddingBottom: 40, minHeight: "100%" }}>
+        <div style={{ width: 56, flexShrink: 0, borderRight: "1px solid rgba(68, 73, 85, 0.2)", paddingTop: 16, paddingBottom: 40, minHeight: "100%" }}>
           {hours.map(hour => (
             <div key={hour} style={{ height: HOUR_HEIGHT, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", paddingRight: 8, paddingTop: 2 }}>
               <Text size="xs" c="dimmed" style={{ fontSize: "0.65rem" }}>
@@ -496,7 +496,7 @@ export function Schedule() {
           {/* Hour grid lines */}
           {hours.map(hour => (
             <div key={hour} style={{ position: "absolute", top: 16 + (hour - startHour) * HOUR_HEIGHT, left: 0, right: 0, height: HOUR_HEIGHT }}>
-              <div style={{ borderTop: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 20%, transparent)" }} />
+              <div style={{ borderTop: "1px solid rgba(68, 73, 85, 0.12)" }} />
             </div>
           ))}
 
@@ -590,11 +590,11 @@ export function Schedule() {
                   justifyContent: cardHeight <= 50 ? "center" : "flex-start",
                   zIndex: isDragOver ? 15 : 1,
                   background: isDone
-                    ? "color-mix(in srgb, var(--mantine-color-default-hover) 50%, transparent)"
-                    : `linear-gradient(135deg, ${bgTint}, var(--mantine-color-default))`,
+                    ? "rgba(74, 125, 255, 0.06)"
+                    : `linear-gradient(135deg, ${bgTint}, rgba(16, 21, 32, 0.65))`,
                   border: isDragOver
                     ? "1px solid var(--mantine-color-blue-5)"
-                    : `1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)`,
+                    : `1px solid rgba(68, 73, 85, 0.2)`,
                   borderLeft: `${isUrgent && !isDone ? 4 : 3}px solid ${isDone ? "var(--mantine-color-dimmed)" : color}`,
                   opacity: isDone ? 0.45 : isDragging ? 0.4 : 1,
                   cursor: "grab",
@@ -658,7 +658,7 @@ export function Schedule() {
         {!focusMode && (
           <div style={{
             width: 220, flexShrink: 0,
-            borderLeft: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 30%, transparent)",
+            borderLeft: "1px solid rgba(68, 73, 85, 0.2)",
             padding: 16,
             overflowY: "auto",
           }}>
@@ -719,7 +719,7 @@ export function Schedule() {
                         style={{
                           padding: "6px 8px",
                           borderRadius: 4,
-                          backgroundColor: "color-mix(in srgb, var(--mantine-color-default-hover) 50%, transparent)",
+                          backgroundColor: "rgba(74, 125, 255, 0.06)",
                           display: "block",
                         }}
                       >
@@ -758,10 +758,10 @@ export function Schedule() {
         const color = priorityColors[item.priority] ?? "var(--mantine-color-blue-filled)";
         return (
           <>
-            <div onClick={() => setSelectedId(null)} style={{ position: "fixed", inset: 0, top: 42, zIndex: 99, backgroundColor: "color-mix(in srgb, var(--mantine-color-body) 40%, transparent)", backdropFilter: "blur(2px)" }} />
+            <div onClick={() => setSelectedId(null)} style={{ position: "fixed", inset: 0, top: 42, zIndex: 99, backgroundColor: "rgba(5, 8, 16, 0.4)", backdropFilter: "blur(2px)" }} />
             <div style={{
               position: "fixed", top: 42, right: 0, bottom: 0, width: 380, zIndex: 100,
-              backgroundColor: "var(--mantine-color-default)",
+              background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
               borderLeft: "1px solid var(--mantine-color-default-hover)",
               overflowY: "auto", padding: 20,
             }}>
@@ -796,7 +796,7 @@ export function Schedule() {
                     {item.url && (
                       <UnstyledButton
                         onClick={() => window.deck?.openExternal?.(item.url!)}
-                        style={{ padding: "6px 8px", borderRadius: 4, backgroundColor: "color-mix(in srgb, var(--mantine-color-default-hover) 50%, transparent)" }}
+                        style={{ padding: "6px 8px", borderRadius: 4, backgroundColor: "rgba(74, 125, 255, 0.06)" }}
                       >
                         <Text size="xs" c="blue.4" lineClamp={1}>{item.url}</Text>
                       </UnstyledButton>
@@ -805,7 +805,7 @@ export function Schedule() {
                       <UnstyledButton
                         key={i}
                         onClick={() => window.deck?.openExternal?.(link.url)}
-                        style={{ padding: "6px 8px", borderRadius: 4, backgroundColor: "color-mix(in srgb, var(--mantine-color-default-hover) 50%, transparent)" }}
+                        style={{ padding: "6px 8px", borderRadius: 4, backgroundColor: "rgba(74, 125, 255, 0.06)" }}
                       >
                         <Group gap={6}>
                           <Badge size="xs" variant="light" color="gray">{link.type}</Badge>

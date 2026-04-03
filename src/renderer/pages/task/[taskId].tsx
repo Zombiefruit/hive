@@ -50,13 +50,13 @@ export function TaskDetail() {
   const textEvents = events.filter(e => e.type === "text");
 
   return (
-    <div style={{ height: "100vh", backgroundColor: "var(--mantine-color-body)", display: "flex", flexDirection: "column" }}>
+    <div style={{ height: "100vh", background: "var(--aegen-void)", display: "flex", flexDirection: "column" }}>
       {/* Header */}
       <div style={{
         padding: "8px 24px", paddingLeft: 80,
-        borderBottom: "1px solid var(--mantine-color-default-border)",
-        backgroundColor: "color-mix(in srgb, var(--mantine-color-body) 80%, transparent)",
-        backdropFilter: "blur(8px)",
+        borderBottom: "1px solid rgba(68, 73, 85, 0.2)",
+        background: "rgba(16, 21, 32, 0.8)",
+        backdropFilter: "blur(16px) saturate(1.2)",
         WebkitAppRegion: "drag",
         flexShrink: 0,
       }}>
@@ -76,7 +76,7 @@ export function TaskDetail() {
       {/* Content */}
       <div style={{ flex: 1, display: "grid", gridTemplateColumns: "320px 1fr", overflow: "hidden", minHeight: 0 }}>
         {/* Timeline sidebar */}
-        <div ref={timelineRef} style={{ borderRight: "1px solid var(--mantine-color-default-border)", overflowY: "auto", padding: 16 }}>
+        <div ref={timelineRef} style={{ borderRight: "1px solid rgba(68, 73, 85, 0.2)", overflowY: "auto", padding: 16 }}>
           <Text size="xs" fw={600} mb="md">Timeline ({timelineEvents.length} events)</Text>
 
           {timelineEvents.length === 0 && !isComplete && (
@@ -94,8 +94,8 @@ export function TaskDetail() {
                 <div key={i} style={{
                   display: "flex", gap: 8, alignItems: "flex-start",
                   padding: "6px 8px", borderRadius: 6,
-                  backgroundColor: event.type === "error" ? "color-mix(in srgb, var(--mantine-color-red-5) 10%, transparent)" :
-                    event.type === "escalation" ? "color-mix(in srgb, var(--mantine-color-yellow-5) 10%, transparent)" : "transparent",
+                  backgroundColor: event.type === "error" ? "rgba(255, 107, 61, 0.08)" :
+                    event.type === "escalation" ? "rgba(255, 170, 51, 0.08)" : "transparent",
                 }}>
                   <Icon size={13} color={cfg.color} style={{ marginTop: 2, flexShrink: 0 }} />
                   <div style={{ minWidth: 0, flex: 1 }}>
@@ -124,8 +124,8 @@ export function TaskDetail() {
             {textEvents.map((event, i) => (
               <div key={i} style={{
                 padding: "12px 16px", borderRadius: 8,
-                backgroundColor: "var(--mantine-color-default)",
-                border: "1px solid color-mix(in srgb, var(--mantine-color-default-border) 40%, transparent)",
+                background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
+                border: "1px solid rgba(68, 73, 85, 0.2)",
               }}>
                 <Markdown content={event.content} />
                 <Text size="xs" c="dimmed" mt={4} ff="monospace" style={{ fontSize: "0.55rem" }}>
@@ -138,8 +138,8 @@ export function TaskDetail() {
           {isComplete && (
             <div style={{
               marginTop: 16, padding: 16, borderRadius: 8,
-              backgroundColor: "color-mix(in srgb, var(--mantine-color-green-5) 10%, transparent)",
-              border: "1px solid color-mix(in srgb, var(--mantine-color-green-5) 30%, transparent)",
+              backgroundColor: "rgba(38, 191, 126, 0.08)",
+              border: "1px solid rgba(38, 191, 126, 0.2)",
             }}>
               <Group gap={8}>
                 <IconCheck size={16} color="var(--mantine-color-green-filled)" />
