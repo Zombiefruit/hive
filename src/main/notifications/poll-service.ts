@@ -780,9 +780,70 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
       links: n.links,
     })));
 
-    let added = 0;
-    // Add actionable items (skip if already exists)
+    // ── PRE-CREATION VALIDATION ──
+    // Validate each item BEFORE adding to inbox. Catches stale tasks the triage agent missed.
+    const { execFileSync } = await import("node:child_process");
+    const validated: typeof items = [];
     for (const item of items) {
+      // 1. PR review tasks: check if PR is already merged/closed
+      if (item.task_type === "review" && item.links) {
+        const prLink = item.links.find((l: { url: string }) => l.url?.includes("github.com") && l.url?.includes("/pull/"));
+        if (prLink) {
+          const prMatch = prLink.url.match(/github\.com\/([^/]+\/[^/]+)\/pull\/(\d+)/);
+          if (prMatch) {
+            try {
+              const result = execFileSync("gh", ["pr", "view", prMatch[2], "--repo", prMatch[1], "--json", "state"], { timeout: 10000 }).toString();
+              const pr = JSON.parse(result);
+              if (pr.state === "MERGED" || pr.state === "CLOSED") {
+                logPoll(`  SKIPPED (pre-validation): "${item.title}" — PR #${prMatch[2]} is ${pr.state}`);
+                continue;
+              }
+            } catch {}
+          }
+        }
+      }
+
+      // 2. Response tasks: check if user already replied in the Slack thread
+      if (item.task_type === "response" && rawData && userSlackId) {
+        // Check if the raw fetch data contains evidence the user already replied
+        const titleLower = item.title.toLowerCase();
+        // Look for the user's Slack ID appearing as a reply author near this thread's context
+        const urlInData = item.url || item.links?.[0]?.url || "";
+        if (urlInData) {
+          // Extract thread timestamp from URL
+          const tsMatch = urlInData.match(/p(\d{10,})(\d{6})?/);
+          if (tsMatch) {
+            // Search raw data for user's reply in this thread context
+            const threadRef = tsMatch[1];
+            const nearThread = rawData.indexOf(threadRef);
+            if (nearThread !== -1) {
+              // Check 2000 chars around the thread reference for the user's ID as a replier
+              const context = rawData.slice(Math.max(0, nearThread - 500), nearThread + 1500);
+              if (context.includes(userSlackId) && (context.includes("replied") || context.includes("response") || context.includes(userName.split(" ")[0]))) {
+                logPoll(`  SKIPPED (pre-validation): "${item.title}" — user appears to have already replied`);
+                continue;
+              }
+            }
+          }
+        }
+      }
+
+      // 3. Check if action_needed suggests it's already done
+      const actionLower = (item.action_needed ?? "").toLowerCase();
+      if (actionLower.includes("already replied") || actionLower.includes("already reviewed") ||
+          actionLower.includes("already responded") || actionLower.includes("already handled") ||
+          actionLower.includes("may have been") || actionLower.includes("likely reviewed")) {
+        logPoll(`  SKIPPED (pre-validation): "${item.title}" — action_needed suggests already handled: "${item.action_needed?.slice(0, 80)}"`);
+        continue;
+      }
+
+      validated.push(item);
+    }
+    logPoll(`Pre-validation: ${items.length} items → ${validated.length} validated (${items.length - validated.length} skipped)`);
+
+    let added = 0;
+    // Add validated actionable items (skip if already exists)
+    for (const item of validated) {
       const key = extractKeyUtil(item);
       if (existingKeys.has(key)) continue;
       existingKeys.add(key);
@@ -864,7 +925,14 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
     }
 
     // Add follow-up items — map to "response" type (follow_up is no longer a valid type/stage)
+    // Apply same pre-validation: skip items with "already" signals in action_needed
     for (const item of followItems) {
+      const actionLower = (item.action_needed ?? "").toLowerCase();
+      if (actionLower.includes("already replied") || actionLower.includes("already reviewed") ||
+          actionLower.includes("already responded") || actionLower.includes("already handled")) {
+        logPoll(`  SKIPPED follow-up (pre-validation): "${item.title}" — already handled`);
+        continue;
+      }
       const key = extractKeyUtil(item);
       if (existingKeys.has(key)) continue;
       existingKeys.add(key);
