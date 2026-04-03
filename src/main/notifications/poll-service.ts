@@ -1273,42 +1273,24 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
         }
       }
     }
-    for (const [key, taskIds] of urlToTasks) {
-      if (taskIds.length >= 2) {
-        // Resolve channel ID to a human-readable name from config
-        const firstTask = notifications.find(n => n.id === taskIds[0]);
-        const ticketPrefix = firstTask?.title?.match(/^([A-Z]+-\d+)/)?.[0];
-        const channelName = channels.find(ch => ch.id === key)?.name?.replace(/^#/, "");
-        // Only create a project if we have a meaningful name — no raw IDs
-        const projName = ticketPrefix ?? (channelName ? `${channelName} discussions` : null);
-        if (!projName) continue;
-        let proj = findProjectByName(projName);
-        if (!proj) {
-          proj = createProject(projName, "ai", undefined, `Auto-grouped ${taskIds.length} tasks sharing source ${key}`);
-          logPoll(`Auto-grouped ${taskIds.length} tasks by shared source "${key}"`);
-          projectsChanged = true;
-        }
-        for (const taskId of taskIds) {
-          const n = notifications.find(nn => nn.id === taskId);
-          if (n && !n.projectId) {
-            addTaskToProject(proj.id, n.id);
-            n.projectId = proj.id;
-          }
-        }
-      }
-    }
+    // Strategy 3 disabled — channel-based grouping was too aggressive
+    // (creating "frontend engineering discussions" from 2 tasks in the same channel).
+    // Projects should come from the triage agent's explicit grouping or ticket prefixes only.
 
     // Strategy 4: Match ungrouped tasks to existing projects by keyword overlap
+    // Conservative: require 75%+ of project name words to match, ignore generic words
+    const NOISE_WORDS = new Set(["the", "and", "for", "with", "from", "review", "update", "fix", "add", "check", "tasks", "work", "support", "data", "new"]);
     const finalUngrouped = notifications.filter(n => !n.projectId && n.stage !== "skipped" && n.stage !== "done");
     const existingProjects = getAllProjects();
     for (const n of finalUngrouped) {
-      const titleWords = n.title.toLowerCase().split(/[\s\-:,]+/).filter(w => w.length > 3);
+      const titleWords = n.title.toLowerCase().split(/[\s\-:,]+/).filter(w => w.length > 3 && !NOISE_WORDS.has(w));
       let bestMatch: { proj: typeof existingProjects[0]; score: number } | null = null;
       for (const proj of existingProjects) {
-        const projWords = proj.name.toLowerCase().split(/[\s\-:,]+/).filter(w => w.length > 2);
+        const projWords = proj.name.toLowerCase().split(/[\s\-:,]+/).filter(w => w.length > 2 && !NOISE_WORDS.has(w));
+        if (projWords.length === 0) continue;
         const overlap = titleWords.filter(w => projWords.some(pw => w.includes(pw) || pw.includes(w))).length;
-        const score = projWords.length > 0 ? overlap / projWords.length : 0;
-        if (score >= 0.5 && (!bestMatch || score > bestMatch.score)) {
+        const score = overlap / projWords.length;
+        if (score >= 0.75 && (!bestMatch || score > bestMatch.score)) {
           bestMatch = { proj, score };
         }
       }

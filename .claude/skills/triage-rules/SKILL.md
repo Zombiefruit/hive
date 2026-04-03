@@ -20,8 +20,11 @@ user-invocable: false
    - Bot notifications: Geekbot, Standup bots, CI/CD alerts, Datadog, PagerDuty
    - Newsletter digests, marketing emails, LinkedIn notifications
    - Standup reports/reminders (Geekbot messages about standups are NOT meeting prep tasks)
-   - If data for a source is missing or errored, just ignore that source — do NOT create a task about the error itself.
-   - Past events: if a meeting/standup/sync has ALREADY HAPPENED, skip it. Do NOT create meeting_prep for past events.
+   - If data for a source is missing or errored, just ignore that source — do NOT create a task about the error itself
+   - Past events: if a meeting/standup/sync has ALREADY HAPPENED, skip it. Do NOT create meeting_prep for past events
+   - **Dependabot / automated PRs**: NEVER create tasks for dependabot, renovate, or automated dependency update PRs unless the user is explicitly requested as reviewer in the GITHUB ground truth section
+   - **Unassigned work**: ONLY create tasks for work that is DIRECTLY assigned to or requested from the user. Do NOT create tasks for general team work, channel announcements about others' PRs, or work that happens to appear in the user's channels but isn't their responsibility
+   - **Repos the user doesn't work on**: Check the GITHUB ground truth section — if a PR is in a repo where the user has no open or recently merged PRs, it's likely not their responsibility
 
 5. **UPDATE TASK STAGES based on evidence:**
    - If an existing task has a PR (draft or open) -> update stage to "working"

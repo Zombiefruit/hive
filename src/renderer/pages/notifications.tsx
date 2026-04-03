@@ -45,10 +45,10 @@ interface NotificationItem {
   verdict?: { status: "approved" | "concerns" | "rejected"; summary: string };
 }
 
-// Agent-actionable: an agent can do the actual work
-const AGENT_ACTIONABLE_TYPES = new Set(["implementation", "investigation", "review"]);
-// Human-only: agent can prepare context but you handle it
-const HUMAN_ONLY_TYPES = new Set(["meeting_prep", "response"]);
+// Agent-actionable: an agent can do the actual work end-to-end
+const AGENT_ACTIONABLE_TYPES = new Set(["implementation", "investigation"]);
+// Human-only: agent prepares context but you handle it
+const HUMAN_ONLY_TYPES = new Set(["meeting_prep", "response", "review"]);
 
 type StageConfig = { key: string; label: string; Icon: React.FC<{ size?: number; color?: string; stroke?: number }>; color: string; tip: string };
 
