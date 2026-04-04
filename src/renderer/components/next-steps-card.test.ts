@@ -20,7 +20,7 @@ describe("getActionIcon", () => {
 describe("getConfirmMessage", () => {
   it("should generate confirm text for run_skill", () => {
     const action: Action = { type: "run_skill", skill: "/hack", label: "Implement Phase 1", risk: "medium", params: { phase: 1 } };
-    expect(getConfirmMessage(action)).toContain("/hack");
+    expect(getConfirmMessage(action)).toContain("hacking");
   });
 
   it("should generate confirm text for update_linear", () => {

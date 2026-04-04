@@ -36,7 +36,16 @@ export function getConfirmMessage(action: Action): string {
   if (action.type === "no_action") return "";
   const risk = (action as { risk: ActionRisk }).risk;
   if (risk === "low") return "";
-  if (action.type === "run_skill") return `Run ${action.skill}${action.params?.phase ? ` phase ${action.params.phase}` : ""}?`;
+  if (action.type === "run_skill") {
+    // Don't show raw skill names — map to human-readable labels
+    const label = action.skill === "/start-work" ? "Start hacking"
+      : action.skill === "/hack" ? "Start hacking"
+      : action.skill === "/ship" ? "Ship changes"
+      : action.skill === "/code-review" ? "Run code review"
+      : action.skill === "/handle-pr-feedback" ? "Address PR feedback"
+      : `Run ${action.skill}`;
+    return `${label}?`;
+  }
   if (action.type === "update_linear") return `Set ${action.ticket} ${action.field} to "${action.value}"?`;
   return "";
 }

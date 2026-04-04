@@ -225,13 +225,21 @@ export function updateNotificationById(id: string, changes: Record<string, unkno
     logPoll(`  NOT FOUND! Available IDs: ${notifications.map(n => n.id.slice(0, 20)).join(", ")}`);
     return false;
   }
-  // Track stage changes in timeline
+  // Track stage changes in timeline — NEVER allow backward regression
   if (changes.stage && changes.stage !== n.stage) {
-    if (!n.timeline) n.timeline = [];
-    n.timeline.push({ timestamp: new Date().toISOString(), event: `Stage: ${n.stage ?? "new"} → ${changes.stage}` });
-    // Record completion timestamp
-    if (changes.stage === "done" && !n.completedAt) {
-      n.completedAt = new Date().toISOString();
+    const currentOrder = STAGE_ORDER[n.stage ?? "new"] ?? 0;
+    const newOrder = STAGE_ORDER[changes.stage as string] ?? 0;
+    // Allow: forward moves, done (from any), backlog (from any), skipped (from any)
+    const alwaysAllowed = changes.stage === "done" || changes.stage === "backlog" || changes.stage === "skipped";
+    if (newOrder < currentOrder && !alwaysAllowed) {
+      logPoll(`  BLOCKED stage regression in updateNotificationById: "${n.title.slice(0, 40)}" ${n.stage} → ${changes.stage} (order ${currentOrder} → ${newOrder})`);
+      delete changes.stage; // strip the invalid stage change, apply everything else
+    } else {
+      if (!n.timeline) n.timeline = [];
+      n.timeline.push({ timestamp: new Date().toISOString(), event: `Stage: ${n.stage ?? "new"} → ${changes.stage}` });
+      if (changes.stage === "done" && !n.completedAt) {
+        n.completedAt = new Date().toISOString();
+      }
     }
   }
   Object.assign(n, changes);
@@ -834,12 +842,15 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
           .map(l => ({ ...l, url: sanitizeUrl(l.url)! }));
         if (newLinks.length > 0) existing.links = newLinks;
       }
-      // Append timeline event if provided
+      // Append timeline event if provided — deduplicate against ALL recent entries (not just last)
       if (upd.timeline_event && typeof upd.timeline_event === "string") {
         if (!existing.timeline) existing.timeline = [];
-        // Avoid duplicate events
-        const lastEvent = existing.timeline[existing.timeline.length - 1];
-        if (!lastEvent || lastEvent.event !== upd.timeline_event) {
+        // Check if any event in the last 24h has the same text (prevents poll-cycle duplicates)
+        const cutoff = Date.now() - 86400000;
+        const isDupe = existing.timeline.some(e =>
+          e.event === upd.timeline_event && new Date(e.timestamp).getTime() > cutoff,
+        );
+        if (!isDupe) {
           existing.timeline.push({ timestamp: new Date().toISOString(), event: upd.timeline_event });
         }
       }
