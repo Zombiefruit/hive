@@ -306,6 +306,7 @@ if (!isElectron) {
       return Promise.resolve({ ok: true });
     },
 
+    resumeInTerminal: () => Promise.resolve({ ok: true }),
     onStoreUpdate: (cb: (state: unknown) => void) => {
       storeCallback = cb;
       // Fetch real data from debug API, fall back to mock

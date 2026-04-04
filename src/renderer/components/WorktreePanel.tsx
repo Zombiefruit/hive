@@ -4,16 +4,17 @@
  */
 
 import { Badge, Group, Text, Tooltip, UnstyledButton } from "@mantine/core";
-import { IconCode, IconGitBranch } from "@tabler/icons-react";
+import { IconCode, IconGitBranch, IconTerminal } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import type { WorktreeInfo } from "../../shared/worktree-types";
 
 interface WorktreePanelProps {
   repoPath?: string;
   branch?: string;
+  sessionId?: string;
 }
 
-export function WorktreePanel({ repoPath, branch }: WorktreePanelProps) {
+export function WorktreePanel({ repoPath, branch, sessionId }: WorktreePanelProps) {
   const [worktree, setWorktree] = useState<WorktreeInfo | null>(null);
 
   useEffect(() => {
@@ -89,24 +90,43 @@ export function WorktreePanel({ repoPath, branch }: WorktreePanelProps) {
           )}
         </div>
 
-        {/* Open in Editor button */}
-        <Tooltip label="Open in editor" position="left" withArrow>
-          <UnstyledButton
-            onClick={() => window.deck.openWorktreeInEditor(worktree.path)}
-            style={{
-              padding: "6px",
-              borderRadius: 6,
-              backgroundColor: "rgba(74, 125, 255, 0.1)",
-              color: "var(--mantine-color-blue-4)",
-              flexShrink: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <IconCode size={14} />
-          </UnstyledButton>
-        </Tooltip>
+        {/* Action buttons */}
+        <Group gap={4} wrap="nowrap" style={{ flexShrink: 0 }}>
+          {sessionId && (
+            <Tooltip label="Resume in Terminal" position="left" withArrow>
+              <UnstyledButton
+                onClick={() => window.deck.resumeInTerminal?.(worktree.path, sessionId)}
+                style={{
+                  padding: "6px",
+                  borderRadius: 6,
+                  backgroundColor: "rgba(74, 200, 120, 0.1)",
+                  color: "var(--mantine-color-green-4)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <IconTerminal size={14} />
+              </UnstyledButton>
+            </Tooltip>
+          )}
+          <Tooltip label="Open in editor" position="left" withArrow>
+            <UnstyledButton
+              onClick={() => window.deck.openWorktreeInEditor(worktree.path)}
+              style={{
+                padding: "6px",
+                borderRadius: 6,
+                backgroundColor: "rgba(74, 125, 255, 0.1)",
+                color: "var(--mantine-color-blue-4)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <IconCode size={14} />
+            </UnstyledButton>
+          </Tooltip>
+        </Group>
       </Group>
     </div>
   );

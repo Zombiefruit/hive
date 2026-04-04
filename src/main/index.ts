@@ -436,6 +436,14 @@ app.whenReady().then(() => {
     return { ok: true };
   });
 
+  ipcMain.handle("worktree:resume-terminal", async (_event, cwd: string, sessionId: string) => {
+    const { exec } = await import("node:child_process");
+    // Open Terminal.app and run claude --resume
+    const cmd = `cd "${cwd}" && claude --resume "${sessionId}"`;
+    exec(`osascript -e 'tell application "Terminal" to do script "${cmd.replace(/"/g, '\\"')}"'`);
+    return { ok: true };
+  });
+
   // Discover git repos in common locations
   ipcMain.handle("repos:discover", async () => {
     const os = require("node:os");

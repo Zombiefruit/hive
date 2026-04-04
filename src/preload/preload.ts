@@ -267,6 +267,7 @@ const api = {
   // Worktrees
   getWorktreeForTask: (data: { repoPath?: string; branch?: string }) => ipcRenderer.invoke("worktree:for-task", data),
   openWorktreeInEditor: (path: string) => ipcRenderer.invoke("worktree:open-editor", path),
+  resumeInTerminal: (cwd: string, sessionId: string) => ipcRenderer.invoke("worktree:resume-terminal", cwd, sessionId),
 
   // Agent Memory
   getMemoryStats: () => ipcRenderer.invoke("memory:stats"),

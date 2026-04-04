@@ -378,7 +378,7 @@ export function DetailDrawer({
       {/* Worktree info */}
       {n.repoPath && n.branch && (
         <div style={{ padding: "0 20px 8px", flexShrink: 0 }}>
-          <WorktreePanel repoPath={n.repoPath} branch={n.branch} />
+          <WorktreePanel repoPath={n.repoPath} branch={n.branch} sessionId={n.sessionId} />
         </div>
       )}
 
