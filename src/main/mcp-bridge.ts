@@ -12,6 +12,8 @@ import { spawn, ChildProcess } from "node:child_process";
 import { app } from "electron";
 import { getClaudeCodePath } from "./claude-path";
 import { trackProcess, untrackProcess } from "./process-monitor";
+import { recordUsage } from "./usage-ledger";
+import type { UsageSource } from "../shared/usage-types";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -153,7 +155,7 @@ export function createBridge(label: string): BridgeInstance {
   let isReady = false;
   let generation = 0;
   let outputBuffer = "";
-  let pendingRequests = new Map<string, { resolve: (text: string) => void; timeout: ReturnType<typeof setTimeout> | null }>();
+  let pendingRequests = new Map<string, { resolve: (text: string) => void; timeout: ReturnType<typeof setTimeout> | null; startTs: number }>();
   let connectorStatus: BridgeConnectorStatus = {
     ready: false, mcpToolCount: 0,
     connectors: { slack: false, linear: false, gmail: false, calendar: false, notion: false },
@@ -188,6 +190,18 @@ export function createBridge(label: string): BridgeInstance {
           log(`[${label}] Result: ${resultText.length} chars`);
           for (const [reqId, req] of pendingRequests) {
             if (req.timeout) clearTimeout(req.timeout);
+            try {
+              recordUsage({
+                timestamp: new Date().toISOString(),
+                source: "poll-bridge",
+                model: "claude-opus-4-6[1m]",
+                inputTokens: msg.usage?.input_tokens ?? 0,
+                outputTokens: msg.usage?.output_tokens ?? 0,
+                costUsd: msg.total_cost_usd ?? 0,
+                durationMs: Date.now() - req.startTs,
+                label: `bridge:${label}`,
+              });
+            } catch {}
             req.resolve(resultText);
             pendingRequests.delete(reqId);
             break;
@@ -275,13 +289,14 @@ export function createBridge(label: string): BridgeInstance {
         const reqId = randomUUID();
         log(`[${label}] Request ${reqId.slice(0, 8)}: ${prompt.slice(0, 100)}`);
 
+        const reqStartTs = Date.now();
         const timeout = timeoutMs ? setTimeout(() => {
           pendingRequests.delete(reqId);
           log(`[${label}] Request ${reqId.slice(0, 8)} timed out after ${timeoutMs}ms`);
           resolve("Request timed out");
         }, timeoutMs) : null;
 
-        pendingRequests.set(reqId, { resolve, timeout });
+        pendingRequests.set(reqId, { resolve, timeout, startTs: reqStartTs });
 
         const message = JSON.stringify({
           type: "user",
@@ -491,6 +506,18 @@ export function askMcpPlanningAgent(
             addDebugEntry("out", `✅ [PLANNING] Result: ${finalText.length} chars (result=${resultText.length}, assistant=${assistantText.length})`, "planning");
             log(`[planning] Result: ${finalText.length} chars (result=${resultText.length}, assistant=${assistantText.length})`);
             emit("result", `Plan complete (${finalText.length} chars)`);
+            try {
+              recordUsage({
+                timestamp: new Date().toISOString(),
+                source: "planning-agent",
+                model: "claude-opus-4-6[1m]",
+                inputTokens: msg.usage?.input_tokens ?? 0,
+                outputTokens: msg.usage?.output_tokens ?? 0,
+                costUsd: msg.total_cost_usd ?? 0,
+                durationMs: Date.now() - startTs,
+                label: "mcp-planning-agent",
+              });
+            } catch {}
             done = true;
             clearInterval(initTicker);
             clearTimeout(timeout);
@@ -520,8 +547,9 @@ export function askMcpPlanningAgent(
 }
 
 // Legacy ephemeral process (no MCP tools — used for plan iteration and work prompt composition)
-export function askEphemeralProcess(prompt: string, timeoutMs = 180000, model = "claude-opus-4-6[1m]"): Promise<string> {
+export function askEphemeralProcess(prompt: string, timeoutMs = 180000, model = "claude-opus-4-6[1m]", usageSource: UsageSource = "ephemeral"): Promise<string> {
   return new Promise((resolve) => {
+    const ephStartTs = Date.now();
     const claudePath = getClaudeCodePath();
 
     const proc = spawn(claudePath, [
@@ -582,6 +610,18 @@ export function askEphemeralProcess(prompt: string, timeoutMs = 180000, model = 
           if (msg.type === "result" && !done) {
             resultText = String(msg.result ?? "");
             addDebugEntry("out", `✅ [PLANNING] Result: ${resultText.length} chars`, "planning");
+            try {
+              recordUsage({
+                timestamp: new Date().toISOString(),
+                source: usageSource,
+                model,
+                inputTokens: msg.usage?.input_tokens ?? 0,
+                outputTokens: msg.usage?.output_tokens ?? 0,
+                costUsd: msg.total_cost_usd ?? 0,
+                durationMs: Date.now() - ephStartTs,
+                label: `ephemeral:${usageSource}`,
+              });
+            } catch {}
             done = true;
             clearTimeout(timeout);
             if (proc.pid) untrackProcess(proc.pid);

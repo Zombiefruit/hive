@@ -9,6 +9,7 @@ import os from "node:os";
 import { getClaudeCodePath } from "./claude-path";
 import { trackProcess, untrackProcess } from "./process-monitor";
 import { addDebugEntry } from "./mcp-bridge";
+import { recordUsage } from "./usage-ledger";
 import { loadSkills } from "../shared/skill-loader";
 import { parseTriageVerdict, parsePlanVerdict, parseWorkVerdict, parseBusinessContextVerdict } from "../shared/judge-parser";
 import type { TriageVerdict, PlanVerdict, WorkVerdict, BusinessContextVerdict } from "../shared/judge-types";
@@ -22,6 +23,7 @@ const JUDGE_SYSTEM_PROMPT = "You are a verification judge. Your ONLY job is to r
 
 function askJudgeProcess(prompt: string, label: string, timeoutMs: number): Promise<string> {
   return new Promise((resolve) => {
+    const judgeStartTs = Date.now();
     const claudePath = getClaudeCodePath();
 
     const proc = spawn(claudePath, [
@@ -75,6 +77,18 @@ function askJudgeProcess(prompt: string, label: string, timeoutMs: number): Prom
           if (msg.type === "result" && !done) {
             resultText = String(msg.result ?? "");
             addDebugEntry("out", `✅ [JUDGE:${label}] Result: ${resultText.length} chars`, "judge");
+            try {
+              recordUsage({
+                timestamp: new Date().toISOString(),
+                source: "judge",
+                model: "claude-sonnet-4-6",
+                inputTokens: msg.usage?.input_tokens ?? 0,
+                outputTokens: msg.usage?.output_tokens ?? 0,
+                costUsd: msg.total_cost_usd ?? 0,
+                durationMs: Date.now() - judgeStartTs,
+                label: `judge:${label}`,
+              });
+            } catch {}
             done = true;
             clearTimeout(timeout);
             if (proc.pid) untrackProcess(proc.pid);

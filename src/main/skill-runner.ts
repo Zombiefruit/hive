@@ -12,6 +12,7 @@
 import { spawn, ChildProcess, execSync } from "node:child_process";
 import { getClaudeCodePath } from "./claude-path";
 import { trackProcess, untrackProcess } from "./process-monitor";
+import { recordUsage } from "./usage-ledger";
 import { type PlanningEvent } from "./mcp-bridge";
 import fs from "node:fs";
 import path from "node:path";
@@ -410,6 +411,19 @@ export function runSkill(
 
             log(`[skill] Result: ${finalText.length} chars (result=${resultText.length}, assistant=${assistantText.length})`);
             emit("result", `Skill complete (${finalText.length} chars)`);
+            try {
+              recordUsage({
+                timestamp: new Date().toISOString(),
+                source: "skill-runner",
+                model: "unknown",
+                inputTokens: msg.usage?.input_tokens ?? 0,
+                outputTokens: msg.usage?.output_tokens ?? 0,
+                costUsd: msg.total_cost_usd ?? 0,
+                durationMs: Date.now() - startTs,
+                label: skillLabel,
+                notificationId: invocation.notificationId,
+              });
+            } catch {}
             done = true;
             clearInterval(initTicker);
             clearTimeout(timeout);

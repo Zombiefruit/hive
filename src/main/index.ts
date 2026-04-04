@@ -422,6 +422,20 @@ app.whenReady().then(() => {
 
   ipcMain.handle("skill:check", () => checkRequiredSkills());
 
+  // Worktree operations
+  ipcMain.handle("worktree:for-task", async (_event, data: { repoPath?: string; branch?: string }) => {
+    const { getWorktreeForTask } = await import("./worktree-service");
+    return getWorktreeForTask(data);
+  });
+  ipcMain.handle("worktree:open-editor", async (_event, worktreePath: string) => {
+    const { openInEditor } = await import("./worktree-service");
+    const cfg = (await import("./config")).getConfig();
+    const editorCmd = ((cfg ?? {}) as Record<string, unknown>).editorCommand as import("../shared/worktree-types").EditorCommand | undefined;
+    const customCmd = ((cfg ?? {}) as Record<string, unknown>).customEditorCommand as string | undefined;
+    openInEditor(worktreePath, editorCmd ?? "code", customCmd);
+    return { ok: true };
+  });
+
   // Discover git repos in common locations
   ipcMain.handle("repos:discover", async () => {
     const os = require("node:os");
@@ -578,6 +592,16 @@ app.whenReady().then(() => {
   ipcMain.handle("reflect:data", async () => {
     const { getReflectData } = await import("./coach/service");
     return getReflectData();
+  });
+
+  // Usage tracking
+  ipcMain.handle("usage:summary", async () => {
+    const { getUsageSummary } = await import("./usage-ledger");
+    return getUsageSummary();
+  });
+  ipcMain.handle("usage:recent", async (_event, limit?: number) => {
+    const { getRecentEntries } = await import("./usage-ledger");
+    return getRecentEntries(limit);
   });
 
   // Setup Agent

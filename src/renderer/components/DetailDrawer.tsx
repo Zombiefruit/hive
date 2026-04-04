@@ -15,8 +15,9 @@ import { TimelineTab } from "./TimelineTab";
 import { RepoDetectionBanner, deriveBranch } from "./RepoDetectionBanner";
 import { StartWorkModal } from "./StartWorkModal";
 import { SubtaskList } from "./SubtaskList";
+import { WorktreePanel } from "./WorktreePanel";
 import { STAGE_META } from "../../shared/ui-constants";
-import { getStageCTA, getStageAction, isHumanTask } from "../../shared/stage-machine";
+import { getStageCTA, getStageAction, isHumanTask, skillToStage } from "../../shared/stage-machine";
 import { detectRepo } from "../../shared/repo-detection";
 import type { NextStepsCardProps } from "./NextStepsCard";
 
@@ -251,7 +252,7 @@ export function DetailDrawer({
   // ── Action handlers for NextStepsCard ──
   const actionHandlers: Omit<NextStepsCardProps, "actions"> = {
     onRunSkill: async (skill, params) => {
-      const nextStage = skill === "/hack" ? "hack" : skill === "/ship" ? "ship" : skill === "/code-review" ? "code_review" : undefined;
+      const nextStage = skillToStage(skill) ?? undefined;
       if (nextStage) window.deck?.updateNotificationById?.(n.id, { stage: nextStage });
       setLoading(true);
       setSkillRunning(true);
@@ -361,6 +362,13 @@ export function DetailDrawer({
           />
         )}
       </div>
+
+      {/* Worktree info */}
+      {n.repoPath && n.branch && (
+        <div style={{ padding: "0 20px 8px", flexShrink: 0 }}>
+          <WorktreePanel repoPath={n.repoPath} branch={n.branch} />
+        </div>
+      )}
 
       {/* Parent task: subtask list */}
       {n.subtaskIds && n.subtaskIds.length > 0 && notificationMap && (

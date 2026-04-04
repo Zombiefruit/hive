@@ -52,6 +52,11 @@ describe("deriveActions", () => {
     expect(actions).toHaveLength(1);
   });
 
+  it("should NOT add dismiss for skipped stage", () => {
+    const actions = deriveActions([noAction], "skipped");
+    expect(actions.some(a => a.type === "dismiss")).toBe(false);
+  });
+
   it("should NOT add Mark Done when there are real actions", () => {
     const actions = deriveActions([noAction, runSkill], "ready");
     expect(actions).toHaveLength(2);

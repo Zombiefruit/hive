@@ -57,7 +57,7 @@ Rules:
 - Confidence: 0.9+ for explicit statements, 0.6-0.8 for inferences, 0.5 for weak signals`;
 
   try {
-    const response = await askEphemeralProcess(prompt, 60000, "claude-haiku-4-5");
+    const response = await askEphemeralProcess(prompt, 60000, "claude-haiku-4-5", "memory-extract");
 
     // Parse JSON array from response
     const jsonMatch = response.match(/\[[\s\S]*\]/);

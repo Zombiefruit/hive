@@ -252,6 +252,10 @@ const api = {
   getReflectSignals: () => ipcRenderer.invoke("reflect:signals"),
   getReflectData: () => ipcRenderer.invoke("reflect:data"),
 
+  // Usage tracking
+  getUsageSummary: () => ipcRenderer.invoke("usage:summary"),
+  getRecentUsage: (limit?: number) => ipcRenderer.invoke("usage:recent", limit),
+
   // Setup Agent (auto-discovery, re-runnable)
   runSetupAgent: (name: string, email: string) => ipcRenderer.invoke("setup:run", name, email),
   onSetupProgress: (callback: (msg: string) => void) => {
@@ -259,6 +263,10 @@ const api = {
     ipcRenderer.on("setup:progress", listener);
     return () => ipcRenderer.removeListener("setup:progress", listener);
   },
+
+  // Worktrees
+  getWorktreeForTask: (data: { repoPath?: string; branch?: string }) => ipcRenderer.invoke("worktree:for-task", data),
+  openWorktreeInEditor: (path: string) => ipcRenderer.invoke("worktree:open-editor", path),
 
   // Agent Memory
   getMemoryStats: () => ipcRenderer.invoke("memory:stats"),

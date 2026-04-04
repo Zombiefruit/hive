@@ -108,6 +108,11 @@ export function getStageAction(targetStage: string): StageAction | null {
   return STAGE_ACTIONS[targetStage] ?? null;
 }
 
+/** Is this stage terminal (task resolved — no further workflow actions)? */
+export function isTerminalStage(stage: string): boolean {
+  return stage === "done" || stage === "backlog" || stage === "skipped";
+}
+
 /**
  * Map a skill name to the stage it belongs to.
  * Used by NextStepsCard to determine stage from agent-suggested skills.

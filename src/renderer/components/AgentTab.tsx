@@ -14,6 +14,7 @@ import { NextStepsCard, type NextStepsCardProps } from "./NextStepsCard";
 import { parseActions } from "../../shared/action-parser";
 import type { Action } from "../../shared/action-types";
 import { Markdown } from "./Markdown";
+import { isTerminalStage, STAGE_ACTIONS } from "../../shared/stage-machine";
 
 // ── Exported helpers (tested) ──
 
@@ -24,7 +25,7 @@ export function shouldAutoExpand(loading: boolean, eventCount: number): boolean 
 /** Derive display actions from raw parsed actions + task state. */
 export function deriveActions(rawActions: Action[], stage?: string): Action[] {
   const allNoAction = rawActions.length > 0 && rawActions.every(a => a.type === "no_action");
-  const isDone = stage === "done" || stage === "backlog";
+  const isDone = isTerminalStage(stage ?? "new");
   if (allNoAction && !isDone) {
     return [...rawActions, { type: "dismiss" as const, label: "Mark Done", reason: "No action needed", risk: "low" as const }];
   }
@@ -38,9 +39,8 @@ export function deriveActions(rawActions: Action[], stage?: string): Action[] {
  */
 export function getEmptyStateMessage(stage?: string): string | null {
   // Stages where an agent is actively running — never show static empty text
-  if (stage === "start_work" || stage === "preparing" || stage === "plan_review" || stage === "hack" || stage === "ship" || stage === "code_review") {
-    return null;
-  }
+  const action = STAGE_ACTIONS[stage ?? ""];
+  if (action?.inProgress || stage === "plan_review") return null;
   if (stage === "new" || stage === "skipped") {
     return 'Click "Move to Planning" to begin.';
   }

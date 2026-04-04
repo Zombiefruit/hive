@@ -9,6 +9,7 @@
  */
 
 import { addDebugEntry, askEphemeralProcess, askMcpPlanningAgent, type PlanningEvent } from "../mcp-bridge";
+import { recordUsage } from "../usage-ledger";
 import { buildMcpPlanningPrompt, buildResponsePrompt, buildMeetingPrepPrompt } from "../../shared/planning-contract";
 import { spawn, ChildProcess, execFile } from "node:child_process";
 import { getClaudeCodePath } from "../claude-path";
@@ -502,6 +503,20 @@ Write the prompt as if you're giving instructions to a skilled developer. Be tho
         // Capture final result text for work judge
         if (msg.type === "result") {
           resultText = String(msg.result ?? "");
+          try {
+            const agentEntry = activeWorkAgents.get(agentId);
+            recordUsage({
+              timestamp: new Date().toISOString(),
+              source: "work-agent",
+              model: "claude-sonnet-4-6",
+              inputTokens: msg.usage?.input_tokens ?? 0,
+              outputTokens: msg.usage?.output_tokens ?? 0,
+              costUsd: msg.total_cost_usd ?? 0,
+              durationMs: agentEntry ? Date.now() - agentEntry.startedAt : 0,
+              label: plan.title,
+              notificationId,
+            });
+          } catch {}
         }
         const event = parseAgentEvent(msg);
         if (event) {

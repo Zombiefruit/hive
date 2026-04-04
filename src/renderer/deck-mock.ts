@@ -221,6 +221,80 @@ if (!isElectron) {
       ],
     }),
 
+    // Usage tracking
+    getUsageSummary: () => {
+      const today = new Date().toISOString().slice(0, 10);
+      const makeDays = (count: number) => Array.from({ length: count }, (_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - (count - 1 - i));
+        const date = d.toISOString().slice(0, 10);
+        const base = 150 + Math.random() * 100;
+        return {
+          date,
+          totalCostUsd: Math.round(base * 100) / 100,
+          totalInputTokens: Math.round(base * 12000),
+          totalOutputTokens: Math.round(base * 3000),
+          callCount: 40 + Math.floor(Math.random() * 30),
+          bySource: {
+            agent: { costUsd: Math.round(base * 0.4 * 100) / 100, callCount: 12 },
+            "skill-runner": { costUsd: Math.round(base * 0.25 * 100) / 100, callCount: 8 },
+            "planning-agent": { costUsd: Math.round(base * 0.12 * 100) / 100, callCount: 6 },
+            judge: { costUsd: Math.round(base * 0.08 * 100) / 100, callCount: 5 },
+            manager: { costUsd: Math.round(base * 0.06 * 100) / 100, callCount: 4 },
+            "poll-bridge": { costUsd: Math.round(base * 0.04 * 100) / 100, callCount: 3 },
+            insights: { costUsd: Math.round(base * 0.03 * 100) / 100, callCount: 2 },
+            reflect: { costUsd: Math.round(base * 0.02 * 100) / 100, callCount: 1 },
+          },
+          byModel: {
+            "claude-sonnet-4-6": { costUsd: Math.round(base * 0.5 * 100) / 100, callCount: 20, inputTokens: Math.round(base * 6000), outputTokens: Math.round(base * 1500) },
+            "claude-haiku-4-5-20251001": { costUsd: Math.round(base * 0.15 * 100) / 100, callCount: 15, inputTokens: Math.round(base * 4000), outputTokens: Math.round(base * 1000) },
+            "claude-opus-4-6": { costUsd: Math.round(base * 0.35 * 100) / 100, callCount: 5, inputTokens: Math.round(base * 2000), outputTokens: Math.round(base * 500) },
+          },
+        };
+      });
+      const last30 = makeDays(30);
+      const last7 = last30.slice(-7);
+      const todayData = last30[last30.length - 1];
+      const allCost = last30.reduce((s, d) => s + d.totalCostUsd, 0) + 4200;
+      const allCalls = last30.reduce((s, d) => s + d.callCount, 0) + 12000;
+      return Promise.resolve({
+        today: { ...todayData, date: today },
+        last7Days: last7,
+        last30Days: last30,
+        allTimeCostUsd: Math.round(allCost * 100) / 100,
+        allTimeCallCount: allCalls,
+      });
+    },
+    getRecentUsage: (limit?: number) => {
+      const sources = ["agent", "skill-runner", "planning-agent", "judge", "manager", "poll-bridge", "insights", "reflect"] as const;
+      const models = ["claude-sonnet-4-6", "claude-haiku-4-5-20251001", "claude-opus-4-6"];
+      const labels = [
+        "Implement retry logic", "Fix flaky test", "Triage notifications", "Plan VEC-423",
+        "Generate insights", "Review PR #4521", "Extract memories", "Reflect analysis",
+        "Manager chat", "Fetch Slack updates", "Poll Linear tickets", "Judge triage",
+      ];
+      const count = limit ?? 50;
+      const entries = Array.from({ length: count }, (_, i) => {
+        const src = sources[i % sources.length];
+        const model = models[i % models.length];
+        const input = 2000 + Math.floor(Math.random() * 30000);
+        const output = 500 + Math.floor(Math.random() * 8000);
+        const cost = (input * 0.000003 + output * 0.000015);
+        return {
+          id: `usage-${i}`,
+          timestamp: new Date(Date.now() - i * 180000).toISOString(),
+          source: src,
+          model,
+          inputTokens: input,
+          outputTokens: output,
+          costUsd: Math.round(cost * 1000) / 1000,
+          durationMs: 1000 + Math.floor(Math.random() * 15000),
+          label: labels[i % labels.length],
+        };
+      });
+      return Promise.resolve(entries);
+    },
+
     // Config (onboarding) — mock with localStorage
     hasConfig: () => Promise.resolve(localStorage.getItem("claude-deck-config") !== null),
     getConfig: () => {

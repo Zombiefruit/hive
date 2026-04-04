@@ -1,4 +1,5 @@
 import { getClaudeCodePath } from "../claude-path";
+import { recordUsage } from "../usage-ledger";
 
 // Dynamic import to avoid Vite bundling issues with import.meta.url
 let sdkQuery: typeof import("@anthropic-ai/claude-agent-sdk").query | null = null;
@@ -113,7 +114,10 @@ export async function spawnAgent(config: SpawnAgentConfig): Promise<string> {
   activeAgents.set(agentId, activeAgent);
 
   // Process the stream in the background
-  processAgentStream(agentId, q).catch((err) => {
+  processAgentStream(agentId, q, {
+    model: config.model ?? "unknown",
+    task: config.task ?? "agent",
+  }).catch((err) => {
     console.error(`[AgentManager] Agent ${agentId} stream error:`, err);
     updateAgent(agentId, { status: "errored" });
     addEvent(agentId, "error", `Stream error: ${String(err)}`);
@@ -129,8 +133,10 @@ export async function spawnAgent(config: SpawnAgentConfig): Promise<string> {
  */
 async function processAgentStream(
   agentId: string,
-  q: any
+  q: any,
+  meta: { model: string; task: string } = { model: "unknown", task: "agent" },
 ): Promise<void> {
+  const startTs = Date.now();
   try {
     for await (const message of q) {
       // Forward raw message to renderer for real-time display
@@ -198,6 +204,20 @@ async function processAgentStream(
               ? `Completed in ${(result.duration_ms ?? 0) / 1000}s`
               : `Error: ${result.subtype}`
           );
+
+          try {
+            recordUsage({
+              timestamp: new Date().toISOString(),
+              source: "agent",
+              model: meta.model,
+              inputTokens: result.usage?.input_tokens ?? 0,
+              outputTokens: result.usage?.output_tokens ?? 0,
+              costUsd: result.total_cost_usd ?? 0,
+              durationMs: Date.now() - startTs,
+              label: meta.task,
+              agentId,
+            });
+          } catch {}
 
           // Clean up
           activeAgents.delete(agentId);
@@ -317,7 +337,10 @@ export async function resumeSession(agentId: string, sessionId: string, cwd: str
   updateAgent(agentId, { status: "active", source: "deck" as "deck" });
   addEvent(agentId, "task_start", "Resumed session — now interactive");
 
-  processAgentStream(agentId, q).catch((err) => {
+  processAgentStream(agentId, q, {
+    model: "unknown",
+    task: "resumed-session",
+  }).catch((err) => {
     console.error(`[AgentManager] Resume ${agentId} stream error:`, err);
     updateAgent(agentId, { status: "errored" });
     addEvent(agentId, "error", `Resume error: ${String(err)}`);

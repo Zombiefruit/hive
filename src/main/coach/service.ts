@@ -280,7 +280,7 @@ ${memoryBlock}
 Return ONLY valid JSON — no markdown fences, no commentary.`;
 
     addDebugEntry("out", "[reflect] generating manager take", "coach");
-    const raw = await askEphemeralProcess(prompt, 30000, "claude-haiku-4-5-20251001");
+    const raw = await askEphemeralProcess(prompt, 30000, "claude-haiku-4-5-20251001", "reflect");
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON found in response");
     const parsed = JSON.parse(jsonMatch[0]) as { summary: string; callouts: string[]; rating: string };
