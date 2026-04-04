@@ -13,6 +13,7 @@ import { addDebugEntry } from "./mcp-bridge";
 import { computeParentStage } from "../shared/task-utils";
 import type { Escalation } from "../shared/escalation-types";
 import { randomUUID } from "node:crypto";
+import { emitMonologue, initThoughtSynthesizer } from "./thought-synthesizer";
 
 // ── State ──
 
@@ -46,6 +47,9 @@ function think(thought: string): void {
   addDebugEntry("out", `🧠 [ORCH] (${sent} windows) ${thought}`, "orchestrator");
 }
 
+// Wire the synthesizer to the low-level think function
+initThoughtSynthesizer(think);
+
 // ── Core loop ──
 
 async function tick(): Promise<void> {
@@ -61,7 +65,7 @@ async function tick(): Promise<void> {
     const childStages = children.map(c => c.stage ?? "new");
     const computed = computeParentStage(childStages);
     if (computed !== parent.stage) {
-      think(`Parent "${parent.title}" stage: ${parent.stage} → ${computed} (from ${childStages.join(", ")})`);
+      emitMonologue(`Parent "${parent.title}" stage: ${parent.stage} → ${computed} (from ${childStages.join(", ")})`);
       updateNotificationById(parent.id, { stage: computed });
     }
   }
@@ -78,7 +82,7 @@ async function tick(): Promise<void> {
       // Check if we already escalated this task recently
       const recentEscalation = escalations.find(e => e.taskId === n.id && !e.resolvedAt);
       if (!recentEscalation) {
-        think(`Task "${n.title}" has been in ${n.stage} for ${Math.round(minutesSince)}min with no activity — escalating`);
+        emitMonologue(`Task "${n.title}" has been in ${n.stage} for ${Math.round(minutesSince)}min with no activity — escalating`);
         escalations.push({
           id: randomUUID(),
           taskId: n.id,
@@ -105,7 +109,7 @@ async function tick(): Promise<void> {
   const planReviewTasks = active.filter(n => n.stage === "plan_review");
   for (const n of planReviewTasks) {
     if (n.verdict?.status === "approved") {
-      think(`Plan for "${n.title}" was approved by judge — ready for user to start work`);
+      emitMonologue(`Plan for "${n.title}" was approved by judge — ready for user to start work`);
     }
   }
 }
@@ -115,7 +119,7 @@ async function tick(): Promise<void> {
 export function startOrchestrator(): void {
   if (running) return;
   running = true;
-  think("Orchestrator started — monitoring all active tasks");
+  emitMonologue("Orchestrator started — monitoring all active tasks");
 
   // Run every 60 seconds
   intervalId = setInterval(() => {
@@ -134,7 +138,7 @@ export function stopOrchestrator(): void {
     intervalId = null;
   }
   running = false;
-  think("Orchestrator stopped");
+  emitMonologue("Orchestrator stopped");
 }
 
 export function getOrchestratorStatus(): {
@@ -150,7 +154,7 @@ export function resolveEscalation(id: string, resolution: string): void {
   if (esc) {
     esc.resolvedAt = new Date().toISOString();
     esc.resolution = resolution;
-    think(`Escalation resolved: ${esc.summary} → ${resolution}`);
+    emitMonologue(`Escalation resolved: ${esc.summary} → ${resolution}`);
   }
 }
 
@@ -158,7 +162,7 @@ export function getRecentThoughts(limit = 10): Array<{ timestamp: string; though
   return recentThoughts.slice(-limit);
 }
 
-/** Emit a thought from outside the orchestrator (e.g., poll service, judges). */
-export function emitThought(thought: string): void {
-  think(thought);
+/** Emit a thought from outside the orchestrator (e.g., poll service, judges). Uses Haiku for natural language. */
+export function emitThought(rawEvent: string): void {
+  emitMonologue(rawEvent);
 }

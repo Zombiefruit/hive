@@ -25,9 +25,15 @@ describe("stage-machine", () => {
       expect(canDropTo("new", "start_work", "implementation")).toBe(true);
       expect(canDropTo("plan_review", "hack", "implementation")).toBe(true);
     });
-    it("blocks backward moves", () => {
-      expect(canDropTo("hack", "start_work", "implementation")).toBe(false);
-      expect(canDropTo("ship", "hack", "implementation")).toBe(false);
+    it("blocks large backward jumps", () => {
+      expect(canDropTo("ship", "new", "implementation")).toBe(false);
+      expect(canDropTo("code_review", "start_work", "implementation")).toBe(false);
+      expect(canDropTo("done", "new", "implementation")).toBe(false);
+    });
+    it("allows specific backward revisions", () => {
+      expect(canDropTo("hack", "start_work", "implementation")).toBe(true);     // revise plan
+      expect(canDropTo("code_review", "hack", "implementation")).toBe(true);    // rework code
+      expect(canDropTo("pr_feedback", "hack", "implementation")).toBe(true);    // rework from feedback
     });
     it("always allows done/backlog/skipped", () => {
       expect(canDropTo("hack", "done", "implementation")).toBe(true);

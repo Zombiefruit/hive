@@ -226,15 +226,19 @@ export function updateNotificationById(id: string, changes: Record<string, unkno
     logPoll(`  NOT FOUND! Available IDs: ${notifications.map(n => n.id.slice(0, 20)).join(", ")}`);
     return false;
   }
-  // Track stage changes in timeline — NEVER allow backward regression
+  // Track stage changes in timeline — block large backward regressions (>1 step) but allow one-step-back
   if (changes.stage && changes.stage !== n.stage) {
     const currentOrder = STAGE_ORDER[n.stage ?? "new"] ?? 0;
     const newOrder = STAGE_ORDER[changes.stage as string] ?? 0;
-    // Allow: forward moves, done (from any), backlog (from any), skipped (from any)
     const alwaysAllowed = changes.stage === "done" || changes.stage === "backlog" || changes.stage === "skipped";
-    if (newOrder < currentOrder && !alwaysAllowed) {
+    // Specific backward transitions the user can initiate (revise plan, rework code)
+    const allowedBackward =
+      (n.stage === "hack" && changes.stage === "start_work") ||
+      (n.stage === "code_review" && changes.stage === "hack") ||
+      (n.stage === "pr_feedback" && changes.stage === "hack");
+    if (newOrder < currentOrder && !alwaysAllowed && !allowedBackward) {
       logPoll(`  BLOCKED stage regression in updateNotificationById: "${n.title.slice(0, 40)}" ${n.stage} → ${changes.stage} (order ${currentOrder} → ${newOrder})`);
-      delete changes.stage; // strip the invalid stage change, apply everything else
+      delete changes.stage;
     } else {
       if (!n.timeline) n.timeline = [];
       n.timeline.push({ timestamp: new Date().toISOString(), event: `Stage: ${n.stage ?? "new"} → ${changes.stage}` });

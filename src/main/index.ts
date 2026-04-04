@@ -403,12 +403,25 @@ app.whenReady().then(() => {
 
   // Skill runner
   ipcMain.handle("skill:run", async (_event, invocation: SkillInvocation) => {
+    const cachePath = path.join(app.getPath("userData"), "planning-events-cache.json");
     const onEvent = (event: PlanningEvent) => {
+      // Broadcast to all renderer windows
       for (const win of BrowserWindow.getAllWindows()) {
         if (!win.isDestroyed()) {
           win.webContents.send("planning:event", { notificationId: invocation.notificationId, event });
         }
       }
+      // Persist to event cache so events survive page navigation / drawer re-open
+      try {
+        let cache: Record<string, Array<{ type: string; content: string; timestamp: string }>> = {};
+        try { cache = JSON.parse(fs.readFileSync(cachePath, "utf-8")); } catch {}
+        if (!cache[invocation.notificationId]) cache[invocation.notificationId] = [];
+        cache[invocation.notificationId].push({ type: event.type, content: event.content, timestamp: event.timestamp });
+        if (cache[invocation.notificationId].length > 100) {
+          cache[invocation.notificationId] = cache[invocation.notificationId].slice(-100);
+        }
+        fs.writeFileSync(cachePath, JSON.stringify(cache));
+      } catch {}
     };
     return runSkill(invocation, onEvent);
   });

@@ -297,19 +297,7 @@ export function Notifications() {
     const action = getStageAction(targetStage);
     if (!action) return;
 
-    if (action.usePlanAgent) {
-      // Planning stage — start the plan agent
-      window.deck.prepareWorkPlan?.({
-        id: notif.id,
-        title: notif.title,
-        summary: notif.summary,
-        taskType: notif.taskType,
-        source: notif.source,
-        priority: notif.priority,
-        links: notif.links,
-        actionNeeded: notif.actionNeeded,
-      }).catch((err: unknown) => console.error("[planning] prepareWorkPlan failed:", err));
-    } else if (action.skill) {
+    if (action.skill) {
       // Skill-based stage — run the skill
       window.deck.runSkill?.({
         skill: action.skill,

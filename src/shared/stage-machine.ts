@@ -12,7 +12,7 @@ import { isValidTransition, STAGE_ORDER } from "./task-utils";
 
 export interface StageAction {
   skill?: string;           // skill to run on entry (e.g. "/hack")
-  usePlanAgent?: boolean;   // uses prepareWorkPlan instead of a skill
+  usePlanAgent?: boolean;   // uses prepareWorkPlan instead of a skill (human tasks only)
   label: string;            // human-readable label
   ctaLabel?: string;        // CTA button text (if this stage needs user action to advance)
   inProgress?: boolean;     // true = an agent is actively working, no CTA shown
@@ -21,7 +21,7 @@ export interface StageAction {
 /** What happens when a task enters each stage. */
 export const STAGE_ACTIONS: Record<string, StageAction> = {
   new:          { label: "Inbox", ctaLabel: "Move to Planning" },
-  start_work:   { usePlanAgent: true, label: "Planning", inProgress: true },
+  start_work:   { skill: "/start-work", label: "Planning", inProgress: true },
   plan_review:  { label: "Plan Review", ctaLabel: "Approve & Start" },
   hack:         { skill: "/hack", label: "Hacking", inProgress: true },
   ship:         { skill: "/ship", label: "Shipping", inProgress: true },
@@ -29,7 +29,7 @@ export const STAGE_ACTIONS: Record<string, StageAction> = {
   pr_feedback:  { skill: "/handle-pr-feedback", label: "Fixing Feedback", inProgress: true },
   preparing:    { usePlanAgent: true, label: "Preparing", inProgress: true },
   ready:        { label: "Ready", ctaLabel: "Mark Done" },
-  done:         { label: "Done" },
+  done:         { skill: "/done", label: "Done" },
   backlog:      { label: "Backlog" },
   skipped:      { label: "Skipped" },
 };
@@ -78,7 +78,8 @@ export function getStageCTA(currentStage: string, taskType?: string): { label: s
 
 /**
  * Can the user drop a task from `from` stage to `to` stage?
- * Allows: one step forward on the track, plus backlog/done/skipped from anywhere.
+ * Allows: one step forward OR one step backward on the track,
+ * plus backlog/done/skipped from anywhere.
  */
 export function canDropTo(from: string, to: string, taskType?: string): boolean {
   // Always allowed targets
@@ -93,11 +94,21 @@ export function canDropTo(from: string, to: string, taskType?: string): boolean 
   // Must be on the same track
   if (fromIdx === -1 || toIdx === -1) return false;
 
-  // Allow moving forward by exactly 1 step on the track
-  // Special: plan_review→hack is valid (plan_review is a sub-stage of the start_work→hack transition)
+  // Allow one step forward
+  if (toIdx === fromIdx + 1) return true;
+
+  // Special: plan_review→hack (plan_review is between start_work and hack in the track)
   if (from === "plan_review" && to === "hack") return true;
 
-  return toIdx === fromIdx + 1;
+  // Specific backward transitions that make sense:
+  // hack → start_work: go back to revise/redo the plan
+  // code_review → hack: reviewer feedback needs code changes
+  // pr_feedback → hack: same — need to rework
+  if (from === "hack" && to === "start_work") return true;
+  if (from === "code_review" && to === "hack") return true;
+  if (from === "pr_feedback" && to === "hack") return true;
+
+  return false;
 }
 
 /**

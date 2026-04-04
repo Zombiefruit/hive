@@ -134,6 +134,12 @@ export function DetailDrawer({
       const evt = data.event;
       setActivity(prev => [...prev, evt]);
 
+      // Agent initialized — mark as running so input becomes active
+      if (evt.type === "init") {
+        setSkillRunning(true);
+        setLoading(true);
+      }
+
       if (evt.type === "text") {
         setConversation(prev => {
           const last = prev[prev.length - 1];
@@ -151,6 +157,7 @@ export function DetailDrawer({
 
       if (evt.type === "error") {
         setLoading(false);
+        setSkillRunning(false);
       }
 
       if (activeTab !== "agent") setActiveTab("agent");
@@ -231,25 +238,31 @@ export function DetailDrawer({
   }, [n.id, n.title]);
 
   const handlePrepare = useCallback(() => {
-    // "Move to Planning" always starts the planning phase — context gathering + plan creation.
-    // Repo selection happens later when moving from Planning → Hacking.
-    setLoading(true);
-    setActiveTab("agent");
+    // "Move to Planning" starts the planning phase.
+    // Agent tasks → open repo selector, then /start-work skill runs via handleStartWork.
+    // Human tasks → run prepareWorkPlan directly (no repo needed).
     const isHuman = n.taskType === "response" || n.taskType === "meeting_prep";
-    window.deck?.updateNotificationById?.(n.id, { stage: isHuman ? "preparing" : "start_work" });
-    (async () => {
-      try {
-        const result = await window.deck.prepareWorkPlan({
-          id: n.id, source: n.source, title: n.title, summary: n.summary, url: n.url,
-          taskType: n.taskType, links: n.links,
-        });
-        const plan = result as { conversationHistory?: typeof conversation; fetchedContext?: typeof fetchedContext };
-        if (plan?.conversationHistory) setConversation(plan.conversationHistory);
-        if (plan?.fetchedContext) setFetchedContext(plan.fetchedContext);
-        window.deck?.updateNotificationById?.(n.id, { stage: isHuman ? "ready" : "plan_review" });
-      } catch {}
-      setLoading(false);
-    })();
+    if (isHuman) {
+      setLoading(true);
+      setActiveTab("agent");
+      window.deck?.updateNotificationById?.(n.id, { stage: "preparing" });
+      (async () => {
+        try {
+          const result = await window.deck.prepareWorkPlan({
+            id: n.id, source: n.source, title: n.title, summary: n.summary, url: n.url,
+            taskType: n.taskType, links: n.links,
+          });
+          const plan = result as { conversationHistory?: typeof conversation; fetchedContext?: typeof fetchedContext };
+          if (plan?.conversationHistory) setConversation(plan.conversationHistory);
+          if (plan?.fetchedContext) setFetchedContext(plan.fetchedContext);
+          window.deck?.updateNotificationById?.(n.id, { stage: "ready" });
+        } catch {}
+        setLoading(false);
+      })();
+    } else {
+      // Agent tasks: open the repo selector modal — handleStartWork runs /start-work
+      setStartWorkOpen(true);
+    }
   }, [n.id, n.taskType, detectedRepo, suggestedBranch]);
 
   // ── Action handlers for NextStepsCard ──
@@ -471,20 +484,12 @@ export function DetailDrawer({
           }}>
             <UnstyledButton
               onClick={() => {
-                if (action?.usePlanAgent) {
-                  // Planning — needs repo selection for agent tasks
-                  if (isHumanTask(n.taskType)) {
-                    // Human tasks: start preparing directly
-                    window.deck?.updateNotificationById?.(n.id, { stage: cta.targetStage });
-                    window.deck?.prepareWorkPlan?.({
-                      id: n.id, title: n.title, summary: n.summary,
-                      taskType: n.taskType, source: n.source, priority: n.priority,
-                      links: n.links, actionNeeded: n.actionNeeded,
-                    }).catch(() => {});
-                  } else {
-                    // Agent tasks: may need repo selection
-                    handlePrepare();
-                  }
+                if (action?.skill && cta.targetStage === "start_work") {
+                  // Planning — handlePrepare routes: human → prepareWorkPlan, agent → repo selector
+                  handlePrepare();
+                } else if (action?.usePlanAgent) {
+                  // Human task preparing stage — uses prepareWorkPlan directly
+                  handlePrepare();
                 } else if (action?.skill) {
                   // Skill-based stage — run the skill
                   window.deck?.updateNotificationById?.(n.id, { stage: cta.targetStage });
