@@ -118,7 +118,10 @@ export function DetailDrawer({
       } catch {}
       try {
         const running = await window.deck.isSkillRunning?.(n.id);
-        if (!cancelled) setSkillRunning(!!running);
+        if (!cancelled && running) {
+          setSkillRunning(true);
+          setLoading(true);
+        }
       } catch {}
     })();
     return () => { cancelled = true; };
@@ -252,16 +255,25 @@ export function DetailDrawer({
   // ── Action handlers for NextStepsCard ──
   const actionHandlers: Omit<NextStepsCardProps, "actions"> = {
     onRunSkill: async (skill, params) => {
-      const nextStage = skillToStage(skill) ?? undefined;
+      // If the agent suggests /start-work but a plan already exists, run /hack instead.
+      // This happens when the planning agent's output suggests "Run /start-work" even
+      // though the plan is complete and the task should advance to hacking.
+      let effectiveSkill = skill;
+      if (skill === "/start-work" && (n.stage === "plan_review" || n.stage === "start_work") && planText) {
+        effectiveSkill = "/hack";
+      }
+
+      const nextStage = skillToStage(effectiveSkill) ?? undefined;
       if (nextStage) window.deck?.updateNotificationById?.(n.id, { stage: nextStage });
       setLoading(true);
       setSkillRunning(true);
+      setActiveTab("agent");
       try {
         await window.deck.runSkill({
-          skill, args: params?.phase ? `phase ${params.phase}` : "",
+          skill: effectiveSkill, args: params?.phase ? `phase ${params.phase}` : "",
           repoPath: n.repoPath ?? "", sessionId: n.sessionId ?? null, notificationId: n.id,
         });
-      } catch (err) { console.error(`Skill ${skill} failed:`, err); }
+      } catch (err) { console.error(`Skill ${effectiveSkill} failed:`, err); }
       setSkillRunning(false);
       setLoading(false);
     },
@@ -444,7 +456,7 @@ export function DetailDrawer({
       </Tabs>
 
       {/* Stage CTA — single action bar derived from stage machine */}
-      {!loading && !(n.subtaskIds && n.subtaskIds.length > 0) && (() => {
+      {!loading && !skillRunning && !(n.subtaskIds && n.subtaskIds.length > 0) && (() => {
         const cta = getStageCTA(n.stage ?? "new", n.taskType);
         if (!cta) return null;
 
