@@ -121,8 +121,8 @@ function ActionRow({
     <div style={{
       padding: "10px 14px", borderRadius: 8,
       border: `1px solid rgba(68, 73, 85, ${action.type === "no_action" ? "0.1" : "0.2"})`,
-      background: action.type === "no_action" ? "transparent" : "rgba(16, 21, 32, 0.65)",
-      backdropFilter: action.type === "no_action" ? "none" : "blur(16px) saturate(1.2)",
+      background: action.type === "no_action" ? "transparent" : "var(--aegen-glass-bg)",
+      backdropFilter: action.type === "no_action" ? "none" : "var(--aegen-glass-blur)",
     }}>
       <Group justify="space-between" wrap="nowrap">
         <Group gap={10} wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
@@ -148,7 +148,7 @@ function ActionRow({
               disabled={disabled}
               style={{
                 padding: "4px 12px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 500,
-                backgroundColor: disabled ? "rgba(16, 21, 32, 0.5)"
+                backgroundColor: disabled ? "var(--aegen-glass-bg)"
                   : action.type === "dismiss" ? "var(--mantine-color-green-filled)"
                   : risk === "high" ? "var(--mantine-color-orange-filled)"
                   : "var(--mantine-color-blue-filled)",
@@ -271,8 +271,8 @@ export function NextStepsCard({
     <div style={{
       padding: "14px 16px", borderRadius: 10,
       border: "1px solid rgba(74, 125, 255, 0.2)",
-      background: "rgba(16, 21, 32, 0.72)",
-      backdropFilter: "blur(16px) saturate(1.2)",
+      background: "var(--aegen-glass-bg)",
+      backdropFilter: "var(--aegen-glass-blur)",
       boxShadow: "0 0 12px rgba(74, 125, 255, 0.1), inset 0 0 12px rgba(74, 125, 255, 0.03)",
     }}>
       <Text size="xs" fw={600} mb={10} c="blue.4">Next Steps</Text>

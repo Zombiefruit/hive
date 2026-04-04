@@ -76,9 +76,9 @@ export function AddTaskModal({ opened, onClose }: AddTaskModalProps) {
       centered
       overlayProps={{ backgroundOpacity: 0.4, blur: 4 }}
       styles={{
-        content: { background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)" },
+        content: { background: "var(--aegen-glass-bg)", backdropFilter: "var(--aegen-glass-blur)" },
         header: {
-          background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
+          background: "var(--aegen-glass-bg)", backdropFilter: "var(--aegen-glass-blur)",
           borderBottom: "1px solid rgba(74, 125, 255, 0.08)",
         },
       }}

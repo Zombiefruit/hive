@@ -12,7 +12,7 @@
   --aegen-stellar-purple: #a855f7;
   --aegen-plasma-cyan: #38bdf8;
   --aegen-star-white: #d3d8e4;
-  --aegen-dust-gray: #74788a;
+  --aegen-dust-gray: #8b90a0;
   --aegen-dim-gray: #444955;
 
   /* Alert / Escalation */
@@ -24,6 +24,8 @@
   /* Typography */
   --aegen-font-primary: 'Inter', -apple-system, system-ui, sans-serif;
   --aegen-font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  --aegen-letter-spacing: -0.011em;
+  --aegen-letter-spacing-wide: 0.02em;
 
   /* Animation */
   --aegen-ease-cosmic: cubic-bezier(0.23, 1, 0.32, 1);
@@ -44,13 +46,58 @@
   --aegen-gradient-cosmic: linear-gradient(135deg, #4a7dff, #a855f7, #38bdf8);
   --aegen-gradient-glow-blue: radial-gradient(circle, rgba(74, 125, 255, 0.12) 0%, transparent 70%);
   --aegen-gradient-glow-warm: radial-gradient(circle, rgba(255, 107, 61, 0.15) 0%, transparent 70%);
+
+  /* Overlay */
+  --aegen-overlay: rgba(5, 8, 16, 0.5);
 }
+
+/* ── Light Mode Overrides ── */
+[data-mantine-color-scheme="light"] {
+  --aegen-void: #f5f6fa;
+  --aegen-deep-space: #ebedf5;
+  --aegen-nebula-dark: #e0e2ed;
+  --aegen-cosmic-blue: #3a6ae6;
+  --aegen-stellar-purple: #8e3de0;
+  --aegen-plasma-cyan: #2196d6;
+  --aegen-star-white: #1a1e2e;
+  --aegen-dust-gray: #555a6e;
+  --aegen-dim-gray: #c4c8d4;
+
+  /* Alert / Escalation — slightly darker for contrast on light bg */
+  --aegen-alert-warm: #e6552e;
+  --aegen-alert-deep: #c04018;
+  --aegen-alert-gold: #d99520;
+  --aegen-success: hsl(150 55% 38%);
+
+  /* Glassmorphism — white glass */
+  --aegen-glass-bg: rgba(255, 255, 255, 0.72);
+  --aegen-glass-blur: blur(20px) saturate(1.2);
+  --aegen-glass-border: rgba(0, 0, 0, 0.08);
+  --aegen-glass-shadow: 0 1px 8px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.03);
+  --aegen-glass-shadow-elevated: 0 4px 24px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04);
+
+  /* Gradient presets — light variants */
+  --aegen-gradient-void: linear-gradient(180deg, #f5f6fa, #ebedf5);
+  --aegen-gradient-surface: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(240, 241, 248, 0.85));
+  --aegen-gradient-cosmic: linear-gradient(135deg, #3a6ae6, #8e3de0, #2196d6);
+  --aegen-gradient-glow-blue: radial-gradient(circle, rgba(58, 106, 230, 0.08) 0%, transparent 70%);
+  --aegen-gradient-glow-warm: radial-gradient(circle, rgba(230, 85, 46, 0.08) 0%, transparent 70%);
+
+  /* Overlay */
+  --aegen-overlay: rgba(0, 0, 0, 0.25);
+}
+
 
 /* ── Global Base Styles ── */
 html, body {
   background-color: var(--aegen-void) !important;
   color: var(--aegen-star-white);
   font-family: var(--aegen-font-primary);
+  letter-spacing: var(--aegen-letter-spacing);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* ── Scrollbar Styling ── */
@@ -77,6 +124,18 @@ html, body {
   background: rgba(116, 120, 138, 0.5);
 }
 
+[data-mantine-color-scheme="light"] * {
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+[data-mantine-color-scheme="light"] *::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+[data-mantine-color-scheme="light"] *::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
 /* ── Glassmorphism Surface Classes ── */
 .aegen-glass {
   background: var(--aegen-glass-bg);
@@ -97,10 +156,10 @@ html, body {
 }
 
 .aegen-glass-header {
-  background: rgba(16, 21, 32, 0.8);
-  backdrop-filter: blur(16px) saturate(1.2);
-  -webkit-backdrop-filter: blur(16px) saturate(1.2);
-  border-bottom: 1px solid rgba(68, 73, 85, 0.2);
+  background: var(--aegen-glass-bg);
+  backdrop-filter: var(--aegen-glass-blur);
+  -webkit-backdrop-filter: var(--aegen-glass-blur);
+  border-bottom: 1px solid var(--aegen-glass-border);
 }
 
 /* ── Inner Glow Accent ── */
@@ -136,6 +195,12 @@ html, body {
 .aegen-glow-warm {
   box-shadow: 0 0 16px rgba(255, 107, 61, 0.15), inset 0 0 12px rgba(255, 107, 61, 0.05);
 }
+
+/* Light mode — toned-down glows */
+[data-mantine-color-scheme="light"] .aegen-glow-blue { box-shadow: 0 0 12px rgba(58, 106, 230, 0.10); }
+[data-mantine-color-scheme="light"] .aegen-glow-purple { box-shadow: 0 0 12px rgba(142, 61, 224, 0.10); }
+[data-mantine-color-scheme="light"] .aegen-glow-cyan { box-shadow: 0 0 12px rgba(33, 150, 214, 0.10); }
+[data-mantine-color-scheme="light"] .aegen-glow-warm { box-shadow: 0 0 12px rgba(230, 85, 46, 0.10); }
 
 /* ── Text Glow ── */
 .aegen-text-glow-blue {
@@ -226,19 +291,18 @@ html, body {
 
 /* ── Interactive Element Overrides ── */
 
-/* Card hover effect */
+/* Card hover effect — blue border highlight, works in both light and dark */
 .deck-card:hover,
 .notif-card:hover {
-  transform: scale(1.01);
-  box-shadow: 0 0 16px rgba(74, 125, 255, 0.12) !important;
-  border-color: rgba(74, 125, 255, 0.2) !important;
-  transition: all 0.2s var(--aegen-ease-cosmic) !important;
+  border-color: var(--aegen-cosmic-blue) !important;
+  box-shadow: 0 0 0 1px var(--aegen-cosmic-blue), 0 0 12px rgba(74, 125, 255, 0.1) !important;
+  transition: all 0.15s var(--aegen-ease-cosmic) !important;
 }
 
 .deck-card:focus-visible,
 .notif-card:focus-visible {
   outline: none !important;
-  box-shadow: 0 0 0 2px rgba(74, 125, 255, 0.4) !important;
+  box-shadow: 0 0 0 2px var(--aegen-cosmic-blue) !important;
 }
 
 /* ── Cosmic Loading Strip ── */

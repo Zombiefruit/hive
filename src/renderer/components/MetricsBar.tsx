@@ -29,8 +29,8 @@ export function MetricsBar() {
             gap: 12,
             padding: "12px 16px",
             borderRadius: 8,
-            border: "1px solid rgba(68, 73, 85, 0.3)",
-            background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
+            border: "1px solid var(--aegen-glass-border)",
+            background: "var(--aegen-glass-bg)", backdropFilter: "var(--aegen-glass-blur)",
           }}
         >
           <item.icon size={16} color={item.color} stroke={1.5} />

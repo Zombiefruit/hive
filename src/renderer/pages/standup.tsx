@@ -66,7 +66,7 @@ export default function StandupPage() {
     : "";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <AppHeader />
 
       <div style={{ flex: 1, overflow: "auto", padding: "24px 32px" }}>

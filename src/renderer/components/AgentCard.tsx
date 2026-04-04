@@ -38,18 +38,18 @@ export function AgentCard({ agent }: { agent: Agent }) {
       style={{
         padding: 20,
         borderRadius: 8,
-        border: "1px solid rgba(68, 73, 85, 0.3)",
-        background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
+        border: "1px solid var(--aegen-glass-border)",
+        background: "var(--aegen-glass-bg)", backdropFilter: "var(--aegen-glass-blur)",
         cursor: "pointer",
         transition: "border-color 0.15s ease, box-shadow 0.15s ease",
         height: "100%",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = "rgba(68, 73, 85, 0.2)";
-        e.currentTarget.style.boxShadow = "0 8px 24px rgba(68, 73, 85, 0.2)";
+        e.currentTarget.style.borderColor = "var(--aegen-glass-border)";
+        e.currentTarget.style.boxShadow = "0 8px 24px var(--aegen-glass-border)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = "rgba(68, 73, 85, 0.3)";
+        e.currentTarget.style.borderColor = "var(--aegen-glass-border)";
         e.currentTarget.style.boxShadow = "none";
       }}
     >

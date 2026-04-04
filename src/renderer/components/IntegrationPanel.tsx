@@ -6,9 +6,9 @@ import { StatusDot } from "./StatusDot";
 const integrations = [
   { name: "Linear", Icon: SiLinear, color: "#5E6AD2", description: "Issues & project tracking" },
   { name: "Slack", Icon: IconBrandSlack, color: "#E01E5A", description: "Channels, threads & messages" },
-  { name: "Notion", Icon: SiNotion, color: "#FFFFFF", description: "Pages, docs & databases" },
+  { name: "Notion", Icon: SiNotion, color: "var(--aegen-star-white)", description: "Pages, docs & databases" },
   { name: "Gmail", Icon: SiGmail, color: "#EA4335", description: "Email inbox" },
-  { name: "GitHub", Icon: SiGithub, color: "#FFFFFF", description: "Repos, PRs & issues" },
+  { name: "GitHub", Icon: SiGithub, color: "var(--aegen-star-white)", description: "Repos, PRs & issues" },
   { name: "Google Calendar", Icon: SiGooglecalendar, color: "#4285F4", description: "Events & scheduling" },
 ];
 
@@ -17,14 +17,14 @@ export function IntegrationPanel() {
     <div
       style={{
         borderRadius: 8,
-        border: "1px solid rgba(68, 73, 85, 0.3)",
-        background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
+        border: "1px solid var(--aegen-glass-border)",
+        background: "var(--aegen-glass-bg)", backdropFilter: "var(--aegen-glass-blur)",
         overflow: "hidden",
       }}
     >
       <Group
         p="sm"
-        style={{ borderBottom: "1px solid rgba(68, 73, 85, 0.2)" }}
+        style={{ borderBottom: "1px solid var(--aegen-glass-border)" }}
       >
         <Text size="sm" fw={600}>Connectors</Text>
         <Text size="xs" c="dimmed">via Claude Code MCP</Text>

@@ -26,10 +26,10 @@ export function ChatBubble({ role, content }: ChatBubbleProps) {
       marginBottom: 8,
       backgroundColor: isUser
         ? "rgba(74, 125, 255, 0.1)"
-        : "rgba(16, 21, 32, 0.65)",
+        : "var(--aegen-glass-bg)",
       border: question
         ? "1px solid rgba(255, 170, 51, 0.25)"
-        : isUser ? "none" : "1px solid rgba(68, 73, 85, 0.2)",
+        : isUser ? "none" : "1px solid var(--aegen-glass-border)",
     }}>
       <Text size="sm" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
         {content}

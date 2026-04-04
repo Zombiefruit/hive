@@ -12,10 +12,11 @@ import { Settings } from "./pages/settings";
 import { Onboarding } from "./pages/onboarding";
 import ProjectsPage from "./pages/projects";
 import InsightsPage from "./pages/insights";
-import CoachPage from "./pages/coach";
+import ReflectPage from "./pages/reflect";
 import MemoriesPage from "./pages/memories";
 import BusinessContextPage from "./pages/context";
 import { AppSidebar } from "./components/AppSidebar";
+import { GlobalLoadingBanner } from "./components/GlobalLoadingBanner";
 
 /**
  * Guard that redirects to /onboarding if no config exists.
@@ -59,10 +60,13 @@ function ConfigGuard() {
  */
 function SidebarLayout() {
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
-      <AppSidebar />
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <Outlet />
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+      <GlobalLoadingBanner />
+      <div style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}>
+        <AppSidebar />
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "auto" }}>
+          <Outlet />
+        </div>
       </div>
     </div>
   );
@@ -83,7 +87,7 @@ const router = createHashRouter([
           { path: "/projects", element: <ProjectsPage /> },
           { path: "/projects/:projectId", element: <ProjectsPage /> },
           { path: "/task/:taskId", element: <TaskDetail /> },
-          { path: "/coach", element: <CoachPage /> },
+          { path: "/reflect", element: <ReflectPage /> },
           { path: "/memories", element: <MemoriesPage /> },
           { path: "/context", element: <BusinessContextPage /> },
           { path: "/insights", element: <InsightsPage /> },

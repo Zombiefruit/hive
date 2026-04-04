@@ -186,6 +186,41 @@ if (!isElectron) {
       Promise.resolve({ id: "mock", title: "Mock", messages: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }),
     deleteManagerConversation: noop,
     getManagerMessages: () => Promise.resolve([]),
+    // Reflect (work habits analysis)
+    getReflectSignals: () => Promise.resolve({
+      responseCadence: { medianReplyMinutes: 23, unansweredOver24h: 2, unansweredTitles: ["Thread from Alice about pipeline fix", "DM from Bob re: deployment"], totalResponseTasks: 14, respondedWithin1h: 8 },
+      focus: { avgConcurrentWip: 3.2, maxConcurrentWip: 5, contextSwitchCount: 7, score: 62 },
+      meetingLoad: { meetingHoursThisWeek: 6.5, longestDeepWorkBlock: 150, meetingFocusRatio: 0.16, meetingCount: 8 },
+      throughput: { completedThisWeek: 11, rollingFourWeekAvg: 9.5, weekOverWeekDelta: 15.8, cycleTimeByType: { implementation: 4.2, response: 0.8, review: 1.5, investigation: 2.1 } },
+      weekLabel: "Week of Apr 4",
+    }),
+    getReflectData: () => Promise.resolve({
+      signals: {
+        responseCadence: { medianReplyMinutes: 23, unansweredOver24h: 2, unansweredTitles: ["Thread from Alice about pipeline fix", "DM from Bob re: deployment"], totalResponseTasks: 14, respondedWithin1h: 8 },
+        focus: { avgConcurrentWip: 3.2, maxConcurrentWip: 5, contextSwitchCount: 7, score: 62 },
+        meetingLoad: { meetingHoursThisWeek: 6.5, longestDeepWorkBlock: 150, meetingFocusRatio: 0.16, meetingCount: 8 },
+        throughput: { completedThisWeek: 11, rollingFourWeekAvg: 9.5, weekOverWeekDelta: 15.8, cycleTimeByType: { implementation: 4.2, response: 0.8, review: 1.5, investigation: 2.1 } },
+        weekLabel: "Week of Apr 4",
+      },
+      managerTake: {
+        summary: "Good week overall. Your throughput is up 16% week-over-week with 11 tasks completed vs a 4-week average of 9.5. Response cadence is solid at 23 minutes median, though 2 Slack threads have gone unanswered for over 24 hours — worth checking on.\n\nFocus could use attention. You peaked at 5 concurrent tasks and averaged 3.2, with 7 context switches during the week. Consider batching similar work together. Your meeting load is manageable at 6.5 hours across 8 meetings, with a 2.5-hour deep work block available.",
+        callouts: [
+          "2 Slack threads unanswered >24h — reply to Alice and Bob",
+          "7 context switches this week — try blocking 2-hour focus windows",
+          "Throughput trending up — 11 completed vs 9.5 avg, nice momentum",
+          "Implementation cycle time at 4.2h avg — healthy for your task complexity",
+        ],
+        rating: "Good progress",
+        generatedAt: new Date().toISOString(),
+      },
+      history: [
+        { weekLabel: "Mar 14", weekStartISO: "2026-03-14", completed: 8, avgCycleHours: 3.5, meetingHours: 5, focusScore: 70, responseCadenceMinutes: 30 },
+        { weekLabel: "Mar 21", weekStartISO: "2026-03-21", completed: 10, avgCycleHours: 4.0, meetingHours: 7, focusScore: 55, responseCadenceMinutes: 25 },
+        { weekLabel: "Mar 28", weekStartISO: "2026-03-28", completed: 9, avgCycleHours: 3.8, meetingHours: 6, focusScore: 65, responseCadenceMinutes: 20 },
+        { weekLabel: "Apr 4", weekStartISO: "2026-04-04", completed: 11, avgCycleHours: 3.2, meetingHours: 6.5, focusScore: 62, responseCadenceMinutes: 23 },
+      ],
+    }),
+
     // Config (onboarding) — mock with localStorage
     hasConfig: () => Promise.resolve(localStorage.getItem("claude-deck-config") !== null),
     getConfig: () => {

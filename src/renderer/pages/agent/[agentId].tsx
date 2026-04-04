@@ -176,7 +176,7 @@ export function AgentDetail() {
 
   if (!agent) {
     return (
-      <Stack align="center" justify="center" h="100vh" gap="md">
+      <Stack align="center" justify="center" h="100%" gap="md">
         <Text c="dimmed">Agent not found</Text>
         <Button variant="light" onClick={() => navigate("/")}>
           Back to Dashboard
@@ -199,7 +199,7 @@ export function AgentDetail() {
         display: "grid",
         gridTemplateColumns: "240px 1fr 280px",
         gridTemplateRows: "auto 1fr",
-        height: "100vh",
+        height: "100%",
         overflow: "hidden",
       }}
     >
@@ -209,7 +209,7 @@ export function AgentDetail() {
           gridColumn: "1 / -1",
           padding: "var(--mantine-spacing-sm) var(--mantine-spacing-md)",
           paddingLeft: 80, // Clear macOS traffic lights
-          borderBottom: "1px solid rgba(68, 73, 85, 0.2)",
+          borderBottom: "1px solid var(--aegen-glass-border)",
           WebkitAppRegion: "drag",
         }}
       >
@@ -257,7 +257,7 @@ export function AgentDetail() {
       {/* Left sidebar: Info + Timeline */}
       <div
         style={{
-          borderRight: "1px solid rgba(68, 73, 85, 0.2)",
+          borderRight: "1px solid var(--aegen-glass-border)",
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
@@ -321,8 +321,8 @@ export function AgentDetail() {
             gap="xs"
             p="xs"
             style={{
-              borderBottom: "1px solid rgba(68, 73, 85, 0.2)",
-              background: "rgba(16, 21, 32, 0.65)",
+              borderBottom: "1px solid var(--aegen-glass-border)",
+              background: "var(--aegen-glass-bg)",
             }}
           >
             <IconExternalLink size={14} color="var(--mantine-color-dimmed)" />
@@ -350,7 +350,7 @@ export function AgentDetail() {
       {/* Right panel: Context */}
       <div
         style={{
-          borderLeft: "1px solid rgba(68, 73, 85, 0.2)",
+          borderLeft: "1px solid var(--aegen-glass-border)",
           overflow: "auto",
         }}
       >

@@ -2,13 +2,12 @@ import { Accordion, Avatar, Badge, Button, Group, Loader, Progress, SimpleGrid, 
 import { IconBuilding, IconRefresh, IconTarget, IconCode, IconUsers, IconMessageCircle, IconChevronRight } from "@tabler/icons-react";
 import { useState, useEffect, useCallback } from "react";
 import { AppHeader } from "../components/AppHeader";
-import { GlobalLoadingBanner } from "../components/GlobalLoadingBanner";
 import { Markdown } from "../components/Markdown";
 import type { BusinessContext } from "../../shared/business-context-types";
 
 function StatCard({ label, value, color }: { label: string; value: number | string; color: string }) {
   return (
-    <Paper p="sm" radius="md" style={{ background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)", border: `1px solid rgba(68, 73, 85, 0.2)` }}>
+    <Paper p="sm" radius="md" style={{ background: "var(--aegen-glass-bg)", backdropFilter: "var(--aegen-glass-blur)", border: `1px solid var(--aegen-glass-border)` }}>
       <Text size="xl" fw={700} c={`${color}.5`}>{value}</Text>
       <Text size="xs" c="dimmed">{label}</Text>
     </Paper>
@@ -66,7 +65,7 @@ export default function BusinessContextPage() {
   const statusColor = (s: string) => s === "active" || s === "in-flight" ? "green" : s === "shipped" || s === "completed" ? "blue" : "gray";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--aegen-void)" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--aegen-void)" }}>
       <AppHeader rightContent={
         <Button size="xs" variant="filled" color="blue"
           leftSection={localRefreshing ? <Loader size={12} color="white" /> : <IconRefresh size={14} />}
@@ -75,7 +74,6 @@ export default function BusinessContextPage() {
           {localRefreshing ? "Scanning..." : (context || raw) ? "Refresh" : "Generate"}
         </Button>
       } />
-      <GlobalLoadingBanner />
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", paddingTop: 8 }}>
         {!context && !raw && !localRefreshing && (
@@ -168,7 +166,7 @@ export default function BusinessContextPage() {
                     <Stack gap={6}>
                       {context.productFocus.map((p, i) => (
                         <Group key={i} gap={8} wrap="nowrap">
-                          <Badge size="xs" variant="dot" color={statusColor(p.status)} style={{ flexShrink: 0 }}>{p.status}</Badge>
+                          <Badge size="xs" variant="light" color={statusColor(p.status)} style={{ flexShrink: 0 }}>{p.status}</Badge>
                           <Text size="xs" fw={500}>{p.area}</Text>
                           {p.details && <Text size="xs" c="dimmed" truncate>— {p.details}</Text>}
                         </Group>
@@ -216,7 +214,7 @@ export default function BusinessContextPage() {
                     <Stack gap={6}>
                       {context.technicalContext.map((t, i) => (
                         <Group key={i} gap={8} wrap="nowrap">
-                          <Badge size="xs" variant="dot" color={statusColor(t.status)} style={{ flexShrink: 0 }}>{t.status}</Badge>
+                          <Badge size="xs" variant="light" color={statusColor(t.status)} style={{ flexShrink: 0 }}>{t.status}</Badge>
                           <Text size="xs" fw={500}>{t.area}</Text>
                           {t.details && <Text size="xs" c="dimmed" truncate>— {t.details}</Text>}
                         </Group>

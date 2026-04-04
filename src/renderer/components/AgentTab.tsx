@@ -159,9 +159,9 @@ export function AgentTab({
             return (
               <div key={i} style={{
                 padding: "10px 14px", borderRadius: 8, marginBottom: 8,
-                background: "rgba(16, 21, 32, 0.65)",
-                backdropFilter: "blur(16px) saturate(1.2)",
-                border: "1px solid rgba(68, 73, 85, 0.2)",
+                background: "var(--aegen-glass-bg)",
+                backdropFilter: "var(--aegen-glass-blur)",
+                border: "1px solid var(--aegen-glass-border)",
               }}>
                 <Markdown content={tldr} />
                 {details && (
@@ -181,11 +181,11 @@ export function AgentTab({
           return (
             <div key={i} style={{
               padding: "10px 14px", borderRadius: 8, marginBottom: 8,
-              background: "rgba(16, 21, 32, 0.65)",
-              backdropFilter: "blur(16px) saturate(1.2)",
+              background: "var(--aegen-glass-bg)",
+              backdropFilter: "var(--aegen-glass-blur)",
               border: isQuestion(content)
                 ? "1px solid rgba(255, 170, 51, 0.25)"
-                : "1px solid rgba(68, 73, 85, 0.2)",
+                : "1px solid var(--aegen-glass-border)",
             }}>
               <Markdown content={content} />
             </div>
@@ -210,7 +210,7 @@ export function AgentTab({
 
       {/* Zone 3: Activity log (collapsible) */}
       {activity.length > 0 && (
-        <div style={{ borderTop: "1px solid rgba(68, 73, 85, 0.2)" }}>
+        <div style={{ borderTop: "1px solid var(--aegen-glass-border)" }}>
           <UnstyledButton
             onClick={() => setShowActivity(!showActivity)}
             aria-label={showActivity ? "Collapse activity" : "Expand activity"}
@@ -255,7 +255,7 @@ export function AgentTab({
       {/* Zone 4: Sticky input */}
       <div style={{
         padding: "10px 20px",
-        borderTop: "1px solid rgba(68, 73, 85, 0.2)",
+        borderTop: "1px solid var(--aegen-glass-border)",
         flexShrink: 0,
       }}>
         <Group gap="xs">
@@ -268,8 +268,8 @@ export function AgentTab({
             disabled={inputDisabled || loading}
             style={{
               flex: 1, padding: "8px 12px", borderRadius: 6, fontSize: "0.8rem",
-              backgroundColor: "rgba(16, 21, 32, 0.7)",
-              border: "1px solid rgba(68, 73, 85, 0.3)",
+              backgroundColor: "var(--aegen-glass-bg)",
+              border: "1px solid var(--aegen-glass-border)",
               color: "var(--aegen-star-white)", outline: "none",
               fontFamily: "inherit",
               opacity: inputDisabled ? 0.5 : 1,
@@ -281,7 +281,7 @@ export function AgentTab({
             aria-label="Send message"
             style={{
               padding: "8px", borderRadius: 6,
-              backgroundColor: feedback.trim() && !inputDisabled ? "var(--aegen-cosmic-blue)" : "rgba(16, 21, 32, 0.7)",
+              backgroundColor: feedback.trim() && !inputDisabled ? "var(--aegen-cosmic-blue)" : "var(--aegen-glass-bg)",
               color: feedback.trim() && !inputDisabled ? "white" : "var(--mantine-color-dimmed)",
             }}
           >

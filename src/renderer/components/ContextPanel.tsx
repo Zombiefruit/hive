@@ -9,8 +9,8 @@ import type { ContextRefType } from "../../shared/types";
 const typeConfig: Record<ContextRefType, { label: string; Icon: React.FC<{ size?: number; color?: string; stroke?: number }>; color: string }> = {
   linear: { label: "Linear", Icon: SiLinear as React.FC<{ size?: number; color?: string }>, color: "#5E6AD2" },
   slack: { label: "Slack", Icon: IconHash as React.FC<{ size?: number; color?: string; stroke?: number }>, color: "#E01E5A" },
-  notion: { label: "Notion", Icon: SiNotion as React.FC<{ size?: number; color?: string }>, color: "#FFFFFF" },
-  github: { label: "GitHub", Icon: IconBrandGithub as React.FC<{ size?: number; color?: string; stroke?: number }>, color: "#FFFFFF" },
+  notion: { label: "Notion", Icon: SiNotion as React.FC<{ size?: number; color?: string }>, color: "var(--aegen-star-white)" },
+  github: { label: "GitHub", Icon: IconBrandGithub as React.FC<{ size?: number; color?: string; stroke?: number }>, color: "var(--aegen-star-white)" },
 };
 
 interface ContextPanelProps {

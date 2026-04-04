@@ -5,7 +5,6 @@ import {
 } from "@tabler/icons-react";
 import { useState, useEffect, useCallback } from "react";
 import { AppHeader } from "../components/AppHeader";
-import { GlobalLoadingBanner } from "../components/GlobalLoadingBanner";
 import type { Insight } from "../../shared/insight-types";
 
 const TYPE_CONFIG: Record<string, { label: string; color: string; Icon: React.FC<{ size?: number }> }> = {
@@ -27,9 +26,9 @@ function InsightCard({ insight, onAcknowledge, onDismiss, onConvert }: {
   return (
     <div style={{
       padding: "14px 16px", borderRadius: 10, marginBottom: 10,
-      background: "rgba(16, 21, 32, 0.65)",
-      backdropFilter: "blur(16px) saturate(1.2)",
-      border: "1px solid rgba(68, 73, 85, 0.2)",
+      background: "var(--aegen-glass-bg)",
+      backdropFilter: "var(--aegen-glass-blur)",
+      border: "1px solid var(--aegen-glass-border)",
     }}>
       <Group gap={8} mb={6} wrap="nowrap">
         <Badge size="xs" variant="light" color={config.color} leftSection={<config.Icon size={10} />}>
@@ -95,7 +94,7 @@ export default function InsightsPage() {
     }).catch(() => {});
 
     const unsub = window.deck?.onInsightsUpdate?.((data: Insight[]) => {
-      if (Array.isArray(data)) setInsights(prev => [...data, ...prev]);
+      if (Array.isArray(data)) setInsights(data);
       setLocalLoading(false);
     });
     return () => { unsub?.(); };
@@ -134,7 +133,7 @@ export default function InsightsPage() {
   const filterTypes = Object.entries(TYPE_CONFIG);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--aegen-void)" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--aegen-void)" }}>
       <AppHeader rightContent={
         <UnstyledButton
           onClick={handleRefresh}
@@ -147,7 +146,6 @@ export default function InsightsPage() {
           </Group>
         </UnstyledButton>
       } />
-      <GlobalLoadingBanner />
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", paddingTop: 8 }}>
         {/* Filter chips */}

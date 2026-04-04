@@ -142,7 +142,7 @@ export function ReviewView({ review, onFixSelected, onPostToPR }: ReviewViewProp
           {onPostToPR && (
             <UnstyledButton onClick={onPostToPR} style={{
               padding: "8px 16px", borderRadius: 6, fontSize: "0.8rem", fontWeight: 500,
-              border: "1px solid rgba(68, 73, 85, 0.2)", color: "var(--mantine-color-text)",
+              border: "1px solid var(--aegen-glass-border)", color: "var(--mantine-color-text)",
               display: "flex", alignItems: "center", gap: 6,
             }}>
               <IconMessageCircle size={14} /> Post to PR

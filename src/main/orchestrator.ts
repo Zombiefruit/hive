@@ -23,22 +23,27 @@ const recentThoughts: Array<{ timestamp: string; thought: string }> = [];
 
 // ── Thinking bubble — broadcasts to UI ──
 
-function think(thought: string): void {
-  const entry = { timestamp: new Date().toISOString(), thought };
-  recentThoughts.push(entry);
-  if (recentThoughts.length > 50) recentThoughts.shift();
-
+function broadcastToWindows(channel: string, data: unknown): number {
   const windows = BrowserWindow.getAllWindows();
   let sent = 0;
   for (const win of windows) {
     if (!win.isDestroyed()) {
       try {
-        win.webContents.send("orchestrator:thought", entry);
+        win.webContents.send(channel, data);
         sent++;
       } catch {}
     }
   }
-  addDebugEntry("out", `🧠 [ORCH] (${sent}/${windows.length} windows) ${thought}`, "orchestrator");
+  return sent;
+}
+
+function think(thought: string): void {
+  const entry = { timestamp: new Date().toISOString(), thought };
+  recentThoughts.push(entry);
+  if (recentThoughts.length > 50) recentThoughts.shift();
+
+  const sent = broadcastToWindows("orchestrator:thought", entry);
+  addDebugEntry("out", `🧠 [ORCH] (${sent} windows) ${thought}`, "orchestrator");
 }
 
 // ── Core loop ──

@@ -317,8 +317,7 @@ app.whenReady().then(() => {
   // Start agent monitoring loop
   startMonitoring();
 
-  // Start autonomous orchestrator
-  import("./orchestrator").then(({ startOrchestrator }) => startOrchestrator()).catch(() => {});
+  // Orchestrator is started after window creation (see below) to ensure IPC delivery.
 
   // Start process monitor sampling (RSS tracking for spawned processes)
   startProcessSampling();
@@ -571,18 +570,14 @@ app.whenReady().then(() => {
     saveBusinessContext(content);
   });
 
-  // Coach
-  ipcMain.handle("coach:daily-brief", async () => {
-    const { generateDailyBrief } = await import("./coach/service");
-    return generateDailyBrief();
+  // Reflect (work habits analysis — replaces Coach)
+  ipcMain.handle("reflect:signals", async () => {
+    const { getReflectSignals } = await import("./coach/service");
+    return getReflectSignals();
   });
-  ipcMain.handle("coach:work-patterns", async (_event, days?: number) => {
-    const { analyzeWorkPatterns } = await import("./coach/service");
-    return analyzeWorkPatterns(days);
-  });
-  ipcMain.handle("coach:output-score", async () => {
-    const { scoreOutput } = await import("./coach/service");
-    return scoreOutput();
+  ipcMain.handle("reflect:data", async () => {
+    const { getReflectData } = await import("./coach/service");
+    return getReflectData();
   });
 
   // Setup Agent
@@ -699,6 +694,9 @@ app.whenReady().then(() => {
   debugServer.listen(9876, () => {});
 
   createWindow();
+
+  // Start autonomous orchestrator after window exists so IPC thoughts are delivered
+  import("./orchestrator").then(({ startOrchestrator }) => startOrchestrator()).catch(() => {});
 
   // Initialize system tray after window is created
   initTray();

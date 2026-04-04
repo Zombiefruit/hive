@@ -4,7 +4,7 @@
  * Click toggles the unified OrchestratorPanel (chat + thoughts).
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import AiOrb from "./AiOrb";
 import { OrchestratorPanel } from "./OrchestratorPanel";
@@ -27,10 +27,10 @@ const ORB_CENTER_Y = CONTAINER_HEIGHT - ORB_RADIUS;
 const CONNECTOR_RADIUS = ORB_RADIUS + 13;
 
 const THOUGHT_SLOTS: ThoughtSlot[] = [
-  { left: 160, top: 200, width: 195, attachAngle: 225 },
-  { left: 148, top: 250, width: 200, attachAngle: 212 },
-  { left: 142, top: 300, width: 190, attachAngle: 198 },
-  { left: 172, top: 166, width: 185, attachAngle: 238 },
+  { left: 200, top: 220, width: 195, attachAngle: 225 },
+  { left: 188, top: 265, width: 200, attachAngle: 212 },
+  { left: 182, top: 310, width: 190, attachAngle: 198 },
+  { left: 212, top: 186, width: 185, attachAngle: 238 },
 ];
 
 const BUBBLE_MIDLINE_Y = 30;
@@ -75,32 +75,53 @@ export function OrchestratorOrbiter() {
   const [panelOpen, setPanelOpen] = useState(false);
   const isPinned = useManagerStore((s) => s.isPinned);
   const slotIndex = useRef(0);
-  const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [prevCount, setPrevCount] = useState(0);
+  const showTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const intensityTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Show a floating thought bubble — matches the demo's proven pattern
+  const addFloatingThought = useCallback((text: string) => {
+    const slot = THOUGHT_SLOTS[slotIndex.current % THOUGHT_SLOTS.length];
+    slotIndex.current += 1;
+    setFloatingThought({ id: `${Date.now()}-${Math.random()}`, text, slot });
+    hideTimerRef.current = setTimeout(() => setFloatingThought(null), 4300);
+  }, []);
+
+  // React to new thoughts arriving (prevCount pattern from demo)
+  useEffect(() => {
+    if (thoughts.length > prevCount) {
+      const latest = thoughts[thoughts.length - 1];
+      setPrevCount(thoughts.length);
+      setIntensity(1);
+
+      clearTimeout(showTimerRef.current);
+      clearTimeout(hideTimerRef.current);
+      clearTimeout(intensityTimerRef.current);
+      setFloatingThought(null);
+
+      showTimerRef.current = setTimeout(() => {
+        addFloatingThought(latest.thought);
+        if (latest.isEscalation) {
+          setIntensity(2);
+        } else {
+          intensityTimerRef.current = setTimeout(() => setIntensity(0), 2800);
+        }
+      }, 320);
+    } else if (thoughts.length < prevCount) {
+      setPrevCount(thoughts.length);
+    }
+  }, [thoughts, prevCount, addFloatingThought]);
 
   // Wire to IPC
   useEffect(() => {
     const unsubThought = window.deck?.onOrchestratorThought?.((entry: ThoughtEntry) => {
       setThoughts((prev) => [...prev.slice(-49), entry]);
-      setIntensity(1);
-
-      // Show floating bubble
-      clearTimeout(hideTimer.current);
-      const slot = THOUGHT_SLOTS[slotIndex.current % THOUGHT_SLOTS.length];
-      slotIndex.current += 1;
-      setFloatingThought(null);
-      setTimeout(() => {
-        setFloatingThought({ id: `${Date.now()}`, text: entry.thought, slot });
-        hideTimer.current = setTimeout(() => {
-          setFloatingThought(null);
-          setIntensity(0);
-        }, 4300);
-      }, 320);
     });
 
     const unsubEscalation = window.deck?.onOrchestratorEscalation?.(() => {
       setIsEscalation(true);
       setIntensity(2);
-      // Mark the most recent thought as an escalation
       setThoughts((prev) => {
         if (prev.length === 0) return prev;
         const last = { ...prev[prev.length - 1], isEscalation: true };
@@ -113,14 +134,29 @@ export function OrchestratorOrbiter() {
     window.deck
       ?.getOrchestratorThoughts?.(20)
       .then((t: ThoughtEntry[]) => {
-        if (Array.isArray(t)) setThoughts(t);
+        if (Array.isArray(t) && t.length > 0) setThoughts(t);
       })
       .catch(() => {});
+
+    // Polling fallback every 10s
+    const pollInterval = setInterval(() => {
+      window.deck
+        ?.getOrchestratorThoughts?.(20)
+        .then((t: ThoughtEntry[]) => {
+          if (Array.isArray(t)) {
+            setThoughts((prev) => (t.length > prev.length ? t : prev));
+          }
+        })
+        .catch(() => {});
+    }, 10000);
 
     return () => {
       unsubThought?.();
       unsubEscalation?.();
-      clearTimeout(hideTimer.current);
+      clearTimeout(showTimerRef.current);
+      clearTimeout(hideTimerRef.current);
+      clearTimeout(intensityTimerRef.current);
+      clearInterval(pollInterval);
     };
   }, []);
 
@@ -215,12 +251,11 @@ export function OrchestratorOrbiter() {
                     borderRadius: 12,
                     padding: "10px 12px",
                     width: floatingThought.slot.width,
-                    background: "linear-gradient(135deg, hsl(228 36% 7% / 0.9), hsl(248 34% 11% / 0.82))",
-                    backdropFilter: "blur(16px) saturate(1.3)",
-                    border: `1px solid ${isEscalation ? "hsl(15 80% 50% / 0.32)" : "hsl(220 70% 60% / 0.28)"}`,
-                    boxShadow: isEscalation
-                      ? "0 0 18px hsl(15 90% 50% / 0.18), inset 0 0 16px hsl(15 90% 50% / 0.05)"
-                      : "0 0 20px hsl(220 90% 60% / 0.14), inset 0 0 16px hsl(220 90% 65% / 0.05)",
+                    background: "var(--aegen-gradient-surface)",
+                    backdropFilter: "var(--aegen-glass-blur)",
+                    border: `1px solid ${isEscalation ? "var(--aegen-alert-warm)" : "var(--aegen-cosmic-blue)"}`,
+                    borderColor: isEscalation ? "rgba(255, 107, 61, 0.3)" : "rgba(74, 125, 255, 0.3)",
+                    boxShadow: "var(--aegen-glass-shadow-elevated)",
                   }}
                 >
                   <p
@@ -228,10 +263,7 @@ export function OrchestratorOrbiter() {
                       margin: 0,
                       fontSize: 11.5,
                       lineHeight: 1.5,
-                      color: isEscalation ? "hsl(18 75% 88%)" : "hsl(214 100% 91%)",
-                      textShadow: isEscalation
-                        ? "0 0 10px hsl(15 90% 55% / 0.25)"
-                        : "0 0 10px hsl(220 90% 75% / 0.18)",
+                      color: isEscalation ? "var(--aegen-alert-warm)" : "var(--aegen-star-white)",
                     }}
                   >
                     {floatingThought.text}

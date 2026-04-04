@@ -374,7 +374,7 @@ export function Schedule() {
   };
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--aegen-void)" }}>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--aegen-void)" }}>
       {/* Header */}
       <AppHeader
         rightContent={
@@ -421,7 +421,7 @@ export function Schedule() {
         return (
           <div style={{
             padding: "12px 20px",
-            borderBottom: "1px solid rgba(68, 73, 85, 0.2)",
+            borderBottom: "1px solid var(--aegen-glass-border)",
             flexShrink: 0,
           }}>
             <Group justify="space-between" mb={8}>
@@ -481,7 +481,7 @@ export function Schedule() {
         {/* Scrollable calendar area */}
         <div ref={scrollContainerRef} style={{ flex: 1, overflow: "auto", display: "flex" }}>
         {/* Time gutter */}
-        <div style={{ width: 56, flexShrink: 0, borderRight: "1px solid rgba(68, 73, 85, 0.2)", paddingTop: 16, paddingBottom: 40, minHeight: "100%" }}>
+        <div style={{ width: 56, flexShrink: 0, borderRight: "1px solid var(--aegen-glass-border)", paddingTop: 16, paddingBottom: 40, minHeight: "100%" }}>
           {hours.map(hour => (
             <div key={hour} style={{ height: HOUR_HEIGHT, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", paddingRight: 8, paddingTop: 2 }}>
               <Text size="xs" c="dimmed" style={{ fontSize: "0.65rem" }}>
@@ -591,10 +591,10 @@ export function Schedule() {
                   zIndex: isDragOver ? 15 : 1,
                   background: isDone
                     ? "rgba(74, 125, 255, 0.06)"
-                    : `linear-gradient(135deg, ${bgTint}, rgba(16, 21, 32, 0.65))`,
+                    : `linear-gradient(135deg, ${bgTint}, var(--aegen-glass-bg))`,
                   border: isDragOver
                     ? "1px solid var(--mantine-color-blue-5)"
-                    : `1px solid rgba(68, 73, 85, 0.2)`,
+                    : `1px solid var(--aegen-glass-border)`,
                   borderLeft: `${isUrgent && !isDone ? 4 : 3}px solid ${isDone ? "var(--mantine-color-dimmed)" : color}`,
                   opacity: isDone ? 0.45 : isDragging ? 0.4 : 1,
                   cursor: "grab",
@@ -658,7 +658,7 @@ export function Schedule() {
         {!focusMode && (
           <div style={{
             width: 220, flexShrink: 0,
-            borderLeft: "1px solid rgba(68, 73, 85, 0.2)",
+            borderLeft: "1px solid var(--aegen-glass-border)",
             padding: 16,
             overflowY: "auto",
           }}>
@@ -761,12 +761,12 @@ export function Schedule() {
             <div onClick={() => setSelectedId(null)} style={{ position: "fixed", inset: 0, top: 42, zIndex: 99, backgroundColor: "rgba(5, 8, 16, 0.4)", backdropFilter: "blur(2px)" }} />
             <div style={{
               position: "fixed", top: 42, right: 0, bottom: 0, width: 380, zIndex: 100,
-              background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
+              background: "var(--aegen-glass-bg)", backdropFilter: "var(--aegen-glass-blur)",
               borderLeft: "1px solid var(--mantine-color-default-hover)",
               overflowY: "auto", padding: 20,
             }}>
               <Group justify="space-between" mb={12}>
-                <Badge size="xs" variant="dot" color={color}>{item.priority}</Badge>
+                <Badge size="xs" variant="light" color={color}>{item.priority}</Badge>
                 <UnstyledButton onClick={() => setSelectedId(null)}>
                   <Text size="xs" c="dimmed">Close</Text>
                 </UnstyledButton>

@@ -54,19 +54,15 @@ const SCROLLBAR_CSS = `
   [data-mantine-color-scheme="dark"] *::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.25);
   }
-  .deck-card:hover { background-color: var(--mantine-color-default-hover) !important; }
   @keyframes slideInRight {
     from { transform: translateX(100%); opacity: 0; }
     to { transform: translateX(0); opacity: 1; }
   }
-  .deck-card:focus-visible { outline: 2px solid var(--mantine-color-blue-5); outline-offset: 2px; }
-  .notif-card:hover { background-color: var(--mantine-color-default-hover) !important; }
-  .notif-card:focus-visible { outline: 2px solid var(--mantine-color-blue-5); outline-offset: 2px; }
 `;
 
 export function App() {
   return (
-    <MantineProvider theme={theme} defaultColorScheme="dark">
+    <MantineProvider theme={theme} defaultColorScheme="auto">
       <style>{SCROLLBAR_CSS}</style>
       <AppInner />
     </MantineProvider>

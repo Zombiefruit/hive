@@ -291,8 +291,8 @@ export function Onboarding() {
           alignItems: "center",
           padding: "8px 24px",
           paddingLeft: 90,
-          borderBottom: "1px solid rgba(68, 73, 85, 0.2)",
-          background: "rgba(16, 21, 32, 0.8)",
+          borderBottom: "1px solid var(--aegen-glass-border)",
+          background: "var(--aegen-glass-bg)",
           backdropFilter: "blur(8px)",
           WebkitAppRegion: "drag",
           flexShrink: 0,
@@ -339,7 +339,7 @@ export function Onboarding() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                borderColor: "rgba(68, 73, 85, 0.3)",
+                borderColor: "var(--aegen-glass-border)",
               },
             }}
           >
@@ -515,7 +515,7 @@ export function Onboarding() {
                             border: `2px solid ${
                               selected
                                 ? "var(--mantine-color-blue-5)"
-                                : "rgba(68, 73, 85, 0.2)"
+                                : "var(--aegen-glass-border)"
                             }`,
                             backgroundColor: selected
                               ? "var(--mantine-color-blue-5)"
@@ -694,7 +694,7 @@ export function Onboarding() {
                     backgroundColor:
                       "rgba(74, 125, 255, 0.06)",
                     border:
-                      "1px solid rgba(68, 73, 85, 0.2)",
+                      "1px solid var(--aegen-glass-border)",
                   }}
                 >
                   <Text size="xs" c="dimmed">

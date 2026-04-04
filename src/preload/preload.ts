@@ -248,10 +248,9 @@ const api = {
     return () => ipcRenderer.removeListener("business-context:draft", listener);
   },
 
-  // Coach
-  getDailyBrief: () => ipcRenderer.invoke("coach:daily-brief"),
-  getWorkPatterns: (days?: number) => ipcRenderer.invoke("coach:work-patterns", days),
-  getOutputScore: () => ipcRenderer.invoke("coach:output-score"),
+  // Reflect (work habits analysis)
+  getReflectSignals: () => ipcRenderer.invoke("reflect:signals"),
+  getReflectData: () => ipcRenderer.invoke("reflect:data"),
 
   // Setup Agent (auto-discovery, re-runnable)
   runSetupAgent: (name: string, email: string) => ipcRenderer.invoke("setup:run", name, email),

@@ -25,6 +25,11 @@ function wireIpc() {
   window.deck?.onGlobalRefreshStart?.(() => setGlobalRefreshing(true));
   window.deck?.onPollingStarted?.(() => setGlobalRefreshing(true));
   window.deck?.onPollingFinished?.(() => setGlobalRefreshing(false));
+
+  // Safety: if polling-finished never fires within 3 min, clear the banner
+  setTimeout(() => {
+    if (_isRefreshing) setGlobalRefreshing(false);
+  }, 180_000);
 }
 
 export function useGlobalRefresh() {

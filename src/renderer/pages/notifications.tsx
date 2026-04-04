@@ -12,9 +12,9 @@ import { usePollStatus } from "../hooks/usePollStatus";
 import { AddToManagerButton } from "../components/AddToManagerButton";
 import { AddTaskModal } from "../components/AddTaskModal";
 import { AppHeader } from "../components/AppHeader";
-import { GlobalLoadingBanner } from "../components/GlobalLoadingBanner";
 import { DetailDrawer } from "../components/DetailDrawer";
 import { buildSlackArchiveUrl, computeParentStage } from "../../shared/task-utils";
+import { canDropTo, getStageAction } from "../../shared/stage-machine";
 import { STAGE_META, SOURCE_COLORS } from "../../shared/ui-constants";
 import { formatTimeSince } from "../components/shared";
 import { SubtaskList } from "../components/SubtaskList";
@@ -290,50 +290,41 @@ export function Notifications() {
   }, []);
 
   // Trigger agent actions for a card (call AFTER moveCardToStage)
-  // Use a ref to always have current notifications (avoids stale closure)
-  const notificationsRef = useRef(notifications);
-  notificationsRef.current = notifications;
+  const executeStageTransition = useCallback((id: string, targetStage: string) => {
+    const notif = notifications.find(n => n.id === id);
+    if (!notif) return;
 
-  const triggerStageAction = useCallback((id: string, newStage: string) => {
-    // Use ref to get current state, not stale closure
-    const n = notificationsRef.current.find(n => n.id === id);
-    if (!n) {
-      console.warn(`[triggerStageAction] notification ${id} not found`);
-      return;
-    }
+    const action = getStageAction(targetStage);
+    if (!action) return;
 
-    if (newStage === "start_work" || newStage === "preparing") {
-      // Only start if no plan exists yet
-      window.deck.getPlan?.(id).then((existing: unknown) => {
-        if (existing && (existing as { conversationHistory?: unknown[] }).conversationHistory?.length) {
-          // Plan already exists — just mark as ready
-          setPlansReady(prev => new Set([...prev, id]));
-          return;
-        }
-        window.deck.prepareWorkPlan?.({
-          id: n.id, source: n.source, title: n.title, summary: n.summary, url: n.url,
-          taskType: n.taskType, links: n.links,
-        }).catch((err: unknown) => console.error("[start_work] prepareWorkPlan failed:", err));
-      }).catch(() => {});
-    } else if (newStage === "hack") {
-      // Use skill runner instead of old startWorkAgent
-      const notif = notifications.find(nn => nn.id === id);
-      if (notif) {
-        window.deck.runSkill?.({
-          skill: "/hack",
-          args: "",
-          repoPath: (notif as any).repoPath ?? "",
-          sessionId: (notif as any).sessionId ?? null,
-          notificationId: id,
-        }).catch((err: unknown) => console.error("[hack] runSkill failed:", err));
-      }
+    if (action.usePlanAgent) {
+      // Planning stage — start the plan agent
+      window.deck.prepareWorkPlan?.({
+        id: notif.id,
+        title: notif.title,
+        summary: notif.summary,
+        taskType: notif.taskType,
+        source: notif.source,
+        priority: notif.priority,
+        links: notif.links,
+        actionNeeded: notif.actionNeeded,
+      }).catch((err: unknown) => console.error("[planning] prepareWorkPlan failed:", err));
+    } else if (action.skill) {
+      // Skill-based stage — run the skill
+      window.deck.runSkill?.({
+        skill: action.skill,
+        args: "",
+        repoPath: (notif as any).repoPath ?? "",
+        sessionId: (notif as any).sessionId ?? null,
+        notificationId: id,
+      }).catch((err: unknown) => console.error(`[${targetStage}] runSkill failed:`, err));
     }
-  }, []);
+  }, [notifications]);
 
   const handleStageButton = useCallback((id: string, newStage: string) => {
     moveCardToStage(id, newStage);
-    triggerStageAction(id, newStage);
-  }, [moveCardToStage, triggerStageAction]);
+    executeStageTransition(id, newStage);
+  }, [moveCardToStage, executeStageTransition]);
 
   // Native HTML5 drag-and-drop state
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -426,7 +417,7 @@ export function Notifications() {
   [notifications]);
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--aegen-void)" }}>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--aegen-void)" }}>
       <style>{`
         .notif-card:hover .drag-handle { opacity: 1 !important; }
         .notif-action-btn { transition: filter 0.15s ease; }
@@ -455,7 +446,6 @@ export function Notifications() {
           </>
         }
       />
-      <GlobalLoadingBanner />
 
       {/* Two-section kanban board */}
         <div style={{ flex: 1, overflowX: "auto", overflowY: "auto" }}>
@@ -485,10 +475,14 @@ export function Notifications() {
                       e.preventDefault();
                       setDragOverStage(null);
                       setDraggingId(null);
-                      const id = e.dataTransfer.getData("text/plain");
-                      if (id) {
-                        moveCardToStage(id, stage.key);
-                        triggerStageAction(id, stage.key);
+                      const dragId = e.dataTransfer.getData("text/plain");
+                      if (dragId) {
+                        // Validate transition
+                        const notif = notifications.find(n => n.id === dragId);
+                        if (!notif || !canDropTo(notif.stage ?? "new", stage.key, notif.taskType)) return;
+
+                        moveCardToStage(dragId, stage.key);
+                        executeStageTransition(dragId, stage.key);
                       }
                     }}
                   >
@@ -534,7 +528,7 @@ export function Notifications() {
                         {items.length === 0 && (
                           <div style={{
                             padding: 16, borderRadius: 6, textAlign: "center",
-                            border: "1px dashed rgba(68, 73, 85, 0.2)",
+                            border: "1px dashed var(--aegen-glass-border)",
                           }}>
                             <Text size="xs" c="dimmed">{isOver ? "Drop here" : "Empty"}</Text>
                           </div>
@@ -562,9 +556,9 @@ export function Notifications() {
                                 padding: "10px 12px", borderRadius: 6, cursor: "grab", userSelect: "none",
                                 border: `1px solid ${
                                   n.id === selectedId ? "var(--mantine-color-blue-5)"
-                                  : "rgba(68, 73, 85, 0.2)"
+                                  : "var(--aegen-glass-border)"
                                 }`,
-                                background: (n.stage === "done" || n.stage === "backlog") ? "var(--aegen-void)" : "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
+                                background: (n.stage === "done" || n.stage === "backlog") ? "var(--aegen-void)" : "var(--aegen-glass-bg)", backdropFilter: "var(--aegen-glass-blur)",
                                 opacity: isDragging ? 0.4 : (n.stage === "done" || n.stage === "backlog") ? 0.5 : 1,
                                 transition: "opacity 0.15s ease, background-color 0.15s ease",
                               }}
@@ -596,7 +590,7 @@ export function Notifications() {
                                 {n.priority && (
                                   <Badge
                                     size="xs"
-                                    variant="dot"
+                                    variant="light"
                                     color={
                                       n.priority === "critical" ? "red" : n.priority === "high" ? "yellow" : n.priority === "medium" ? "blue" : "gray"
                                     }
@@ -720,11 +714,15 @@ export function Notifications() {
                       e.preventDefault();
                       setDragOverStage(null);
                       setDraggingId(null);
-                      const id = e.dataTransfer.getData("text/plain");
-                      if (id) {
+                      const dragId = e.dataTransfer.getData("text/plain");
+                      if (dragId) {
                         const targetStage = stage.key === "new" ? "new" : stage.key;
-                        moveCardToStage(id, targetStage);
-                        triggerStageAction(id, targetStage);
+                        // Validate transition
+                        const notif = notifications.find(n => n.id === dragId);
+                        if (!notif || !canDropTo(notif.stage ?? "new", targetStage, notif.taskType)) return;
+
+                        moveCardToStage(dragId, targetStage);
+                        executeStageTransition(dragId, targetStage);
                       }
                     }}
                   >
@@ -749,7 +747,7 @@ export function Notifications() {
                     }}>
                       <Stack gap={6}>
                         {items.length === 0 && (
-                          <div style={{ padding: 12, borderRadius: 6, textAlign: "center", border: "1px dashed rgba(68, 73, 85, 0.2)" }}>
+                          <div style={{ padding: 12, borderRadius: 6, textAlign: "center", border: "1px dashed var(--aegen-glass-border)" }}>
                             <Text size="xs" c="dimmed">{isOver ? "Drop here" : "Empty"}</Text>
                           </div>
                         )}
@@ -771,8 +769,8 @@ export function Notifications() {
                               className="notif-card"
                               style={{
                                 padding: "10px 12px", borderRadius: 6, cursor: "grab", userSelect: "none",
-                                border: `1px solid ${n.id === selectedId ? "var(--mantine-color-blue-5)" : "rgba(68, 73, 85, 0.2)"}`,
-                                background: (n.stage === "done" || n.stage === "backlog") ? "var(--aegen-void)" : "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
+                                border: `1px solid ${n.id === selectedId ? "var(--mantine-color-blue-5)" : "var(--aegen-glass-border)"}`,
+                                background: (n.stage === "done" || n.stage === "backlog") ? "var(--aegen-void)" : "var(--aegen-glass-bg)", backdropFilter: "var(--aegen-glass-blur)",
                                 opacity: draggingId === n.id ? 0.4 : (n.stage === "done" || n.stage === "backlog") ? 0.5 : 1,
                               }}
                             >
@@ -794,7 +792,7 @@ export function Notifications() {
                                 {n.priority && (
                                   <Badge
                                     size="xs"
-                                    variant="dot"
+                                    variant="light"
                                     color={n.priority === "critical" ? "red" : n.priority === "high" ? "yellow" : n.priority === "medium" ? "blue" : "gray"}
                                     style={{ fontSize: "0.5rem" }}
                                   >
@@ -875,7 +873,7 @@ export function Notifications() {
                           onClick={() => setSelectedId(n.id === selectedId ? null : n.id)}
                           style={{
                             padding: "6px 10px", borderRadius: 6, cursor: "grab",
-                            border: "1px solid rgba(68, 73, 85, 0.2)",
+                            border: "1px solid var(--aegen-glass-border)",
                             background: "var(--aegen-void)",
                             opacity: 0.6, maxWidth: 250,
                           }}
@@ -898,17 +896,17 @@ export function Notifications() {
           {/* Backdrop — click to close */}
           <div
             onClick={() => setSelectedId(null)}
-            style={{ position: "fixed", inset: 0, top: 42, zIndex: 99, backgroundColor: "rgba(0,0,0,0.2)" }}
+            style={{ position: "fixed", inset: 0, zIndex: 99, backgroundColor: "rgba(0,0,0,0.2)" }}
           />
           <div
             onClick={(e) => e.stopPropagation()}
             className="detail-drawer-panel"
             style={{
-              position: "fixed", top: 42, right: 0, bottom: 0,
+              position: "fixed", top: 0, right: 0, bottom: 0,
               width: 520, maxWidth: "60vw",
               zIndex: 100,
               background: "var(--aegen-void)",
-              borderLeft: "1px solid rgba(68, 73, 85, 0.2)",
+              borderLeft: "1px solid var(--aegen-glass-border)",
               boxShadow: "-4px 0 20px rgba(0,0,0,0.3)",
               animation: "slideInRight 0.2s ease-out",
             }}
@@ -933,18 +931,21 @@ export function Notifications() {
         <div style={{
           position: "fixed", top: 42, right: 0, bottom: 0, width: 400,
           background: "var(--aegen-void)",
-          borderLeft: "1px solid rgba(68, 73, 85, 0.2)",
+          borderLeft: "1px solid var(--aegen-glass-border)",
           zIndex: 50, display: "flex", flexDirection: "column",
           fontSize: "0.7rem", fontFamily: "var(--mantine-font-family-monospace)",
         }}>
-          <div style={{ padding: "8px 12px", borderBottom: "1px solid rgba(68, 73, 85, 0.2)", flexShrink: 0 }}>
+          <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--aegen-glass-border)", flexShrink: 0 }}>
             <Group justify="space-between">
               <Text size="xs" fw={600}>Bridge Activity</Text>
               <Text size="xs" c="dimmed">{debugEntries.length} entries</Text>
-              <UnstyledButton onClick={async () => {
-                try { await fetch("http://localhost:9876/api/debug/clear"); } catch {}
-                setDebugEntries([]);
-              }} style={{ fontSize: "0.6rem", color: "var(--mantine-color-dimmed)" }}>Clear</UnstyledButton>
+              <Group gap={8}>
+                <UnstyledButton onClick={async () => {
+                  try { await fetch("http://localhost:9876/api/debug/clear"); } catch {}
+                  setDebugEntries([]);
+                }} style={{ fontSize: "0.6rem", color: "var(--mantine-color-dimmed)" }}>Clear</UnstyledButton>
+                <UnstyledButton onClick={() => setShowDebug(false)} style={{ fontSize: "0.7rem", color: "var(--mantine-color-dimmed)", padding: "0 4px" }}>✕</UnstyledButton>
+              </Group>
             </Group>
           </div>
           <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
@@ -956,7 +957,7 @@ export function Notifications() {
                   padding: "4px 8px", marginBottom: 4, borderRadius: 4,
                   backgroundColor: entry.direction === "in"
                     ? "rgba(74, 125, 255, 0.08)"
-                    : "rgba(16, 21, 32, 0.65)",
+                    : "var(--aegen-glass-bg)",
                   borderLeft: `2px solid ${entry.direction === "in" ? "var(--mantine-color-blue-5)" : "var(--mantine-color-green-5)"}`,
                 }}>
                   <Group gap={4} mb={2}>

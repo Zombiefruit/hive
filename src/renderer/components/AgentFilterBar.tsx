@@ -33,7 +33,7 @@ export function AgentFilterBar({ activeFilters, onToggle, totalCount }: AgentFil
               fontSize: "0.75rem",
               fontWeight: 500,
               border: isActive
-                ? "1px solid rgba(68, 73, 85, 0.2)"
+                ? "1px solid var(--aegen-glass-border)"
                 : "1px solid transparent",
               backgroundColor: isActive ? "var(--mantine-color-default-hover)" : "transparent",
               color: isActive ? "var(--mantine-color-text)" : "var(--mantine-color-dimmed)",

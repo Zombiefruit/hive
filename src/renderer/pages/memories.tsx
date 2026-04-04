@@ -2,7 +2,6 @@ import { Badge, Group, Stack, Text, TextInput, UnstyledButton, Progress } from "
 import { IconBrain, IconSearch, IconTrash, IconRefresh } from "@tabler/icons-react";
 import { useState, useEffect, useCallback } from "react";
 import { AppHeader } from "../components/AppHeader";
-import { GlobalLoadingBanner } from "../components/GlobalLoadingBanner";
 import type { Memory } from "../../shared/memory-types";
 
 const SCOPE_COLORS: Record<string, string> = {
@@ -18,9 +17,9 @@ function MemoryCard({ memory, onDelete }: { memory: Memory; onDelete: () => void
   return (
     <div style={{
       padding: "12px 14px", borderRadius: 8, marginBottom: 8,
-      background: "rgba(16, 21, 32, 0.65)",
-      backdropFilter: "blur(16px) saturate(1.2)",
-      border: "1px solid rgba(68, 73, 85, 0.2)",
+      background: "var(--aegen-glass-bg)",
+      backdropFilter: "var(--aegen-glass-blur)",
+      border: "1px solid var(--aegen-glass-border)",
     }}>
       <Group gap={6} mb={6} wrap="nowrap">
         <Badge size="xs" variant="light" color={SCOPE_COLORS[memory.scope] ?? "gray"}>{memory.scope}</Badge>
@@ -90,9 +89,8 @@ export default function MemoriesPage() {
   const scopes = ["shared", "triage", "planning", "work"];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--aegen-void)" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--aegen-void)" }}>
       <AppHeader />
-      <GlobalLoadingBanner />
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", paddingTop: 8 }}>
         {/* Stats header */}

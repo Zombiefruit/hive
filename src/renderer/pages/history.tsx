@@ -42,7 +42,7 @@ export function History() {
   }, []);
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--aegen-void)" }}>
+    <div style={{ minHeight: "100%", background: "var(--aegen-void)" }}>
       <div style={{ position: "sticky", top: 0, zIndex: 10 }}>
         <AppHeader
           rightContent={
@@ -71,13 +71,13 @@ export function History() {
                   gap: 12,
                   padding: "12px 16px",
                   borderRadius: 8,
-                  border: "1px solid rgba(68, 73, 85, 0.2)",
-                  background: "rgba(16, 21, 32, 0.65)",
-                  backdropFilter: "blur(16px) saturate(1.2)",
+                  border: "1px solid var(--aegen-glass-border)",
+                  background: "var(--aegen-glass-bg)",
+                  backdropFilter: "var(--aegen-glass-blur)",
                   transition: "border-color 0.1s ease",
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(74, 125, 255, 0.2)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(68, 73, 85, 0.2)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--aegen-glass-border)"; }}
               >
                 <IconFileText size={16} color="var(--aegen-dust-gray)" style={{ marginTop: 2, flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>

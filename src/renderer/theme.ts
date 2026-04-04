@@ -7,7 +7,9 @@ import {
 
 /**
  * Aegen Design System — Mantine Theme Override
- * Dark-only cosmic design language with glassmorphism surfaces.
+ * Cosmic design language with glassmorphism surfaces.
+ * Supports dark (default) and light color schemes via CSS custom properties.
+ * Component styles reference var(--aegen-*) tokens so they adapt automatically.
  */
 const aeGenTheme = createTheme({
   cursorType: "pointer",
@@ -47,7 +49,6 @@ const aeGenTheme = createTheme({
     },
   },
 
-  black: "#d3d8e4", // Star White — primary text in dark
   primaryShade: 5,
   autoContrast: true,
   luminanceThreshold: 0.2,
@@ -105,17 +106,16 @@ const aeGenTheme = createTheme({
   },
 
   components: {
-    // Paper — glass surface
+    // Paper — glass surface (uses CSS vars -> adapts to light/dark)
     Paper: {
       defaultProps: { radius: "md" },
       styles: () => ({
         root: {
-          background: "rgba(16, 21, 32, 0.72)",
-          backdropFilter: "blur(20px) saturate(1.3)",
-          WebkitBackdropFilter: "blur(20px) saturate(1.3)",
-          border: "1px solid rgba(68, 73, 85, 0.2)",
-          boxShadow:
-            "0 0 12px rgba(74, 125, 255, 0.1), inset 0 0 12px rgba(74, 125, 255, 0.03)",
+          background: "var(--aegen-glass-bg)",
+          backdropFilter: "var(--aegen-glass-blur)",
+          WebkitBackdropFilter: "var(--aegen-glass-blur)",
+          border: "1px solid var(--aegen-glass-border)",
+          boxShadow: "var(--aegen-glass-shadow)",
         },
       }),
     },
@@ -125,14 +125,12 @@ const aeGenTheme = createTheme({
       defaultProps: { radius: "md", padding: "lg" },
       styles: () => ({
         root: {
-          background:
-            "linear-gradient(135deg, rgba(16, 21, 32, 0.9), rgba(26, 22, 37, 0.82))",
-          backdropFilter: "blur(20px) saturate(1.3)",
-          WebkitBackdropFilter: "blur(20px) saturate(1.3)",
-          border: "1px solid rgba(68, 73, 85, 0.2)",
+          background: "var(--aegen-gradient-surface)",
+          backdropFilter: "var(--aegen-glass-blur)",
+          WebkitBackdropFilter: "var(--aegen-glass-blur)",
+          border: "1px solid var(--aegen-glass-border)",
           borderRadius: 14,
-          boxShadow:
-            "0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(74, 125, 255, 0.05)",
+          boxShadow: "var(--aegen-glass-shadow-elevated)",
         },
       }),
     },
@@ -169,45 +167,45 @@ const aeGenTheme = createTheme({
     Accordion: {
       styles: () => ({
         item: {
-          background: "rgba(16, 21, 32, 0.72)",
-          backdropFilter: "blur(16px) saturate(1.2)",
-          border: "1px solid rgba(68, 73, 85, 0.2)",
+          background: "var(--aegen-glass-bg)",
+          backdropFilter: "var(--aegen-glass-blur)",
+          border: "1px solid var(--aegen-glass-border)",
           borderRadius: 14,
           marginBottom: 8,
         },
         control: {
-          color: "#d3d8e4",
+          color: "var(--aegen-star-white)",
           "&:hover": {
             background: "rgba(74, 125, 255, 0.05)",
           },
         },
         content: {
-          color: "#b4b9c7",
+          color: "var(--aegen-dust-gray)",
         },
       }),
     },
 
-    // TextInput — deep space input
+    // TextInput — adaptive input
     TextInput: {
       styles: () => ({
         input: {
-          background: "rgba(16, 21, 32, 0.7)",
-          border: "1px solid rgba(68, 73, 85, 0.3)",
-          color: "#d3d8e4",
+          background: "var(--aegen-glass-bg)",
+          border: "1px solid var(--aegen-glass-border)",
+          color: "var(--aegen-star-white)",
           borderRadius: 10,
           "&::placeholder": {
-            color: "#74788a",
+            color: "var(--aegen-dust-gray)",
           },
           "&:focus": {
-            borderColor: "rgba(74, 125, 255, 0.4)",
+            borderColor: "var(--aegen-cosmic-blue)",
             boxShadow: "0 0 0 2px rgba(74, 125, 255, 0.15)",
           },
         },
         label: {
-          color: "#d3d8e4",
+          color: "var(--aegen-star-white)",
         },
         description: {
-          color: "#74788a",
+          color: "var(--aegen-dust-gray)",
         },
       }),
     },
@@ -216,15 +214,15 @@ const aeGenTheme = createTheme({
     Textarea: {
       styles: () => ({
         input: {
-          background: "rgba(16, 21, 32, 0.7)",
-          border: "1px solid rgba(68, 73, 85, 0.3)",
-          color: "#d3d8e4",
+          background: "var(--aegen-glass-bg)",
+          border: "1px solid var(--aegen-glass-border)",
+          color: "var(--aegen-star-white)",
           borderRadius: 10,
           "&::placeholder": {
-            color: "#74788a",
+            color: "var(--aegen-dust-gray)",
           },
           "&:focus": {
-            borderColor: "rgba(74, 125, 255, 0.4)",
+            borderColor: "var(--aegen-cosmic-blue)",
             boxShadow: "0 0 0 2px rgba(74, 125, 255, 0.15)",
           },
         },
@@ -236,24 +234,24 @@ const aeGenTheme = createTheme({
       defaultProps: { checkIconPosition: "right", allowDeselect: false },
       styles: () => ({
         input: {
-          background: "rgba(16, 21, 32, 0.7)",
-          border: "1px solid rgba(68, 73, 85, 0.3)",
-          color: "#d3d8e4",
+          background: "var(--aegen-glass-bg)",
+          border: "1px solid var(--aegen-glass-border)",
+          color: "var(--aegen-star-white)",
           borderRadius: 10,
           "&:focus": {
-            borderColor: "rgba(74, 125, 255, 0.4)",
+            borderColor: "var(--aegen-cosmic-blue)",
           },
         },
         dropdown: {
-          background: "rgba(26, 22, 37, 0.95)",
-          backdropFilter: "blur(20px) saturate(1.3)",
-          border: "1px solid rgba(68, 73, 85, 0.3)",
+          background: "var(--aegen-gradient-surface)",
+          backdropFilter: "var(--aegen-glass-blur)",
+          border: "1px solid var(--aegen-glass-border)",
           borderRadius: 12,
         },
         option: {
           borderRadius: 8,
-          color: "#d3d8e4",
-          "&[dataChecked]": {
+          color: "var(--aegen-star-white)",
+          "&[data-checked]": {
             background: "rgba(74, 125, 255, 0.15)",
           },
           "&:hover": {
@@ -267,11 +265,11 @@ const aeGenTheme = createTheme({
     Radio: {
       styles: () => ({
         radio: {
-          borderColor: "rgba(68, 73, 85, 0.4)",
-          backgroundColor: "rgba(16, 21, 32, 0.7)",
+          borderColor: "var(--aegen-dim-gray)",
+          backgroundColor: "var(--aegen-glass-bg)",
         },
         label: {
-          color: "#d3d8e4",
+          color: "var(--aegen-star-white)",
         },
       }),
     },
@@ -280,14 +278,14 @@ const aeGenTheme = createTheme({
     Switch: {
       styles: () => ({
         track: {
-          borderColor: "rgba(68, 73, 85, 0.4)",
-          backgroundColor: "rgba(16, 21, 32, 0.5)",
+          borderColor: "var(--aegen-dim-gray)",
+          backgroundColor: "var(--aegen-glass-bg)",
         },
         label: {
-          color: "#d3d8e4",
+          color: "var(--aegen-star-white)",
         },
         description: {
-          color: "#74788a",
+          color: "var(--aegen-dust-gray)",
         },
       }),
     },
@@ -296,19 +294,19 @@ const aeGenTheme = createTheme({
     Tabs: {
       styles: () => ({
         tab: {
-          color: "#74788a",
+          color: "var(--aegen-dust-gray)",
           borderRadius: 8,
-          "&[dataActive]": {
-            color: "#d3d8e4",
-            borderColor: "#4a7dff",
-            background: "rgba(74, 125, 255, 0.08)",
+          "&[data-active]": {
+            color: "var(--aegen-star-white)",
+            borderColor: "var(--aegen-cosmic-blue)",
+            background: "rgba(74, 125, 255, 0.12)",
           },
           "&:hover": {
             background: "rgba(74, 125, 255, 0.05)",
           },
         },
         list: {
-          borderColor: "rgba(68, 73, 85, 0.2)",
+          borderColor: "var(--aegen-glass-border)",
         },
       }),
     },
@@ -320,11 +318,11 @@ const aeGenTheme = createTheme({
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: "rgba(16, 21, 32, 0.7)",
-          borderColor: "rgba(68, 73, 85, 0.3)",
+          backgroundColor: "var(--aegen-glass-bg)",
+          borderColor: "var(--aegen-glass-border)",
         },
         separator: {
-          backgroundColor: "rgba(68, 73, 85, 0.3)",
+          backgroundColor: "var(--aegen-glass-border)",
         },
       }),
     },
@@ -334,10 +332,9 @@ const aeGenTheme = createTheme({
       defaultProps: { centered: true },
       styles: () => ({
         content: {
-          background:
-            "linear-gradient(135deg, rgba(16, 21, 32, 0.95), rgba(26, 22, 37, 0.9))",
+          background: "var(--aegen-gradient-surface)",
           backdropFilter: "blur(24px) saturate(1.4)",
-          border: "1px solid rgba(68, 73, 85, 0.2)",
+          border: "1px solid var(--aegen-glass-border)",
           borderRadius: 16,
         },
         header: {
@@ -354,10 +351,9 @@ const aeGenTheme = createTheme({
       defaultProps: { position: "right" },
       styles: () => ({
         content: {
-          background:
-            "linear-gradient(135deg, rgba(16, 21, 32, 0.95), rgba(26, 22, 37, 0.9))",
+          background: "var(--aegen-gradient-surface)",
           backdropFilter: "blur(24px) saturate(1.4)",
-          border: "1px solid rgba(68, 73, 85, 0.2)",
+          border: "1px solid var(--aegen-glass-border)",
         },
         header: {
           background: "transparent",
@@ -372,11 +368,11 @@ const aeGenTheme = createTheme({
       },
       styles: () => ({
         tooltip: {
-          background: "rgba(16, 21, 32, 0.9)",
+          background: "var(--aegen-glass-bg)",
           backdropFilter: "blur(12px)",
-          border: "1px solid rgba(68, 73, 85, 0.2)",
+          border: "1px solid var(--aegen-glass-border)",
           borderRadius: 8,
-          color: "#d3d8e4",
+          color: "var(--aegen-star-white)",
           fontSize: "0.75rem",
         },
       }),
@@ -387,11 +383,11 @@ const aeGenTheme = createTheme({
       defaultProps: { variant: "subtle" },
       styles: () => ({
         root: {
-          color: "#74788a",
+          color: "var(--aegen-dust-gray)",
           borderRadius: 8,
           "&:hover": {
             background: "rgba(74, 125, 255, 0.08)",
-            color: "#d3d8e4",
+            color: "var(--aegen-star-white)",
           },
         },
       }),
@@ -404,14 +400,14 @@ const aeGenTheme = createTheme({
 
     // Loader — cosmic blue
     Loader: {
-      defaultProps: { color: "#4a7dff" },
+      defaultProps: { color: "var(--aegen-cosmic-blue)" },
     },
 
     // Progress — cosmic gradient
     Progress: {
       styles: () => ({
         root: {
-          backgroundColor: "rgba(68, 73, 85, 0.2)",
+          backgroundColor: "var(--aegen-glass-border)",
           borderRadius: 6,
         },
       }),

@@ -31,9 +31,9 @@ export function AppHeader({ title, rightContent }: AppHeaderProps) {
         height: TITLEBAR_HEIGHT,
         padding: "0 16px",
         gap: 12,
-        borderBottom: "1px solid rgba(68, 73, 85, 0.12)",
-        background: "rgba(16, 21, 32, 0.6)",
-        backdropFilter: "blur(12px) saturate(1.1)",
+        borderBottom: "1px solid var(--aegen-glass-border)",
+        background: "var(--aegen-glass-bg)",
+        backdropFilter: "var(--aegen-glass-blur)",
         WebkitAppRegion: "drag",
         flexShrink: 0,
       }}

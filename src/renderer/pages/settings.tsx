@@ -328,7 +328,7 @@ export function Settings() {
     <div
       style={{
         height: 1,
-        backgroundColor: "rgba(68, 73, 85, 0.2)",
+        backgroundColor: "var(--aegen-glass-border)",
         margin: "8px 0",
       }}
     />
@@ -336,7 +336,7 @@ export function Settings() {
 
   if (loadStatus === "loading") {
     return (
-      <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--aegen-void)" }}>
+      <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--aegen-void)" }}>
         <Loader size="sm" color="blue" />
       </div>
     );
@@ -345,7 +345,7 @@ export function Settings() {
   return (
     <div
       style={{
-        height: "100vh",
+        height: "100%",
         display: "flex",
         flexDirection: "column",
         background: "var(--aegen-void)",
@@ -483,7 +483,7 @@ export function Settings() {
                     padding: "8px 12px",
                     borderRadius: 8,
                     border: "1px solid rgba(68, 73, 85, 0.25)",
-                    backgroundColor: "rgba(16, 21, 32, 0.5)",
+                    backgroundColor: "var(--aegen-glass-bg)",
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -608,7 +608,7 @@ export function Settings() {
                     padding: "8px 12px",
                     borderRadius: 8,
                     border: "1px solid rgba(68, 73, 85, 0.25)",
-                    backgroundColor: "rgba(16, 21, 32, 0.5)",
+                    backgroundColor: "var(--aegen-glass-bg)",
                   }}
                 >
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -863,7 +863,7 @@ export function Settings() {
 
             <Stack gap={6}>
               {(repoMappings ?? []).map((m, i) => (
-                <Group key={i} gap={8} style={{ padding: "6px 10px", borderRadius: 6, background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)" }}>
+                <Group key={i} gap={8} style={{ padding: "6px 10px", borderRadius: 6, background: "var(--aegen-glass-bg)", backdropFilter: "var(--aegen-glass-blur)" }}>
                   <Badge size="xs" variant="light" color="teal">{m.pattern}</Badge>
                   <Text size="xs" style={{ fontFamily: "var(--mantine-font-family-monospace)", fontSize: "0.7rem", flex: 1 }}>{m.repoPath}</Text>
                   <ActionIcon size="sm" variant="subtle" color="red" aria-label="Remove repo mapping" onClick={() => setRepoMappings(prev => (prev ?? []).filter((_, j) => j !== i))}>
@@ -982,7 +982,7 @@ export function Settings() {
           position: "sticky",
           bottom: 0,
           padding: "12px 24px",
-          borderTop: "1px solid rgba(68, 73, 85, 0.2)",
+          borderTop: "1px solid var(--aegen-glass-border)",
           backgroundColor: "rgba(5, 8, 16, 0.9)",
           backdropFilter: "blur(8px)",
           display: "flex",

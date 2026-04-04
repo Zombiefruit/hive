@@ -26,7 +26,7 @@ interface ContextPickerProps {
 const CONNECTORS: Array<{ key: ConnectorType; label: string; Icon: React.FC<{ size?: number; color?: string }>; color: string; placeholder: string }> = [
   { key: "linear", label: "Linear", Icon: SiLinear as React.FC<{ size?: number; color?: string }>, color: "#5E6AD2", placeholder: "Search issues by title or ID (e.g. VEC-10)..." },
   { key: "slack", label: "Slack", Icon: IconHash, color: "#E01E5A", placeholder: "Search channels or messages..." },
-  { key: "notion", label: "Notion", Icon: SiNotion as React.FC<{ size?: number; color?: string }>, color: "#FFFFFF", placeholder: "Search pages and databases..." },
+  { key: "notion", label: "Notion", Icon: SiNotion as React.FC<{ size?: number; color?: string }>, color: "var(--aegen-star-white)", placeholder: "Search pages and databases..." },
 ];
 
 export function ContextPicker({ onSelect, onClose }: ContextPickerProps) {
@@ -94,12 +94,12 @@ export function ContextPicker({ onSelect, onClose }: ContextPickerProps) {
       <div onClick={e => e.stopPropagation()} style={{
         width: 520, maxHeight: "70vh", display: "flex", flexDirection: "column",
         borderRadius: 12, overflow: "hidden",
-        background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
-        border: "1px solid rgba(68, 73, 85, 0.2)",
+        background: "var(--aegen-glass-bg)", backdropFilter: "var(--aegen-glass-blur)",
+        border: "1px solid var(--aegen-glass-border)",
         boxShadow: "0 16px 48px rgba(5, 8, 16, 0.6)",
       }}>
         {/* Header with tabs */}
-        <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(68, 73, 85, 0.2)" }}>
+        <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--aegen-glass-border)" }}>
           <Group justify="space-between" mb={10}>
             <Text size="sm" fw={600}>Add Context</Text>
             <UnstyledButton onClick={onClose}><IconX size={16} color="var(--mantine-color-dimmed)" /></UnstyledButton>
@@ -124,7 +124,7 @@ export function ContextPicker({ onSelect, onClose }: ContextPickerProps) {
         </div>
 
         {/* Search input */}
-        <div style={{ padding: "8px 16px", borderBottom: "1px solid rgba(68, 73, 85, 0.2)" }}>
+        <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--aegen-glass-border)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 6, backgroundColor: "rgba(74, 125, 255, 0.08)" }}>
             <IconSearch size={14} color="var(--mantine-color-dimmed)" />
             <input
@@ -183,7 +183,7 @@ export function ContextPicker({ onSelect, onClose }: ContextPickerProps) {
 
         {/* Footer */}
         {selected.size > 0 && (
-          <div style={{ padding: "10px 16px", borderTop: "1px solid rgba(68, 73, 85, 0.2)" }}>
+          <div style={{ padding: "10px 16px", borderTop: "1px solid var(--aegen-glass-border)" }}>
             <Group justify="space-between">
               <Text size="xs" c="dimmed">{selected.size} selected</Text>
               <UnstyledButton onClick={handleAttach} style={{

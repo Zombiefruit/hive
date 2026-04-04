@@ -42,7 +42,7 @@ function ToolGroupMessage({ message }: { message: Message }) {
           fontSize: "0.75rem",
           color: "var(--mantine-color-dimmed)",
           backgroundColor: "rgba(74, 125, 255, 0.08)",
-          border: "1px solid rgba(68, 73, 85, 0.2)",
+          border: "1px solid var(--aegen-glass-border)",
         }}
       >
         {isAgentGroup ? <IconRobot size={12} /> : <IconTool size={12} />}
@@ -119,7 +119,7 @@ function ChatMessage({ message }: { message: Message }) {
         backgroundColor: bgColor,
         alignSelf: isUser ? "flex-end" : "flex-start",
         maxWidth: "85%",
-        border: isUser ? undefined : "1px solid rgba(68, 73, 85, 0.2)",
+        border: isUser ? undefined : "1px solid var(--aegen-glass-border)",
       }}
     >
       {isManager && (
@@ -198,7 +198,7 @@ export function ChatPanel({ agentId, agentStatus, isReadOnly }: ChatPanelProps) 
       </ScrollArea>
 
       {!isReadOnly && (
-        <Paper p="sm" style={{ borderTop: "1px solid rgba(68, 73, 85, 0.2)", flexShrink: 0 }}>
+        <Paper p="sm" style={{ borderTop: "1px solid var(--aegen-glass-border)", flexShrink: 0 }}>
           {sendError && (
             <Text size="xs" c="red" mb="xs">{sendError}</Text>
           )}

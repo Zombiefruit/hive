@@ -43,7 +43,7 @@ export function PlanView({ plan, onStartHack, onReviewPlan }: PlanViewProps) {
             </Badge>
           )}
           {plan.scope && (
-            <Badge size="sm" variant="dot" color={scopeColor}>
+            <Badge size="sm" variant="light" color={scopeColor}>
               {plan.scope} scope
             </Badge>
           )}
@@ -95,7 +95,7 @@ export function PlanView({ plan, onStartHack, onReviewPlan }: PlanViewProps) {
                 marginTop: 6,
                 padding: "8px 12px",
                 borderRadius: 6,
-                background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
+                background: "var(--aegen-glass-bg)", backdropFilter: "var(--aegen-glass-blur)",
                 fontSize: "0.7rem",
               }}
             >
@@ -130,7 +130,7 @@ export function PlanView({ plan, onStartHack, onReviewPlan }: PlanViewProps) {
             <div
               key={phase.number}
               style={{
-                border: "1px solid rgba(68, 73, 85, 0.2)",
+                border: "1px solid var(--aegen-glass-border)",
                 borderRadius: 8,
                 overflow: "hidden",
               }}
@@ -228,7 +228,7 @@ export function PlanView({ plan, onStartHack, onReviewPlan }: PlanViewProps) {
               borderRadius: 6,
               fontSize: "0.8rem",
               fontWeight: 500,
-              border: "1px solid rgba(68, 73, 85, 0.2)",
+              border: "1px solid var(--aegen-glass-border)",
               color: "var(--mantine-color-text)",
               display: "flex",
               alignItems: "center",

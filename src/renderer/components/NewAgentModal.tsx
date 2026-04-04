@@ -228,7 +228,7 @@ function ImportContextPanel({
                 padding: "6px 10px",
                 borderBottom:
                   i < results.length - 1
-                    ? "1px solid rgba(68, 73, 85, 0.2)"
+                    ? "1px solid var(--aegen-glass-border)"
                     : undefined,
               }}
               className="hover-highlight"

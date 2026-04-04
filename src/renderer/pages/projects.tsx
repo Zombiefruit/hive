@@ -4,7 +4,6 @@ import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppHeader } from "../components/AppHeader";
-import { GlobalLoadingBanner } from "../components/GlobalLoadingBanner";
 import { usePollStatus } from "../hooks/usePollStatus";
 import type { Project } from "../../shared/project-model";
 import { STAGE_ORDER } from "../../shared/task-utils";
@@ -176,8 +175,8 @@ export default function ProjectsPage() {
         {hasContext && (
           <div style={{
             padding: "14px 16px", borderRadius: 8, marginBottom: 20,
-            border: "1px solid rgba(68, 73, 85, 0.2)",
-            background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
+            border: "1px solid var(--aegen-glass-border)",
+            background: "var(--aegen-glass-bg)", backdropFilter: "var(--aegen-glass-blur)",
           }}>
             <Text size="sm" fw={600} mb={10}>Context</Text>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -275,8 +274,8 @@ export default function ProjectsPage() {
                           className="notif-card"
                           style={{
                             padding: "10px 14px", borderRadius: 6,
-                            border: "1px solid rgba(68, 73, 85, 0.2)",
-                            background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
+                            border: "1px solid var(--aegen-glass-border)",
+                            background: "var(--aegen-glass-bg)", backdropFilter: "var(--aegen-glass-blur)",
                             display: "flex", alignItems: "center", justifyContent: "space-between",
                             transition: "background-color 0.15s",
                           }}
@@ -290,7 +289,7 @@ export default function ProjectsPage() {
                               {n.priority && (
                                 <Badge
                                   size="xs"
-                                  variant="dot"
+                                  variant="light"
                                   color={
                                     n.priority === "critical" ? "red" : n.priority === "high" ? "yellow" : n.priority === "medium" ? "blue" : "gray"
                                   }
@@ -323,9 +322,8 @@ export default function ProjectsPage() {
   const showDetail = projectId && selectedProject;
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--aegen-void)" }}>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--aegen-void)" }}>
       <AppHeader rightContent={headerRight} />
-      <GlobalLoadingBanner />
 
       {showDetail ? renderDetail(selectedProject) : (
         <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
@@ -369,8 +367,8 @@ export default function ProjectsPage() {
                     aria-label={proj.name}
                     style={{
                       padding: "14px 16px", borderRadius: 8,
-                      border: "1px solid rgba(68, 73, 85, 0.2)",
-                      background: "rgba(16, 21, 32, 0.65)", backdropFilter: "blur(16px) saturate(1.2)",
+                      border: "1px solid var(--aegen-glass-border)",
+                      background: "var(--aegen-glass-bg)", backdropFilter: "var(--aegen-glass-blur)",
                       display: "flex", alignItems: "center", justifyContent: "space-between",
                       transition: "background-color 0.15s",
                     }}
@@ -408,7 +406,7 @@ export default function ProjectsPage() {
                             <div style={{
                               position: "relative", flex: 1, height: 6, borderRadius: 3,
                               overflow: "hidden",
-                              backgroundColor: "rgba(68, 73, 85, 0.3)",
+                              backgroundColor: "var(--aegen-glass-border)",
                             }}>
                               <div style={{ display: "flex", height: "100%", width: `${(doneCount / taskCount) * 100}%`, minWidth: doneCount > 0 ? 4 : 0 }}>
                                 <Tooltip label={`Done: ${doneCount}`} withArrow position="top">

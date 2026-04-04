@@ -18,7 +18,7 @@ export function TimelineTab({ entries }: TimelineTabProps) {
 
   return (
     <div style={{ padding: "16px 20px", overflowY: "auto", flex: 1 }}>
-      <div style={{ borderLeft: "2px solid rgba(68, 73, 85, 0.2)", paddingLeft: 12 }}>
+      <div style={{ borderLeft: "2px solid var(--aegen-glass-border)", paddingLeft: 12 }}>
         {[...entries].reverse().map((entry, i) => {
           const isCreation = entry.event.toLowerCase().includes("created") || entry.event.toLowerCase().includes("new");
           const isStage = entry.event.toLowerCase().includes("moved") || entry.event.toLowerCase().includes("stage");

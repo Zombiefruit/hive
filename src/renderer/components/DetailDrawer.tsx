@@ -16,6 +16,7 @@ import { RepoDetectionBanner, deriveBranch } from "./RepoDetectionBanner";
 import { StartWorkModal } from "./StartWorkModal";
 import { SubtaskList } from "./SubtaskList";
 import { STAGE_META } from "../../shared/ui-constants";
+import { getStageCTA, getStageAction, isHumanTask } from "../../shared/stage-machine";
 import { detectRepo } from "../../shared/repo-detection";
 import type { NextStepsCardProps } from "./NextStepsCard";
 
@@ -47,6 +48,7 @@ interface NotificationItem {
   sessionId?: string;
   workSlug?: string;
   branch?: string;
+  actionNeeded?: string;
   parentTaskId?: string;
   subtaskIds?: string[];
 }
@@ -275,13 +277,13 @@ export function DetailDrawer({
   const stageConfig = STAGE_META[n.stage as keyof typeof STAGE_META] ?? { label: n.stage ?? "new", color: "#6b7280" };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "linear-gradient(135deg, rgba(16, 21, 32, 0.95), rgba(26, 22, 37, 0.9))", backdropFilter: "blur(24px) saturate(1.4)" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--aegen-gradient-surface)", backdropFilter: "var(--aegen-glass-blur)" }}>
       {/* Header */}
-      <div style={{ padding: "12px 20px", borderBottom: "1px solid rgba(68, 73, 85, 0.2)", flexShrink: 0 }}>
+      <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--aegen-glass-border)", flexShrink: 0 }}>
         <Group justify="space-between" mb={4}>
           <Group gap="xs">
             <Badge size="xs" style={{ backgroundColor: stageConfig.color, color: "white" }}>{stageConfig.label}</Badge>
-            {n.priority && <Badge size="xs" variant="dot" color={n.priority === "critical" ? "red" : n.priority === "high" ? "yellow" : n.priority === "medium" ? "blue" : "gray"}>{n.priority}</Badge>}
+            {n.priority && <Badge size="xs" variant="light" color={n.priority === "critical" ? "red" : n.priority === "high" ? "yellow" : n.priority === "medium" ? "blue" : "cyan"}>{n.priority}</Badge>}
           </Group>
           <UnstyledButton onClick={onClose} aria-label="Close detail pane">
             <Text size="xs" c="dimmed">Close</Text>
@@ -362,7 +364,7 @@ export function DetailDrawer({
 
       {/* Parent task: subtask list */}
       {n.subtaskIds && n.subtaskIds.length > 0 && notificationMap && (
-        <div style={{ padding: "8px 20px", borderBottom: "1px solid rgba(68, 73, 85, 0.2)", flexShrink: 0 }}>
+        <div style={{ padding: "8px 20px", borderBottom: "1px solid var(--aegen-glass-border)", flexShrink: 0 }}>
           <Text size="xs" fw={600} c="dimmed" mb={4}>
             {n.subtaskIds.filter(id => notificationMap.get(id)?.stage === "done").length} of {n.subtaskIds.length} subtasks done
           </Text>
@@ -377,8 +379,22 @@ export function DetailDrawer({
       )}
 
       {/* Tabs */}
-      <Tabs value={activeTab} onChange={(v) => v && setActiveTab(v as TabId)} style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-        <Tabs.List style={{ flexShrink: 0 }}>
+      <Tabs
+        variant="pills"
+        value={activeTab}
+        onChange={(v) => v && setActiveTab(v as TabId)}
+        style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}
+        styles={{
+          tab: {
+            color: "var(--aegen-dust-gray)",
+            "&[data-active]": {
+              color: "var(--aegen-star-white)",
+              backgroundColor: "rgba(74, 125, 255, 0.15)",
+            },
+          },
+        }}
+      >
+        <Tabs.List style={{ flexShrink: 0, padding: "4px 12px", gap: 4 }}>
           <Tabs.Tab value="agent" leftSection={<IconMessageCircle size={14} />} rightSection={loading ? <Loader size={8} /> : undefined}>
             Agent
           </Tabs.Tab>
@@ -419,57 +435,70 @@ export function DetailDrawer({
         </Tabs.Panel>
       </Tabs>
 
-      {/* Action bar — Start Work / Rerun / Dismiss (hidden for parent tasks — children get started individually) */}
-      {!loading && !(n.subtaskIds && n.subtaskIds.length > 0) && (n.stage === "new" || n.stage === "skipped") && conversation.length === 0 && (
-        <div style={{
-          padding: "8px 20px",
-          borderTop: "1px solid rgba(68, 73, 85, 0.2)",
-          flexShrink: 0,
-          display: "flex", gap: 8,
-        }}>
-          <UnstyledButton
-            onClick={handlePrepare}
-            style={{
-              padding: "6px 12px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 600,
-              backgroundColor: "var(--mantine-color-blue-5)", color: "white",
-            }}
-          >
-            Move to Planning
-          </UnstyledButton>
-          <UnstyledButton onClick={onDismiss} style={{ padding: "6px 12px", borderRadius: 6, fontSize: "0.75rem", color: "var(--mantine-color-dimmed)" }}>
-            Dismiss
-          </UnstyledButton>
-        </div>
-      )}
+      {/* Stage CTA — single action bar derived from stage machine */}
+      {!loading && !(n.subtaskIds && n.subtaskIds.length > 0) && (() => {
+        const cta = getStageCTA(n.stage ?? "new", n.taskType);
+        if (!cta) return null;
 
-      {/* Approve & Start bar — shown when plan is ready for implementation tasks */}
-      {!loading && !(n.subtaskIds && n.subtaskIds.length > 0) && (n.stage === "plan_review" || n.stage === "start_work") && planText && (
-        <div style={{
-          padding: "8px 20px",
-          borderTop: "1px solid rgba(68, 73, 85, 0.2)",
-          flexShrink: 0,
-          display: "flex", gap: 8,
-        }}>
-          <UnstyledButton
-            onClick={() => {
-              if (detectedRepo) {
-                handleStartWork(detectedRepo, suggestedBranch);
-              } else {
-                setStartWorkOpen(true);
-              }
-            }}
-            style={{
-              padding: "6px 12px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 600,
-              backgroundColor: "var(--mantine-color-green-filled)", color: "white",
-            }}
-          >
-            Approve &amp; Start
-          </UnstyledButton>
-          <UnstyledButton onClick={onDismiss} style={{ padding: "6px 12px", borderRadius: 6, fontSize: "0.75rem", color: "var(--mantine-color-dimmed)" }}>
-            Dismiss
-          </UnstyledButton>
-        </div>
-      )}
+        const action = getStageAction(cta.targetStage);
+
+        return (
+          <div style={{
+            padding: "8px 20px",
+            borderTop: "1px solid var(--aegen-glass-border)",
+            flexShrink: 0,
+            display: "flex", gap: 8,
+          }}>
+            <UnstyledButton
+              onClick={() => {
+                if (action?.usePlanAgent) {
+                  // Planning — needs repo selection for agent tasks
+                  if (isHumanTask(n.taskType)) {
+                    // Human tasks: start preparing directly
+                    window.deck?.updateNotificationById?.(n.id, { stage: cta.targetStage });
+                    window.deck?.prepareWorkPlan?.({
+                      id: n.id, title: n.title, summary: n.summary,
+                      taskType: n.taskType, source: n.source, priority: n.priority,
+                      links: n.links, actionNeeded: n.actionNeeded,
+                    }).catch(() => {});
+                  } else {
+                    // Agent tasks: may need repo selection
+                    handlePrepare();
+                  }
+                } else if (action?.skill) {
+                  // Skill-based stage — run the skill
+                  window.deck?.updateNotificationById?.(n.id, { stage: cta.targetStage });
+                  window.deck?.runSkill?.({
+                    skill: action.skill,
+                    args: "",
+                    repoPath: (n as unknown as { repoPath?: string }).repoPath ?? "",
+                    sessionId: (n as unknown as { sessionId?: string }).sessionId ?? null,
+                    notificationId: n.id,
+                  }).catch((err: unknown) => console.error(`[${cta.targetStage}] runSkill failed:`, err));
+                } else {
+                  // No agent/skill — just advance the stage (e.g. ready → done)
+                  window.deck?.updateNotificationById?.(n.id, { stage: cta.targetStage });
+                  if (cta.targetStage === "done") onDismiss();
+                }
+              }}
+              style={{
+                padding: "6px 14px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 600,
+                backgroundColor: cta.targetStage === "done" ? "var(--mantine-color-green-filled)"
+                  : cta.targetStage === "hack" ? "var(--mantine-color-green-filled)"
+                  : "var(--mantine-color-blue-filled)",
+                color: "white",
+              }}
+            >
+              {cta.label}
+            </UnstyledButton>
+            {n.stage !== "ready" && (
+              <UnstyledButton onClick={onDismiss} style={{ padding: "6px 12px", borderRadius: 6, fontSize: "0.75rem", color: "var(--mantine-color-dimmed)" }}>
+                Dismiss
+              </UnstyledButton>
+            )}
+          </div>
+        );
+      })()}
 
       {/* StartWorkModal fallback */}
       <StartWorkModal

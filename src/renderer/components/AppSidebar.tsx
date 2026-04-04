@@ -28,7 +28,7 @@ const NAV_ITEMS = [
   { path: "/notifications", label: "Inbox", icon: IconInbox },
   { path: "/projects", label: "Projects", icon: IconFolder },
   { path: "/schedule", label: "Schedule", icon: IconCalendar },
-  { path: "/coach", label: "Coach", icon: IconTrendingUp },
+  { path: "/reflect", label: "Reflect", icon: IconTrendingUp },
   { path: "/insights", label: "Insights", icon: IconBulb },
   { path: "/memories", label: "Memories", icon: IconBrain },
   { path: "/context", label: "Context", icon: IconBuilding },
@@ -52,20 +52,20 @@ export function AppSidebar() {
   }, [collapsed]);
 
   const width = collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
-  const topPadding = isFullscreen ? 16 : 80;
+  const topPadding = isFullscreen ? 8 : 38;
 
   return (
     <nav
       style={{
         width,
         minWidth: width,
-        height: "100vh",
+        height: "100%",
         display: "flex",
         flexDirection: "column",
-        background: "rgba(16, 21, 32, 0.95)",
-        backdropFilter: "blur(16px)",
-        WebkitBackdropFilter: "blur(16px)",
-        borderRight: "1px solid rgba(68, 73, 85, 0.2)",
+        background: "var(--aegen-glass-bg)",
+        backdropFilter: "var(--aegen-glass-blur)",
+        WebkitBackdropFilter: "var(--aegen-glass-blur)",
+        borderRight: "1px solid var(--aegen-glass-border)",
         transition: "width 0.2s ease, min-width 0.2s ease",
         overflow: "hidden",
         flexShrink: 0,
@@ -77,8 +77,8 @@ export function AppSidebar() {
       <div
         style={{
           paddingTop: topPadding,
-          paddingBottom: 8,
-          paddingLeft: collapsed ? 0 : 20,
+          paddingBottom: 4,
+          paddingLeft: collapsed ? 0 : 16,
           display: "flex",
           alignItems: "center",
           justifyContent: collapsed ? "center" : "flex-start",
@@ -180,7 +180,7 @@ export function AppSidebar() {
       <div
         style={{
           padding: "8px 8px 12px",
-          borderTop: "1px solid rgba(68, 73, 85, 0.15)",
+          borderTop: "1px solid var(--aegen-glass-border)",
           display: "flex",
           flexDirection: "column",
           gap: 2,
@@ -228,13 +228,14 @@ export function AppSidebar() {
           );
         })()}
 
-        {/* Theme + Refresh + Collapse row */}
+        {/* Theme + Refresh + Collapse */}
         <div
           style={{
             display: "flex",
+            flexDirection: collapsed ? "column" : "row",
             alignItems: "center",
             justifyContent: collapsed ? "center" : "flex-start",
-            gap: 4,
+            gap: collapsed ? 2 : 4,
             padding: collapsed ? "4px 0" : "4px 8px",
             WebkitAppRegion: "no-drag",
           }}
@@ -257,9 +258,9 @@ export function AppSidebar() {
               }}
             >
               {colorScheme === "dark" ? (
-                <IconMoon size={16} />
-              ) : (
                 <IconSun size={16} />
+              ) : (
+                <IconMoon size={16} />
               )}
             </UnstyledButton>
           </Tooltip>

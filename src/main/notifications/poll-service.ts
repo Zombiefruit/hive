@@ -389,6 +389,9 @@ async function poll(): Promise<void> {
       if (!isBridgeReady()) {
         logPoll("Bridge still not ready after restart — aborting poll");
         isPolling = false;
+        for (const win of BrowserWindow.getAllWindows()) {
+          if (!win.isDestroyed()) win.webContents.send("notifications:polling-finished");
+        }
         return;
       }
       logPoll("Bridge recovered after restart");
