@@ -288,6 +288,7 @@ export async function prepareWorkPlan(notification: {
         const iteratedPlan = await askEphemeralProcess(
           `You previously produced this plan:\n\n${response}\n\n---\n\nFeedback from reviewer:\n${judgeFeedback}\n\nPlease revise the plan to address all concerns. Return ONLY the revised plan.`,
           120000,
+          "claude-sonnet-4-6",
         );
         if (iteratedPlan && iteratedPlan.length > response.length * 0.3) {
           plan.plan = iteratedPlan;
@@ -378,7 +379,7 @@ User's feedback: ${userFeedback}
 Please update your plan based on this feedback. Address the user's concerns and provide a revised plan.`;
 
   // Ephemeral process — isolated from fetch bridge, full conversation in prompt
-  const response = await askEphemeralProcess(prompt, 180000);
+  const response = await askEphemeralProcess(prompt, 180000, "claude-sonnet-4-6");
 
   existing.plan = response;
   existing.context = response;
@@ -432,7 +433,7 @@ ${executeSkill ? `## Execution skill instructions:\n${executeSkill}\n` : ""}
 Write the prompt as if you're giving instructions to a skilled developer. Be thorough but clear.`;
 
   // Ephemeral process — self-contained prompt, no bridge context needed
-  const workPrompt = await askEphemeralProcess(promptComposition, 120000);
+  const workPrompt = await askEphemeralProcess(promptComposition, 120000, "claude-sonnet-4-6");
   log(`Work prompt composed: ${workPrompt.length} chars`);
 
   // Spawn the work agent — use git worktree if repo is configured

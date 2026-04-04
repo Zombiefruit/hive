@@ -75,7 +75,7 @@ Return your insights as a JSON array.`;
       if (event.type === "tool_use") {
         onProgress?.(`Scanning: ${event.content.slice(0, 80)}`);
       }
-    });
+    }, "claude-sonnet-4-6");
 
     // Parse insights from response
     const jsonMatch = response.match(/\[[\s\S]*\]/);

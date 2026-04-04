@@ -22,9 +22,11 @@ vi.mock("electron", () => ({
 }));
 
 vi.mock("../mcp-bridge", () => ({
-  askBridge: vi.fn().mockResolvedValue("mock bridge response"),
-  isBridgeReady: vi.fn().mockReturnValue(true),
-  restartBridge: vi.fn(),
+  askFetchBridge: vi.fn().mockResolvedValue("mock bridge response"),
+  isFetchBridgeReady: vi.fn().mockReturnValue(true),
+  restartFetchBridge: vi.fn(),
+  addDebugEntry: vi.fn(),
+  askEphemeralProcess: vi.fn().mockResolvedValue("mock triage response"),
 }));
 
 vi.mock("../claude-path", () => ({

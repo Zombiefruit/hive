@@ -1,5 +1,6 @@
 import { app, BrowserWindow } from "electron";
-import { askBridge, isBridgeReady, restartBridge, addDebugEntry } from "../mcp-bridge";
+import { askFetchBridge, isFetchBridgeReady, restartFetchBridge, addDebugEntry, askEphemeralProcess } from "../mcp-bridge";
+import { computeDiff, computeSectionHashes } from "../../shared/poll-diff";
 import { getConfig } from "../config";
 import { getPlan } from "./work-dispatcher";
 import fs from "node:fs";
@@ -369,11 +370,11 @@ async function poll(): Promise<void> {
     if (!win.isDestroyed()) win.webContents.send("notifications:polling-started");
   }
 
-  if (!isBridgeReady()) {
-    logPoll("Bridge not ready, waiting up to 60s...");
+  if (!isFetchBridgeReady()) {
+    logPoll("Fetch bridge not ready, waiting up to 60s...");
     emitThought("waiting for MCP tools to connect...");
     const waitStart = Date.now();
-    while (!isBridgeReady() && Date.now() - waitStart < 60000) {
+    while (!isFetchBridgeReady() && Date.now() - waitStart < 60000) {
       const elapsed = Math.round((Date.now() - waitStart) / 1000);
       for (const win of BrowserWindow.getAllWindows()) {
         if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", {
@@ -382,29 +383,29 @@ async function poll(): Promise<void> {
       }
       await new Promise(r => setTimeout(r, 2000));
     }
-    if (!isBridgeReady()) {
-      logPoll("Bridge still not ready after 60s — restarting bridge and retrying");
+    if (!isFetchBridgeReady()) {
+      logPoll("Fetch bridge still not ready after 60s — restarting and retrying");
       try {
-        await restartBridge();
+        await restartFetchBridge();
         // Wait another 60s for the restarted bridge
         const retryStart = Date.now();
-        while (!isBridgeReady() && Date.now() - retryStart < 60000) {
+        while (!isFetchBridgeReady() && Date.now() - retryStart < 60000) {
           await new Promise(r => setTimeout(r, 1000));
         }
       } catch (err) {
-        logPoll(`Bridge restart failed: ${String(err)}`);
+        logPoll(`Fetch bridge restart failed: ${String(err)}`);
       }
-      if (!isBridgeReady()) {
-        logPoll("Bridge still not ready after restart — aborting poll");
+      if (!isFetchBridgeReady()) {
+        logPoll("Fetch bridge still not ready after restart — aborting poll");
         isPolling = false;
         for (const win of BrowserWindow.getAllWindows()) {
           if (!win.isDestroyed()) win.webContents.send("notifications:polling-finished");
         }
         return;
       }
-      logPoll("Bridge recovered after restart");
+      logPoll("Fetch bridge recovered after restart");
     }
-    logPoll("Bridge became ready after waiting");
+    logPoll("Fetch bridge became ready after waiting");
     emitThought("connected — fetching from Slack, Linear, Calendar...");
   }
 
@@ -632,9 +633,9 @@ RULES:
 
     let rawData = "";
     try {
-      rawData = await askBridge(fetchPrompt, fetchTimeout);
-      logPoll(`  Fetch complete: ${rawData.length} chars`);
-      emitThought(`fetched ${Math.round(rawData.length / 1000)}K chars — now triaging...`);
+      rawData = await askFetchBridge(fetchPrompt, fetchTimeout);
+      logPoll(`  Fetch complete (Haiku): ${rawData.length} chars`);
+      emitThought(`fetched ${Math.round(rawData.length / 1000)}K chars — computing diff...`);
       // Log data volume per source for debugging coverage
       const slackLines = (rawData.match(/## SLACK/gi) || []).length;
       const slackMentions = (rawData.match(new RegExp(userSlackId, "g")) || []).length;
@@ -648,12 +649,39 @@ RULES:
     clearInterval(fetchTicker);
 
     const fetchElapsed = Date.now() - fetchStart;
-    logPoll(`Pass 1 complete: ${rawData.length} chars in ${(fetchElapsed / 1000).toFixed(1)}s`);
+    logPoll(`Pass 1 complete (Haiku): ${rawData.length} chars in ${(fetchElapsed / 1000).toFixed(1)}s`);
 
-    // No bridge restart needed — triage prompt includes all raw data explicitly.
-    // Removing the restart saves 60s per poll cycle.
+    // ── DIFF: detect changes since last poll ──
+    const hashPath = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "fetch-hashes.json");
+    let previousHashes: Array<{ source: string; hash: string }> = [];
+    try {
+      previousHashes = JSON.parse(fs.readFileSync(hashPath, "utf-8"));
+    } catch {}
 
-    logPoll("Pass 2: Triaging raw data");
+    const diff = computeDiff(rawData, previousHashes);
+
+    if (!diff.hasChanges) {
+      logPoll("No changes detected since last poll — skipping triage");
+      emitThought("no new data since last poll");
+      // Save hashes for next cycle
+      try { fs.writeFileSync(hashPath, JSON.stringify(computeSectionHashes(rawData))); } catch {}
+      // Broadcast so UI knows poll finished
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) win.webContents.send("notifications:polling-finished");
+      }
+      lastPollTimestamp = new Date().toISOString();
+      saveCacheToFile();
+      isPolling = false;
+      hasCompletedFirstPoll = true;
+      // Restart fetch bridge to clear context for next poll
+      await restartFetchBridge();
+      return;
+    }
+
+    logPoll(`Changes detected in: ${diff.changedSources.join(", ")} (${diff.delta.length} chars delta)`);
+    emitThought(`changes in ${diff.changedSources.join(", ")} — triaging with Sonnet...`);
+
+    logPoll("Pass 2: Triaging changed data (Sonnet ephemeral)");
     const triageStart = Date.now();
     const triageTicker = setInterval(() => broadcastElapsed("Triaging", triageStart), 10000);
     broadcastElapsed("Triaging", triageStart);
@@ -677,15 +705,19 @@ RULES:
     // Load triage skills from .claude/skills/
     const triageSkills = loadSkills(["triage-rules", "triage-output-format", "triage-linking"]);
 
+    // Use only the changed data for triage (smaller input = cheaper Sonnet call)
+    const triageData = diff.delta;
+    const changedSourcesLabel = diff.changedSources.join(", ");
+
     const triagePrompt = `You are ${userName}'s personal assistant. Current time: ${now.toISOString()} (${localTime} ${tz}).
 
 ${userName}'s timezone is ${tz}. All meeting times must be evaluated relative to this timezone. If a meeting has ALREADY PASSED in ${tz}, do NOT flag it as needing prep.
 ${managerName ? `${userName}'s manager is ${managerName}. Direct asks from ${managerName} = critical priority.` : ""}
 
-Here is everything from ${enabledSourceNames.join(", ")}:
+Here is CHANGED data from ${changedSourcesLabel} (unchanged sources: ${diff.unchangedSources.join(", ") || "none"}):
 
 ---
-${rawData}
+${triageData}
 ---
 ${githubContext}
 ${existingTasksSummary ? `
@@ -721,8 +753,8 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
 - DO NOT classify everything as implementation. A DM asking "can you take a look?" is a RESPONSE, not an implementation task.`;
 
     const triageTimeout = hasCompletedFirstPoll ? 300000 : 600000;
-    logPoll(`  Triage timeout: ${triageTimeout / 1000}s (first poll: ${!hasCompletedFirstPoll})`);
-    const response = await askBridge(triagePrompt, triageTimeout);
+    logPoll(`  Triage timeout: ${triageTimeout / 1000}s (first poll: ${!hasCompletedFirstPoll}), delta: ${triageData.length} chars`);
+    const response = await askEphemeralProcess(triagePrompt, triageTimeout, "claude-sonnet-4-6", "poll-triage");
     clearInterval(triageTicker);
     const triageElapsed = Math.round((Date.now() - triageStart) / 1000);
     if (response.includes("timed out")) {
@@ -1475,6 +1507,9 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
       }
     }
 
+    // Save section hashes after successful triage (for next poll's diff)
+    try { fs.writeFileSync(hashPath, JSON.stringify(computeSectionHashes(rawData))); } catch {}
+
     lastPollTimestamp = new Date().toISOString();
     saveCacheToFile();
     broadcastNotifications();
@@ -1500,8 +1535,8 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
       }).catch(() => {});
     }
 
-    // Restart the bridge to clear conversation context for next poll
-    await restartBridge();
+    // Restart the fetch bridge to clear conversation context for next poll
+    await restartFetchBridge();
 
     // If a refresh was queued while we were polling, run again
     if (pendingRefresh) {

@@ -9,6 +9,7 @@ import {
   IconBrain,
   IconBuilding,
   IconCurrencyDollar,
+  IconNetwork,
   IconSettings,
   IconSun,
   IconMoon,
@@ -34,6 +35,7 @@ const NAV_ITEMS = [
   { path: "/memories", label: "Memories", icon: IconBrain },
   { path: "/context", label: "Context", icon: IconBuilding },
   { path: "/usage", label: "Usage", icon: IconCurrencyDollar },
+  { path: "/architecture", label: "Pipeline", icon: IconNetwork },
 ];
 
 export { SIDEBAR_WIDTH_EXPANDED, SIDEBAR_WIDTH_COLLAPSED };

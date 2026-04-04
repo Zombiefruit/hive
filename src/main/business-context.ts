@@ -120,7 +120,7 @@ export async function refreshBusinessContext(
       } else if (event.type === "status") {
         log(`🏢 [CONTEXT] Status: ${event.content}`);
       }
-    });
+    }, "claude-sonnet-4-6");
 
     log(`🏢 [CONTEXT] Agent returned: ${response.length} chars`);
 

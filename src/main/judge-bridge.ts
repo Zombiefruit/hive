@@ -1,7 +1,7 @@
 /**
  * Judge Bridge — spawns lightweight ephemeral judge agents that verify
  * triage output, plans, and work results. All judges are read-only,
- * use Sonnet for speed/cost, and never block the main pipeline on failure.
+ * use Haiku for speed/cost, and never block the main pipeline on failure.
  */
 
 import { spawn } from "node:child_process";
@@ -31,7 +31,7 @@ function askJudgeProcess(prompt: string, label: string, timeoutMs: number): Prom
       "--verbose",
       "--input-format", "stream-json",
       "--no-chrome",
-      "--model", "claude-sonnet-4-6",
+      "--model", "claude-haiku-4-5",
       "--no-session-persistence",
       "--disallowedTools", "Write,Edit,Bash,NotebookEdit,Agent,EnterWorktree,ExitWorktree,Read,Glob,Grep",
       "--system-prompt", JUDGE_SYSTEM_PROMPT,
@@ -81,7 +81,7 @@ function askJudgeProcess(prompt: string, label: string, timeoutMs: number): Prom
               recordUsage({
                 timestamp: new Date().toISOString(),
                 source: "judge",
-                model: "claude-sonnet-4-6",
+                model: "claude-haiku-4-5",
                 inputTokens: msg.usage?.input_tokens ?? 0,
                 outputTokens: msg.usage?.output_tokens ?? 0,
                 costUsd: msg.total_cost_usd ?? 0,

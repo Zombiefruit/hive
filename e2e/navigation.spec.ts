@@ -25,6 +25,7 @@ const PAGES = [
   { path: "#/memories", label: "Memories" },
   { path: "#/context", label: "Context" },
   { path: "#/usage", label: "Usage" },
+  { path: "#/architecture", label: "Pipeline" },
   { path: "#/settings", label: "Settings" },
 ];
 

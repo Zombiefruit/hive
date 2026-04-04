@@ -12,7 +12,7 @@ import { startSessionTailing, stopSessionTailing } from "./agents/session-tailer
 import { addContextFromUrl } from "./agents/context-tracker";
 import { listAllSessions } from "./agents/session-history";
 import { startPolling, stopPolling, getNotifications, dismissNotification, startWorkOnNotification, clearAllNotifications, forcePoll, hasPolledOnce, getSkippedItems, updateNotificationByTitle, updateNotificationById, upsertNotification, createManualNotification } from "./notifications/poll-service";
-import { startBridge, stopBridge, restartBridge, getBridgeDebugLog, clearBridgeDebugLog, getBridgeStatus } from "./mcp-bridge";
+import { startBridge, stopBridge, restartBridge, getBridgeDebugLog, clearBridgeDebugLog, getBridgeStatus, startFetchBridge, stopFetchBridge } from "./mcp-bridge";
 import { getProcessStats, startProcessSampling, stopProcessSampling } from "./process-monitor";
 import { prepareWorkPlan, iteratePlan, startWorkAgent, getPlan, clearPlan, getAllPlans, getActiveWorkAgents } from "./notifications/work-dispatcher";
 import { startMonitoring, stopMonitoring } from "./notifications/agent-monitor";
@@ -307,9 +307,12 @@ app.whenReady().then(() => {
     return await startWorkAgent(notificationId);
   });
 
-  // Start poll bridge (persistent — used by poll-service for fetch + triage)
+  // Start poll bridge (persistent — used by poll-service for triage fallback)
   // Planning agents spawn their own MCP-enabled processes on demand.
   try { startBridge(); } catch (err) { console.error("Poll bridge start failed:", err); }
+
+  // Start fetch bridge (Haiku + MCP — lightweight data fetcher for poll cycle)
+  try { startFetchBridge(); } catch (err) { console.error("Fetch bridge start failed:", err); }
 
   // Start notification polling (uses bridge for MCP access)
   startPolling();
@@ -751,6 +754,7 @@ app.on("before-quit", () => {
   stopProcessSampling();
   stopMonitoring();
   stopBridge();
+  stopFetchBridge();
   stopPolling();
   stopSessionTailing();
   stopStoreSync();

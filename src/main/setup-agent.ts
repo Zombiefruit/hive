@@ -68,7 +68,7 @@ export async function runSetupAgent(
           else if (tool.includes("Gong")) broadcastProgress("Checking Gong access...");
         }
       }
-    });
+    }, "claude-sonnet-4-6");
 
     // Parse JSON from response
     const start = response.indexOf("{");

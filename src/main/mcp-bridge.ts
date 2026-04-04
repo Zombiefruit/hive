@@ -149,7 +149,7 @@ export interface BridgeInstance {
   label: string;
 }
 
-export function createBridge(label: string): BridgeInstance {
+export function createBridge(label: string, model = "claude-opus-4-6[1m]"): BridgeInstance {
   let bridgeProcess: ChildProcess | null = null;
   let sessionId = "";
   let isReady = false;
@@ -194,7 +194,7 @@ export function createBridge(label: string): BridgeInstance {
               recordUsage({
                 timestamp: new Date().toISOString(),
                 source: "poll-bridge",
-                model: "claude-opus-4-6[1m]",
+                model,
                 inputTokens: msg.usage?.input_tokens ?? 0,
                 outputTokens: msg.usage?.output_tokens ?? 0,
                 costUsd: msg.total_cost_usd ?? 0,
@@ -225,7 +225,7 @@ export function createBridge(label: string): BridgeInstance {
         "--verbose",
         "--input-format", "stream-json",
         "--no-chrome",
-        "--model", "claude-opus-4-6[1m]",
+        "--model", model,
         "--no-session-persistence",
         "--disallowedTools", DISALLOWED_TOOLS.join(","),
         "--system-prompt", SYSTEM_PROMPT,
@@ -354,6 +354,9 @@ export const pollBridge = createBridge("poll");
 /** Context bridge — owned EXCLUSIVELY by work-dispatcher (planning context). */
 export const contextBridge = createBridge("context");
 
+/** Fetch bridge — lightweight fetch using Haiku. */
+export const fetchBridge = createBridge("fetch", "claude-haiku-4-5");
+
 // ── Backward-compatible exports (for gradual migration) ──
 
 export function startBridge(): void { pollBridge.start(); }
@@ -362,6 +365,14 @@ export function isBridgeReady(): boolean { return pollBridge.isReady(); }
 export async function restartBridge(): Promise<void> { return pollBridge.restart(); }
 export function stopBridge(): void { pollBridge.stop(); }
 export function getBridgeStatus(): BridgeConnectorStatus { return pollBridge.getStatus(); }
+
+// ── Fetch bridge exports ──
+
+export function startFetchBridge(): void { fetchBridge.start(); }
+export function askFetchBridge(prompt: string, timeoutMs?: number): Promise<string> { return fetchBridge.ask(prompt, timeoutMs); }
+export function isFetchBridgeReady(): boolean { return fetchBridge.isReady(); }
+export async function restartFetchBridge(): Promise<void> { return fetchBridge.restart(); }
+export function stopFetchBridge(): void { fetchBridge.stop(); }
 
 // ═══════════════════════════════════════════════════════════════
 // MCP PLANNING AGENT — single agent with full MCP tool access
@@ -385,6 +396,7 @@ export function askMcpPlanningAgent(
   prompt: string,
   timeoutMs = 300000,
   onEvent?: (event: PlanningEvent) => void,
+  model = "claude-opus-4-6[1m]",
 ): Promise<string> {
   return new Promise((resolve) => {
     const claudePath = getClaudeCodePath();
@@ -394,7 +406,7 @@ export function askMcpPlanningAgent(
       "--verbose",
       "--input-format", "stream-json",
       "--no-chrome",
-      "--model", "claude-opus-4-6[1m]",
+      "--model", model,
       "--no-session-persistence",
       "--disallowedTools", DISALLOWED_TOOLS.join(","),
       "--system-prompt", "You are a READ-ONLY planning agent. You have MCP tools to fetch context from Slack, Linear, Notion, Gmail, and Google Calendar. Use them to gather all relevant information, then produce a work plan. NEVER write, edit, or send anything. NEVER explore the local filesystem — the task is NOT about the current directory.",
@@ -510,7 +522,7 @@ export function askMcpPlanningAgent(
               recordUsage({
                 timestamp: new Date().toISOString(),
                 source: "planning-agent",
-                model: "claude-opus-4-6[1m]",
+                model,
                 inputTokens: msg.usage?.input_tokens ?? 0,
                 outputTokens: msg.usage?.output_tokens ?? 0,
                 costUsd: msg.total_cost_usd ?? 0,

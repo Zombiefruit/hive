@@ -13,7 +13,9 @@ export type UsageSource =
   | "reflect"         // Reflect/coach LLM (haiku)
   | "setup-agent"     // Auto-discovery setup agent
   | "manager"         // Manager AI conversations
-  | "insights";       // Insights extraction
+  | "insights"        // Insights extraction
+  | "poll-fetch"      // Poll fetch step (haiku)
+  | "poll-triage";    // Poll triage step
 
 /** A single recorded usage event. */
 export interface UsageEntry {
