@@ -154,6 +154,7 @@ export function createBridge(label: string, model = "claude-opus-4-6[1m]"): Brid
   let sessionId = "";
   let isReady = false;
   let generation = 0;
+  let initResultPending = false;
   let outputBuffer = "";
   let pendingRequests = new Map<string, { resolve: (text: string) => void; timeout: ReturnType<typeof setTimeout> | null; startTs: number }>();
   let connectorStatus: BridgeConnectorStatus = {
@@ -187,6 +188,12 @@ export function createBridge(label: string, model = "claude-opus-4-6[1m]"): Brid
         }
         if (msg.type === "result") {
           const resultText = String(msg.result ?? "");
+          // Skip the first result — it's the INIT_ACK from the startup message, not a real request
+          if (initResultPending) {
+            initResultPending = false;
+            log(`[${label}] Init ack received (${resultText.length} chars) — discarding`);
+            continue;
+          }
           log(`[${label}] Result: ${resultText.length} chars`);
           for (const [reqId, req] of pendingRequests) {
             if (req.timeout) clearTimeout(req.timeout);
@@ -247,13 +254,16 @@ export function createBridge(label: string, model = "claude-opus-4-6[1m]"): Brid
         log(`[${label}] STDERR: ${chunk.toString("utf-8").slice(0, 200)}`);
       });
 
-      // Send an initial no-op message to trigger Claude Code initialization.
+      // Send an initial message to trigger Claude Code initialization.
       // Without this, --input-format stream-json waits for the first message
-      // before emitting the system/init event (same deadlock as skill-runner had).
+      // before emitting the system/init event.
+      // IMPORTANT: Track that the first result is from this init message,
+      // not a real request — so it doesn't get consumed by a pending request.
+      initResultPending = true;
       bridgeProcess.stdin?.write(
         JSON.stringify({
           type: "user",
-          message: { role: "user", content: "Initialize. Respond with 'ready'." },
+          message: { role: "user", content: "You are now initialized. Respond with exactly: INIT_ACK" },
           parent_tool_use_id: null,
           session_id: "",
         }) + "\n",
