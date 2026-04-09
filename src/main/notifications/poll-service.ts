@@ -563,7 +563,8 @@ async function poll(): Promise<void> {
         enabledSources,
         async (source: string) => {
           const prompt = sourcePrompts.get(source as SourceName) ?? "";
-          return askFetchBridge(prompt);
+          // 120s timeout per source — prevents one hung MCP server from blocking all sources
+          return askFetchBridge(prompt, 120000);
         },
         (progress) => {
           logPoll(`  Source ${progress.source}: ${progress.status} (${progress.chars ?? 0} chars)`);

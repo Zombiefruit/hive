@@ -111,37 +111,24 @@ describe("fetchSourcesParallel", () => {
     expect(result.mergedData).not.toContain("Linear data");
   });
 
-  it("reports per-source progress as each completes", async () => {
-    let resolveSlack: (v: string) => void;
-    let resolveLinear: (v: string) => void;
-    const slackPromise = new Promise<string>(r => { resolveSlack = r; });
-    const linearPromise = new Promise<string>(r => { resolveLinear = r; });
-
+  it("reports per-source progress as each completes (sequential)", async () => {
+    // Sources are fetched sequentially through the serial bridge
     const askFn = vi.fn()
-      .mockReturnValueOnce(slackPromise)
-      .mockReturnValueOnce(linearPromise);
+      .mockResolvedValueOnce("## SLACK\nDone")
+      .mockResolvedValueOnce("## LINEAR\nDone");
 
     const onProgress = vi.fn();
 
-    const resultPromise = fetchSourcesParallel(
+    const result = await fetchSourcesParallel(
       ["slack", "linear"],
       askFn,
       onProgress,
     );
 
-    // Linear finishes first
-    resolveLinear!("## LINEAR\nDone");
-    await new Promise(r => setTimeout(r, 10));
-    expect(onProgress).toHaveBeenCalledWith(expect.objectContaining({
-      source: "linear",
-      status: "done",
-    }));
-
-    // Slack finishes second
-    resolveSlack!("## SLACK\nDone");
-    const result = await resultPromise;
-
+    // Both sources complete in order
     expect(onProgress).toHaveBeenCalledTimes(2);
+    expect(onProgress).toHaveBeenNthCalledWith(1, expect.objectContaining({ source: "slack", status: "done" }));
+    expect(onProgress).toHaveBeenNthCalledWith(2, expect.objectContaining({ source: "linear", status: "done" }));
     expect(result.succeeded).toHaveLength(2);
   });
 

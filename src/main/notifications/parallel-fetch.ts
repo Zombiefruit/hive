@@ -122,11 +122,13 @@ export function buildSourcePrompt(source: SourceName, config: SourceFetchConfig)
 // ── Parallel orchestrator ──
 
 /**
- * Fetch all enabled sources in parallel. Each source gets its own bridge call.
- * Uses Promise.allSettled so one failure doesn't block others.
+ * Fetch all enabled sources sequentially through the bridge.
+ * The bridge is serial (one request at a time), so "parallel" Promise.allSettled
+ * just queues them — and a hung source blocks all subsequent ones.
+ * Sequential with per-source timeouts is more reliable.
  *
  * @param sources - enabled source names
- * @param askFn - function that sends a prompt to a bridge and returns text (injected for testability)
+ * @param askFn - function that sends a prompt to a bridge and returns text
  * @param onProgress - called as each source completes
  */
 export async function fetchSourcesParallel(
@@ -138,29 +140,18 @@ export async function fetchSourcesParallel(
     return { mergedData: "", succeeded: [], errors: [] };
   }
 
-  const results = await Promise.allSettled(
-    sources.map(async (source) => {
-      // Note: prompt building is done by the caller and passed via askFn closure,
-      // or we build it here if askFn is a raw bridge call.
-      // For testability, askFn receives the prompt and returns data.
-      const data = await askFn(source);
-      onProgress?.({ source, status: "done", chars: data.length });
-      return { source, data };
-    }),
-  );
-
   const succeeded: SourceName[] = [];
   const errors: Array<{ source: SourceName; error: string }> = [];
   const dataParts: string[] = [];
 
-  for (let i = 0; i < results.length; i++) {
-    const result = results[i];
-    const source = sources[i];
-    if (result.status === "fulfilled") {
+  for (const source of sources) {
+    try {
+      const data = await askFn(source);
       succeeded.push(source);
-      if (result.value.data) dataParts.push(result.value.data);
-    } else {
-      const errMsg = result.reason instanceof Error ? result.reason.message : String(result.reason);
+      if (data) dataParts.push(data);
+      onProgress?.({ source, status: "done", chars: data.length });
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
       errors.push({ source, error: errMsg });
       onProgress?.({ source, status: "error", error: errMsg });
     }
