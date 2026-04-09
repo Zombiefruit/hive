@@ -154,7 +154,7 @@ export function createBridge(label: string, model = "claude-opus-4-6[1m]"): Brid
   let sessionId = "";
   let isReady = false;
   let generation = 0;
-  let initResultPending = false;
+  // (initResultPending removed — orphan results are now discarded by checking pendingRequests.size)
   let outputBuffer = "";
   let pendingRequests = new Map<string, { resolve: (text: string) => void; timeout: ReturnType<typeof setTimeout> | null; startTs: number }>();
   let connectorStatus: BridgeConnectorStatus = {
@@ -188,10 +188,11 @@ export function createBridge(label: string, model = "claude-opus-4-6[1m]"): Brid
         }
         if (msg.type === "result") {
           const resultText = String(msg.result ?? "");
-          // Skip the first result — it's the INIT_ACK from the startup message, not a real request
-          if (initResultPending) {
-            initResultPending = false;
-            log(`[${label}] Init ack received (${resultText.length} chars) — discarding`);
+          // Only deliver results to pending requests. Discard any result
+          // that arrives without a pending request — these come from the init
+          // message, compaction, hooks, or other non-request output.
+          if (pendingRequests.size === 0) {
+            log(`[${label}] Discarding orphan result (${resultText.length} chars, no pending request)`);
             continue;
           }
           log(`[${label}] Result: ${resultText.length} chars`);
@@ -257,9 +258,8 @@ export function createBridge(label: string, model = "claude-opus-4-6[1m]"): Brid
       // Send an initial message to trigger Claude Code initialization.
       // Without this, --input-format stream-json waits for the first message
       // before emitting the system/init event.
-      // IMPORTANT: Track that the first result is from this init message,
-      // not a real request — so it doesn't get consumed by a pending request.
-      initResultPending = true;
+      // The init message produces a result, but it's discarded because
+      // pendingRequests is empty when it arrives.
       bridgeProcess.stdin?.write(
         JSON.stringify({
           type: "user",
