@@ -258,16 +258,8 @@ export function createBridge(label: string, model = "claude-opus-4-6[1m]"): Brid
       // Send an initial message to trigger Claude Code initialization.
       // Without this, --input-format stream-json waits for the first message
       // before emitting the system/init event.
-      // The init message produces a result, but it's discarded because
-      // pendingRequests is empty when it arrives.
-      bridgeProcess.stdin?.write(
-        JSON.stringify({
-          type: "user",
-          message: { role: "user", content: "You are now initialized. Respond with exactly: INIT_ACK" },
-          parent_tool_use_id: null,
-          session_id: "",
-        }) + "\n",
-      );
+      // No init message needed — the 60s fallback marks the bridge ready.
+      // Sending an init message caused orphan results that corrupted real requests.
 
       const startGen = generation;
       bridgeProcess.on("exit", (code) => {
