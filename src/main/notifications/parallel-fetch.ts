@@ -38,23 +38,17 @@ export interface SourceProgress {
 
 // ── Per-source prompt builder ──
 
-const FETCH_AND_SUMMARIZE = (source: string, section: string, cutoff: string, userName: string) =>
-  `You are a data-fetching agent for ${userName}. Fetch data from ${source}, then SUMMARIZE your findings.
+const FETCH_AND_SUMMARIZE = (source: string, section: string, cutoff: string, _userName: string) =>
+  `Fetch data from ${source}. Execute ALL API calls listed below — do not skip any. Call tools in parallel where possible.
 
 ${section}
 
 RULES:
 - Only include data from after ${cutoff}
-- Execute ALL listed API calls — do not skip any
-- After fetching, produce a STRUCTURED SUMMARY (not raw data) organized as:
-  ## ${source.toUpperCase()} Summary
-  ### Items needing ${userName}'s attention
-  - [item]: who needs what, link/thread reference, urgency
-  ### FYI / informational
-  - [item]: brief description
-- Each item should be 1-2 lines max with enough context for triage
-- Include thread IDs, channel names, ticket numbers — triage needs these to create tasks
-- Do NOT return raw message dumps. Summarize and prioritize.`;
+- Return ALL results as plain text, organized with ## headers
+- Be thorough and complete — include everything relevant
+- NEVER add commentary like "Let me compile..." or "No data found" — return ONLY the data itself
+- If a tool call returns no results, move to the next one`;
 
 export function buildSourcePrompt(source: SourceName, config: SourceFetchConfig): string {
   const { hours, cutoffStr } = config;
