@@ -1,4 +1,4 @@
-import { Badge, Group, Stack, Text, Tooltip, UnstyledButton } from "@mantine/core";
+import { Badge, Group, Loader, Stack, Text, Tooltip, UnstyledButton } from "@mantine/core";
 import {
   IconInbox, IconSparkles, IconPlayerPlay, IconGitPullRequest, IconCircleCheck,
   IconBrandGithub, IconHash, IconMail, IconFileText, IconChevronRight, IconChevronDown,
@@ -13,7 +13,7 @@ import { AddToManagerButton } from "../components/AddToManagerButton";
 import { AddTaskModal } from "../components/AddTaskModal";
 import { AppHeader } from "../components/AppHeader";
 import { DetailDrawer } from "../components/DetailDrawer";
-import { buildSlackArchiveUrl, computeParentStage } from "../../shared/task-utils";
+import { buildSlackArchiveUrl, computeParentStage, HUMAN_ONLY_TYPES } from "../../shared/task-utils";
 import { canDropTo, getStageAction } from "../../shared/stage-machine";
 import { STAGE_META, SOURCE_COLORS } from "../../shared/ui-constants";
 import { formatTimeSince } from "../components/shared";
@@ -46,9 +46,7 @@ interface NotificationItem {
 }
 
 // Agent-actionable: an agent can do the actual work end-to-end
-const AGENT_ACTIONABLE_TYPES = new Set(["implementation", "investigation"]);
 // Human-only: agent prepares context but you handle it
-const HUMAN_ONLY_TYPES = new Set(["meeting_prep", "response", "review"]);
 
 type StageConfig = { key: string; label: string; Icon: React.FC<{ size?: number; color?: string; stroke?: number }>; color: string; tip: string };
 
@@ -111,6 +109,7 @@ export function Notifications() {
   const [lastRefreshed, setLastRefreshed] = useState<string | null>(null);
   const [pollProgress, setPollProgress] = useState<{ source: string; current: number; total: number } | null>(null);
   const [showSkipped, setShowSkipped] = useState(false);
+  const [runningSkillIds, setRunningSkillIds] = useState<Set<string>>(new Set());
   const [collapsedCols, setCollapsedCols] = useState<Set<string>>(() => new Set(["done", "backlog"]));
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const toggleParentExpanded = (id: string) => setExpandedParents(prev => {
@@ -118,17 +117,26 @@ export function Notifications() {
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
-  // Track which poll cycle each item was last seen at — items with pollCycle > seenCycle show a badge
-  const [seenCycle, setSeenCycle] = useState<Map<string, number>>(new Map());
-  const markSeen = (id: string, cycle: number) => setSeenCycle(prev => new Map(prev).set(id, cycle));
+  // Track which poll cycle each item was last seen at — items with pollCycle > seenCycle show a badge.
+  // Persisted to localStorage so badges don't reset on app restart.
+  const [seenCycle, setSeenCycle] = useState<Map<string, number>>(() => {
+    try {
+      const raw = localStorage.getItem("relay-seen-cycles");
+      if (raw) return new Map(JSON.parse(raw) as Array<[string, number]>);
+    } catch {}
+    return new Map();
+  });
+  const persistSeenCycle = (next: Map<string, number>) => {
+    setSeenCycle(next);
+    try { localStorage.setItem("relay-seen-cycles", JSON.stringify([...next])); } catch {}
+  };
+  const markSeen = (id: string, cycle: number) => persistSeenCycle(new Map(seenCycle).set(id, cycle));
   const markAllSeen = () => {
-    setSeenCycle(prev => {
-      const next = new Map(prev);
-      for (const n of notifications) {
-        if (n.pollCycle) next.set(n.id, n.pollCycle);
-      }
-      return next;
-    });
+    const next = new Map(seenCycle);
+    for (const n of notifications) {
+      if (n.pollCycle) next.set(n.id, n.pollCycle);
+    }
+    persistSeenCycle(next);
   };
   const toggleCollapse = (key: string) => setCollapsedCols(prev => {
     const next = new Set(prev);
@@ -138,8 +146,23 @@ export function Notifications() {
   const [authStatus, setAuthStatus] = useState<{ installed: boolean; version: string | null; authenticated: boolean } | null>(null);
   const [config, setConfig] = useState<{ repoMappings?: Array<{ pattern: string; repoPath: string }>; name?: string; linearUsername?: string } | null>(null);
 
+  // Track recent local moves to prevent server broadcasts from reverting optimistic updates
+  const recentMoves = useRef<Map<string, { stage: string; ts: number }>>(new Map());
+
   useEffect(() => {
     window.deck.checkAuth?.().then(setAuthStatus).catch(() => {});
+  }, []);
+
+  // Poll for running skill IDs to show in-progress indicators on cards
+  useEffect(() => {
+    const poll = () => {
+      window.deck?.getRunningSkillIds?.().then((ids: string[]) => {
+        setRunningSkillIds(new Set(ids));
+      }).catch(() => {});
+    };
+    poll();
+    const interval = setInterval(poll, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -171,8 +194,14 @@ export function Notifications() {
           const skipped = Array.isArray(data) ? [] : (data.skipped ?? []);
           const hasPolled = Array.isArray(data) ? items.length > 0 : (data.hasPolled ?? false);
 
-          // Server is the single source of truth
-          const serverItems = items.map(n => ({ ...n, stage: n.stage ?? "new" }));
+          // Server is the single source of truth, but protect recent local moves
+          const serverItems = items.map(n => {
+            const recent = recentMoves.current.get(n.id);
+            if (recent && Date.now() - recent.ts < 2000) {
+              return { ...n, stage: recent.stage };
+            }
+            return { ...n, stage: n.stage ?? "new" };
+          });
           if (serverItems.length > 0) setNotifications(serverItems);
           // Don't clear fetching from load() — only polling-finished should do that
           // But if we have cached data on first load and no poll is active, show it
@@ -187,9 +216,18 @@ export function Notifications() {
     // Update notification list when new data arrives (but DON'T clear fetching here)
     const unsub = window.deck.onNotificationsUpdate?.((data: unknown) => {
       const items = (data as NotificationItem[]).map(n => ({ ...n, stage: n.stage ?? "new" }));
-      console.log(`[live] onNotificationsUpdate: ${items.length} items, stages: ${[...new Set(items.map(n => n.stage))].join(",")}`);
       if (items.length > 0) {
-        setNotifications(items);
+        // Protect recent local moves from being reverted by server broadcasts
+        setNotifications(prev => {
+          const merged = items.map(item => {
+            const recent = recentMoves.current.get(item.id);
+            if (recent && Date.now() - recent.ts < 2000) {
+              return { ...item, stage: recent.stage };
+            }
+            return item;
+          });
+          return merged;
+        });
       }
     });
 
@@ -244,6 +282,11 @@ export function Notifications() {
 
   // Move card visually + persist. Always call this first so the card doesn't freeze.
   const moveCardToStage = useCallback((id: string, newStage: string) => {
+    console.log(`[MOVE] moveCardToStage: ${id.slice(0, 20)} → ${newStage}`);
+    // Record this move — protect from server overwrites for 2 seconds
+    recentMoves.current.set(id, { stage: newStage, ts: Date.now() });
+    setTimeout(() => recentMoves.current.delete(id), 2000);
+
     let movedTitle = "";
     let oldStage = "new";
     let movedParentTaskId: string | undefined;
@@ -297,12 +340,56 @@ export function Notifications() {
     const action = getStageAction(targetStage);
     if (!action) return;
 
+    // Human tasks: preparing stage runs prepareWorkPlan (no repo needed)
+    if (action.usePlanAgent) {
+      window.deck?.prepareWorkPlan?.({
+        id: notif.id, source: notif.source, title: notif.title,
+        summary: notif.summary, url: notif.url,
+        taskType: notif.taskType, links: notif.links,
+      }).catch((err: unknown) => console.error(`[preparing] prepareWorkPlan failed:`, err));
+      return;
+    }
+
+    // Agent tasks: /start-work runs without repo — MCP tools fetch context
+    if (action.skill === "/start-work") {
+      const links = (notif.links ?? []).filter((l: { url?: string }) => l.url);
+      const taskContext = [
+        notif.title,
+        notif.summary ?? "",
+        ...links.map((l: { url: string }) => l.url),
+      ].filter(Boolean).join("\n");
+      window.deck?.runSkill?.({
+        skill: "/start-work",
+        args: taskContext,
+        repoPath: (notif as any).repoPath ?? "",
+        sessionId: (notif as any).sessionId ?? null,
+        notificationId: id,
+      }).then((result: unknown) => {
+        const r = result as { success?: boolean; resultText?: string } | undefined;
+        if (r?.success || (r?.resultText && r.resultText.length > 50)) {
+          window.deck?.updateNotificationById?.(id, { stage: "plan_review" });
+          if (r?.resultText) {
+            window.deck?.setPlan?.(id, {
+              plan: r.resultText,
+              conversationHistory: [{ role: "assistant", content: r.resultText }],
+              fetchedContext: [],
+            });
+          }
+        }
+      }).catch((err: unknown) => console.error("[start_work] runSkill failed:", err));
+      return;
+    }
+
     if (action.skill) {
-      // Skill-based stage — run the skill
+      const repoPath = (notif as any).repoPath ?? "";
+      if (!repoPath && action.skill !== "/done") {
+        // Can't run code skills without a repo path — user needs to open the detail drawer
+        return;
+      }
       window.deck.runSkill?.({
         skill: action.skill,
         args: "",
-        repoPath: (notif as any).repoPath ?? "",
+        repoPath,
         sessionId: (notif as any).sessionId ?? null,
         notificationId: id,
       }).catch((err: unknown) => console.error(`[${targetStage}] runSkill failed:`, err));
@@ -318,10 +405,11 @@ export function Notifications() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const wasDragging = useRef(false);
+  const dragEndTime = useRef(0);
 
   const dismiss = (id: string) => {
-    // Don't delete — move to done
-    moveCardToStage(id, "done");
+    // Archive — move to backlog (not done, which means "completed")
+    moveCardToStage(id, "backlog");
     if (selectedId === id) setSelectedId(null);
   };
 
@@ -465,10 +553,8 @@ export function Notifications() {
                       setDraggingId(null);
                       const dragId = e.dataTransfer.getData("text/plain");
                       if (dragId) {
-                        // Validate transition
                         const notif = notifications.find(n => n.id === dragId);
                         if (!notif || !canDropTo(notif.stage ?? "new", stage.key, notif.taskType)) return;
-
                         moveCardToStage(dragId, stage.key);
                         executeStageTransition(dragId, stage.key);
                       }
@@ -533,9 +619,9 @@ export function Notifications() {
                               draggable
                               onMouseDown={() => { wasDragging.current = false; }}
                               onDragStart={(e) => { e.dataTransfer.setData("text/plain", n.id); setDraggingId(n.id); wasDragging.current = true; }}
-                              onDragEnd={() => { setDraggingId(null); setDragOverStage(null); }}
+                              onDragEnd={() => { setDraggingId(null); setDragOverStage(null); dragEndTime.current = Date.now(); }}
                               onClick={() => {
-                                if (wasDragging.current) { wasDragging.current = false; return; }
+                                if (wasDragging.current || Date.now() - dragEndTime.current < 200) { wasDragging.current = false; return; }
                                 if (n.pollCycle) markSeen(n.id, n.pollCycle);
                                 setSelectedId(n.id === selectedId ? null : n.id);
                               }}
@@ -628,16 +714,17 @@ export function Notifications() {
                                   → {n.actionNeeded}
                                 </Text>
                               )}
-                              {/* Status indicator for in-progress stages */}
-                              {!isParent && (stage.key === "start_work" || stage.key === "hack") && !plansReady.has(n.id) && (
+                              {/* Status indicator: skill running (real-time from skill runner) */}
+                              {!isParent && runningSkillIds.has(n.id) && (
                                 <Group gap={4} mt={2}>
-                                  <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: stage.color, animation: "pulse 1.5s infinite" }} />
+                                  <Loader size={8} color={stage.color} />
                                   <Text size="xs" c={stage.color} fw={500} style={{ fontSize: "0.6rem" }}>
-                                    {stage.key === "start_work" ? "Planning..." : "Building..."}
+                                    {stage.key === "start_work" ? "Planning..." : stage.key === "hack" ? "Coding..." : stage.key === "ship" ? "Shipping..." : stage.key === "code_review" ? "Agent reviewing..." : "Working..."}
                                   </Text>
                                 </Group>
                               )}
-                              {stage.key === "start_work" && plansReady.has(n.id) && (
+                              {/* Plan ready indicator (planning done, not yet in hack) */}
+                              {stage.key === "start_work" && plansReady.has(n.id) && !runningSkillIds.has(n.id) && (
                                 <Group gap={4} mt={2}>
                                   <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#22c55e" }} />
                                   <Text size="xs" c="#22c55e" fw={500} style={{ fontSize: "0.6rem" }}>Plan ready</Text>
@@ -646,7 +733,7 @@ export function Notifications() {
                               {!isParent && stage.key !== "done" && stage.key !== "skipped" && stage.key !== "start_work" && stage.key !== "hack" && (
                                 <Group gap={4} mt={2}>
                                   <UnstyledButton
-                                    onClick={(e) => { e.stopPropagation(); moveCardToStage(n.id, "done"); }}
+                                    onClick={(e) => { e.stopPropagation(); moveCardToStage(n.id, "done"); executeStageTransition(n.id, "done"); }}
                                     style={{ padding: "2px 4px", borderRadius: 4, color: "var(--mantine-color-dimmed)", opacity: 0.5 }}
                                   >
                                     <IconCircleCheck size={12} />
@@ -705,10 +792,9 @@ export function Notifications() {
                       const dragId = e.dataTransfer.getData("text/plain");
                       if (dragId) {
                         const targetStage = stage.key === "new" ? "new" : stage.key;
-                        // Validate transition
                         const notif = notifications.find(n => n.id === dragId);
-                        if (!notif || !canDropTo(notif.stage ?? "new", targetStage, notif.taskType)) return;
-
+                        if (!notif) return;
+                        if (!canDropTo(notif.stage ?? "new", targetStage, notif.taskType)) return;
                         moveCardToStage(dragId, targetStage);
                         executeStageTransition(dragId, targetStage);
                       }
@@ -748,9 +834,9 @@ export function Notifications() {
                               draggable
                               onMouseDown={() => { wasDragging.current = false; }}
                               onDragStart={(e) => { e.dataTransfer.setData("text/plain", n.id); setDraggingId(n.id); wasDragging.current = true; }}
-                              onDragEnd={() => { setDraggingId(null); setDragOverStage(null); }}
+                              onDragEnd={() => { setDraggingId(null); setDragOverStage(null); dragEndTime.current = Date.now(); }}
                               onClick={() => {
-                                if (wasDragging.current) { wasDragging.current = false; return; }
+                                if (wasDragging.current || Date.now() - dragEndTime.current < 200) { wasDragging.current = false; return; }
                                 if (n.pollCycle) markSeen(n.id, n.pollCycle);
                                 setSelectedId(n.id === selectedId ? null : n.id);
                               }}
@@ -819,7 +905,7 @@ export function Notifications() {
                               )}
                               {stage.key !== "done" && stage.key !== "ready" && stage.key !== "skipped" && (
                                 <Group gap={4} mt={2}>
-                                  <UnstyledButton onClick={(e) => { e.stopPropagation(); moveCardToStage(n.id, "done"); }}
+                                  <UnstyledButton onClick={(e) => { e.stopPropagation(); moveCardToStage(n.id, "done"); executeStageTransition(n.id, "done"); }}
                                     style={{ padding: "2px 4px", borderRadius: 4, color: "var(--mantine-color-dimmed)", opacity: 0.5 }}>
                                     <IconCircleCheck size={12} />
                                   </UnstyledButton>
@@ -857,7 +943,7 @@ export function Notifications() {
                           key={n.id}
                           draggable
                           onDragStart={(e) => { e.dataTransfer.setData("text/plain", n.id); setDraggingId(n.id); }}
-                          onDragEnd={() => { setDraggingId(null); setDragOverStage(null); }}
+                          onDragEnd={() => { setDraggingId(null); setDragOverStage(null); dragEndTime.current = Date.now(); }}
                           onClick={() => setSelectedId(n.id === selectedId ? null : n.id)}
                           style={{
                             padding: "6px 10px", borderRadius: 6, cursor: "grab",
@@ -891,7 +977,7 @@ export function Notifications() {
             className="detail-drawer-panel"
             style={{
               position: "fixed", top: 0, right: 0, bottom: 0,
-              width: 520, maxWidth: "60vw",
+              width: 720, maxWidth: "75vw",
               zIndex: 100,
               background: "var(--aegen-void)",
               borderLeft: "1px solid var(--aegen-glass-border)",
@@ -920,7 +1006,7 @@ export function Notifications() {
           position: "fixed", top: 42, right: 0, bottom: 0, width: 400,
           background: "var(--aegen-void)",
           borderLeft: "1px solid var(--aegen-glass-border)",
-          zIndex: 50, display: "flex", flexDirection: "column",
+          zIndex: 200, display: "flex", flexDirection: "column",
           fontSize: "0.7rem", fontFamily: "var(--mantine-font-family-monospace)",
         }}>
           <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--aegen-glass-border)", flexShrink: 0 }}>

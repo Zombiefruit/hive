@@ -1,4 +1,4 @@
-import { Loader, Text, Tooltip, UnstyledButton, useMantineColorScheme } from "@mantine/core";
+import { Loader, Text, Tooltip, UnstyledButton, useMantineColorScheme, useComputedColorScheme } from "@mantine/core";
 import {
   IconSparkles,
   IconInbox,
@@ -9,13 +9,14 @@ import {
   IconBrain,
   IconBuilding,
   IconCurrencyDollar,
-  IconNetwork,
   IconSettings,
   IconSun,
   IconMoon,
+  IconDeviceDesktop,
   IconRefresh,
   IconChevronLeft,
   IconChevronRight,
+  IconHexagon,
 } from "@tabler/icons-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -26,8 +27,8 @@ const SIDEBAR_WIDTH_EXPANDED = 220;
 const SIDEBAR_WIDTH_COLLAPSED = 60;
 
 const NAV_ITEMS = [
-  { path: "/", label: "Agents", icon: IconSparkles },
-  { path: "/notifications", label: "Inbox", icon: IconInbox },
+  { path: "/", label: "Inbox", icon: IconInbox },
+  { path: "/agents", label: "Agents", icon: IconSparkles },
   { path: "/projects", label: "Projects", icon: IconFolder },
   { path: "/schedule", label: "Schedule", icon: IconCalendar },
   { path: "/reflect", label: "Reflect", icon: IconTrendingUp },
@@ -35,7 +36,6 @@ const NAV_ITEMS = [
   { path: "/memories", label: "Memories", icon: IconBrain },
   { path: "/context", label: "Context", icon: IconBuilding },
   { path: "/usage", label: "Usage", icon: IconCurrencyDollar },
-  { path: "/architecture", label: "Pipeline", icon: IconNetwork },
 ];
 
 export { SIDEBAR_WIDTH_EXPANDED, SIDEBAR_WIDTH_COLLAPSED };
@@ -45,7 +45,17 @@ export function AppSidebar() {
   const location = useLocation();
   const isFullscreen = useIsFullscreen();
   const { colorScheme, setColorScheme } = useMantineColorScheme();
+  const computedScheme = useComputedColorScheme("dark");
   const { isRefreshing, refresh } = useGlobalRefresh();
+
+  // Three-state cycle: auto → light → dark → auto
+  const cycleTheme = () => {
+    if (colorScheme === "auto") setColorScheme("light");
+    else if (colorScheme === "light") setColorScheme("dark");
+    else setColorScheme("auto");
+  };
+  const themeLabel = colorScheme === "auto" ? "Auto (system)" : colorScheme === "light" ? "Light" : "Dark";
+  const ThemeIcon = colorScheme === "auto" ? IconDeviceDesktop : computedScheme === "dark" ? IconSun : IconMoon;
 
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem("sidebar-collapsed") === "true",
@@ -56,7 +66,7 @@ export function AppSidebar() {
   }, [collapsed]);
 
   const width = collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED;
-  const topPadding = isFullscreen ? 8 : 38;
+  const topPadding = 20;
 
   return (
     <nav
@@ -81,27 +91,42 @@ export function AppSidebar() {
       <div
         style={{
           paddingTop: topPadding,
-          paddingBottom: 4,
-          paddingLeft: collapsed ? 0 : 16,
+          paddingBottom: 2,
+          paddingLeft: collapsed ? 0 : 12,
           display: "flex",
           alignItems: "center",
+          gap: 8,
           justifyContent: collapsed ? "center" : "flex-start",
           WebkitAppRegion: "drag",
           transition: "padding-top 0.2s ease, padding-left 0.2s ease",
           flexShrink: 0,
         }}
       >
-        <Text
-          size="md"
-          fw={700}
+        <IconHexagon
+          size={collapsed ? 20 : 18}
+          stroke={1.8}
           style={{
-            color: "var(--aegen-star-white)",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
+            color: "var(--aegen-cosmic-blue)",
+            flexShrink: 0,
           }}
-        >
-          {collapsed ? "H" : "Hive"}
-        </Text>
+        />
+        {!collapsed && (
+          <Text
+            size="xs"
+            fw={600}
+            style={{
+              color: "var(--aegen-star-white)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              fontFamily: "var(--aegen-font-mono)",
+              opacity: 0.85,
+            }}
+          >
+            Relay
+          </Text>
+        )}
       </div>
 
       {/* Navigation items */}
@@ -245,15 +270,13 @@ export function AppSidebar() {
           }}
         >
           <Tooltip
-            label={`Switch to ${colorScheme === "dark" ? "light" : "dark"} mode`}
+            label={`Theme: ${themeLabel}`}
             position="right"
             withArrow
           >
             <UnstyledButton
-              onClick={() =>
-                setColorScheme(colorScheme === "dark" ? "light" : "dark")
-              }
-              aria-label={`Switch to ${colorScheme === "dark" ? "light" : "dark"} mode`}
+              onClick={cycleTheme}
+              aria-label={`Theme: ${themeLabel}`}
               style={{
                 padding: 6,
                 borderRadius: 6,
@@ -261,11 +284,7 @@ export function AppSidebar() {
                 transition: "color 0.15s ease",
               }}
             >
-              {colorScheme === "dark" ? (
-                <IconSun size={16} />
-              ) : (
-                <IconMoon size={16} />
-              )}
+              <ThemeIcon size={16} />
             </UnstyledButton>
           </Tooltip>
 

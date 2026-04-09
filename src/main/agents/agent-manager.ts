@@ -315,31 +315,51 @@ export async function resumeSession(agentId: string, sessionId: string, cwd: str
     resolveNextMessage: null,
   };
 
-  // Use the Agent SDK's resume option to continue an existing session
   const query = await getSdkQuery();
-  const q = query({
-    prompt: "Continue where you left off. What's the current status?",
-    options: {
-      pathToClaudeCodeExecutable: getClaudeCodePath(),
-      cwd,
-      resume: sessionId,
-      permissionMode: "default",
-      canUseTool: createCanUseTool(agentId),
-      includePartialMessages: true,
-      abortController,
-    },
-  });
+
+  // Try to resume the existing session. If it fails (session expired/deleted),
+  // fall back to starting a fresh conversation in the same cwd.
+  let q;
+  let resumed = false;
+  try {
+    q = query({
+      prompt: "Continue where you left off. What's the current status?",
+      options: {
+        pathToClaudeCodeExecutable: getClaudeCodePath(),
+        cwd,
+        resume: sessionId,
+        permissionMode: "default",
+        canUseTool: createCanUseTool(agentId),
+        includePartialMessages: true,
+        abortController,
+      },
+    });
+    resumed = true;
+  } catch (resumeErr) {
+    console.log(`[AgentManager] Resume failed (${String(resumeErr).slice(0, 80)}), starting fresh`);
+    // Fall back to a fresh session
+    q = query({
+      prompt: "Starting a new session. What would you like to work on?",
+      options: {
+        pathToClaudeCodeExecutable: getClaudeCodePath(),
+        cwd,
+        permissionMode: "default",
+        canUseTool: createCanUseTool(agentId),
+        includePartialMessages: true,
+        abortController,
+      },
+    });
+  }
 
   activeAgent.query = q;
   activeAgents.set(agentId, activeAgent);
 
-  // Update agent to deck-managed (enables chat input)
   updateAgent(agentId, { status: "active", source: "deck" as "deck" });
-  addEvent(agentId, "task_start", "Resumed session — now interactive");
+  addEvent(agentId, "task_start", resumed ? "Resumed session — now interactive" : "Previous session expired — started fresh");
 
   processAgentStream(agentId, q, {
     model: "unknown",
-    task: "resumed-session",
+    task: resumed ? "resumed-session" : "fresh-session",
   }).catch((err) => {
     console.error(`[AgentManager] Resume ${agentId} stream error:`, err);
     updateAgent(agentId, { status: "errored" });

@@ -1,10 +1,10 @@
-# Hive — Product Specification
+# Relay — Product Specification
 
 > Last updated: 2026-04-03
 
 ## Vision
 
-Hive is an autonomous engineering assistant — a native desktop app that monitors your work channels (Slack, Linear, Gmail, Calendar, Notion, GitHub), intelligently triages incoming work, and executes approved tasks through Claude Code agents all the way to PR.
+Relay is an autonomous engineering assistant — a native desktop app that monitors your work channels (Slack, Linear, Gmail, Calendar, Notion, GitHub), intelligently triages incoming work, and executes approved tasks through Claude Code agents all the way to PR.
 
 The goal is to replace the manual inbox-checking → context-gathering → task-planning → coding loop with an AI-driven pipeline where the engineer reviews and approves rather than executes.
 
@@ -49,6 +49,16 @@ The goal is to replace the manual inbox-checking → context-gathering → task-
 - **Existing task dedup** — up to 30 open tasks included in triage prompt to prevent duplicates
 - **Cache persistence** — notifications survive app restart via JSON cache file
 - **Skipped items tracking** — reviewed/dismissed items preserved with reasons
+
+#### Task Type Classification
+- **Agent track** (autonomous — agent does the work):
+  - `implementation` — Linear tickets requiring building/coding
+- **Human track** (user does the work, agent prepares context):
+  - `response` — DMs, threads, messages needing a reply
+  - `meeting_prep` — Calendar events needing preparation
+  - `review` — PR reviews assigned to the user
+  - `investigation` — Research/analysis tasks
+- **Classification source of truth:** `isHumanTask()` in `src/shared/stage-machine.ts`, `HUMAN_ONLY_TYPES` in `src/shared/task-utils.ts`
 
 #### Priority System (5 levels)
 
@@ -117,15 +127,27 @@ Priority assignment is context-aware: who asked matters (manager → critical, l
 - Approval sidebar (pending permission requests)
 - New Agent modal (task, cwd, model, permission mode, import from Linear/Slack)
 
-#### Inbox (/notifications) — Kanban Board
+#### Inbox (/ — default page) — Kanban Board
 - **Two-section layout:**
-  - "Actionable — Agent Can Work" (implementation, review, investigation, planning)
-  - "Needs Your Attention" (response, meeting_prep, follow_up)
-- **Columns per section:** Inbox → Follow Up → Planning → Prepared → Working → Done + Reviewed
-- **Native HTML5 drag-and-drop** with stage transitions triggering actions:
-  - → Planning: triggers `prepareWorkPlan()`
-  - → Working: triggers `startWorkAgent()`
+  - "Actionable — Agent Can Work" (implementation only)
+  - "Needs Your Attention" (response, meeting_prep, review, investigation)
+- **Agent track columns:** Inbox → Planning → Plan Review → Hacking → Shipping → Reviewing → Feedback → Backlog → Done
+- **Human track columns:** Inbox → Preparing → Ready → Backlog → Done
+- **Human track flow:** Drag to Preparing → agent gathers context → user reviews → clicks "Mark Ready" → clicks "Mark Done"
+- **Drag-and-drop rules — dragging into a column starts the work for that column:**
+  - → Planning (start_work): runs `/start-work` skill (MCP agent fetches context, creates plan). On success, advances to plan_review.
+  - → Hacking (hack): runs `/hack` skill (requires repoPath — only droppable if task has repo set from plan approval). Creates worktree, executes plan.
+  - → Shipping (ship): runs `/ship` skill
+  - → Reviewing (code_review): runs `/code-review` skill
+  - → Feedback (pr_feedback): runs `/handle-pr-feedback` skill
+  - → Preparing (human): runs `prepareWorkPlan()` (MCP agent gathers context, produces key points)
+  - → Done: runs `/done` skill (archives .work/ directory)
+  - → Backlog: just moves (archive, no skill)
+  - → Inbox (new): always allowed (reset — clears plan)
+- **Prerequisites enforced by `canDropTo()`:** can't skip stages (e.g., can't drag from inbox directly to hacking)
+- **Drag does NOT open the detail drawer** — only explicit click opens it
 - **Tabbed detail drawer** — four tabs (Agent, Plan, Context, Timeline) with live agent chat, structured plan view, fetched context items, and chronological event timeline
+- **Secondary actions** in detail drawer: Re-plan (clears plan, moves to planning), Reset (clears plan, moves to inbox), Archive (moves to backlog)
 - **Add Task modal** — manual task creation (title, description, type, priority, estimated time)
 - **Refresh** fetches new items without clearing existing
 - **Debug log panel** with clear button
@@ -136,10 +158,11 @@ Priority assignment is context-aware: who asked matters (manager → critical, l
 - **Current time indicator** (red line)
 - **Drag to reorder** with automatic time recalculation
 
-#### Coach (/coach) — Productivity Coach (replaced Standup)
-- **Daily Brief** — yesterday's completions, today's priorities, blockers
-- **Work Patterns** — task distribution by type, completion rates, bottleneck detection, meeting load
-- **Output Scoring** — weekly composite score (0-100): completion rate, response speed, plan quality
+#### Reflect (/reflect) — Work Habits Analysis (replaced Coach/Standup)
+- **Manager's Take** — LLM-generated assessment of the week's work patterns (Haiku, cached in sessionStorage)
+- **Signal Cards** — Response Cadence, Focus Score, Meeting Load, Throughput (computed from notification data)
+- **Weekly Throughput** — bar chart of completed tasks over time
+- **Cycle Time by Type** — horizontal bars showing avg completion time per task type
 - **Actionable Suggestions** — "60% of tasks are responses — batch Slack replies"
 
 #### Insights (/insights) — Proactive Ideas

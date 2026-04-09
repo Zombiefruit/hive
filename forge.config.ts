@@ -21,10 +21,10 @@ const config: ForgeConfig = {
     asar: {
       unpack: "**/*.node",
     },
-    name: "Hive",
-    executableName: "hive",
+    name: "Relay",
+    executableName: "relay",
     icon: path.resolve(__dirname, "resources", "icon"),
-    appBundleId: "com.hive-deck.app",
+    appBundleId: "com.relay-deck.app",
     appCategoryType: "public.app-category.developer-tools",
   },
   rebuildConfig: {},
@@ -32,6 +32,13 @@ const config: ForgeConfig = {
     {
       name: "@electron-forge/maker-zip",
       platforms: ["darwin"],
+    },
+    {
+      name: "@electron-forge/maker-dmg",
+      platforms: ["darwin"],
+      config: {
+        format: "ULFO",
+      },
     },
   ],
   hooks: {

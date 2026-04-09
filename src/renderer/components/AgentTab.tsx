@@ -40,9 +40,12 @@ export function deriveActions(rawActions: Action[], stage?: string): Action[] {
 export function getEmptyStateMessage(stage?: string): string | null {
   // Stages where an agent is actively running — never show static empty text
   const action = STAGE_ACTIONS[stage ?? ""];
-  if (action?.inProgress || stage === "plan_review") return null;
+  if (action?.inProgress) return null;
   if (stage === "new" || stage === "skipped") {
     return 'Click "Move to Planning" to begin.';
+  }
+  if (stage === "plan_review") {
+    return "Plan ready — switch to the Plan tab to review.";
   }
   return "No conversation yet.";
 }
@@ -98,15 +101,31 @@ export function AgentTab({
     setFeedback("");
   };
 
-  // Parse actions from last assistant message
+  // Parse actions from last assistant message.
+  // During work stages (hack, ship, etc.), filter out run_skill actions (those
+  // duplicate the plan flow) but keep side-effect actions (update_linear,
+  // send_slack, open_url, etc.) — those are useful regardless of stage.
   const lastAssistant = [...conversation].reverse().find(m => m.role === "assistant");
   const rawActions = lastAssistant ? parseActions(lastAssistant.content) : [];
-  // If no structured actions but assistant says "no action needed", synthesize a no_action + dismiss
-  const noActionText = lastAssistant && rawActions.length === 0 &&
+  const WORK_STAGES = new Set(["hack", "ship", "code_review", "pr_feedback", "done"]);
+  const inWorkStage = WORK_STAGES.has(stage ?? "");
+  const filteredActions = inWorkStage
+    ? rawActions.filter(a => {
+        if (a.type === "run_skill") return false;
+        // Filter "Move to In Progress" once we're past planning — already in progress
+        if (a.type === "update_linear") {
+          const p = (a as unknown as { params?: Record<string, string> }).params;
+          const val = a.value || p?.value || "";
+          if (/in.progress/i.test(val)) return false;
+        }
+        return true;
+      })
+    : rawActions;
+  const noActionText = lastAssistant && filteredActions.length === 0 && rawActions.length === 0 &&
     /no action needed|already responded|already replied/i.test(lastAssistant.content);
   const effectiveActions = noActionText
     ? [{ type: "no_action" as const, label: "No action needed" }]
-    : rawActions;
+    : filteredActions;
   const actions = deriveActions(effectiveActions, stage);
 
   const hasConversation = conversation.length > 0;
@@ -139,9 +158,16 @@ export function AgentTab({
                 : "Working..."}
             </Text>
             {activity.length > 0 && (
-              <Text size="xs" c="dimmed" ta="center" truncate style={{ maxWidth: "90%" }}>
-                {activity[activity.length - 1].content}
-              </Text>
+              <>
+                <Text size="xs" c="dimmed" ta="center" truncate style={{ maxWidth: "90%" }}>
+                  {activity[activity.length - 1].content}
+                </Text>
+                {activity.length > 1 && (
+                  <Text size="xs" c="dimmed" ta="center" style={{ opacity: 0.5 }}>
+                    {activity.length} events
+                  </Text>
+                )}
+              </>
             )}
           </Stack>
         )}

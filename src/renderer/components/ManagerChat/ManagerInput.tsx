@@ -89,7 +89,7 @@ export function ManagerInput({ onSend }: ManagerInputProps) {
           <IconCommand size={14} stroke={1.5} />
         </ActionIcon>
         <Textarea
-          placeholder={isStreaming ? "Manager is thinking..." : "Ask the Manager... (/ for actions)"}
+          placeholder={isStreaming ? "Relay is thinking..." : "Ask Relay anything..."}
           value={input}
           onChange={(e) => {
             setInput(e.currentTarget.value);

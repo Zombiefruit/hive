@@ -1,9 +1,6 @@
-import { Badge, Group, Loader, Skeleton, Stack, Text, Tooltip } from "@mantine/core";
-import {
-  IconMessageCircle, IconTarget, IconCalendarEvent, IconTrendingUp,
-  IconArrowUp, IconArrowDown, IconMinus, IconAlertTriangle,
-} from "@tabler/icons-react";
-import { useState, useEffect, useCallback } from "react";
+import { Badge, Group, Skeleton, Stack, Text, Loader } from "@mantine/core";
+import { IconTrendingUp, IconAlertTriangle, IconCheck, IconTarget } from "@tabler/icons-react";
+import { useState, useEffect, useRef } from "react";
 import { AppHeader } from "../components/AppHeader";
 import type {
   ReflectSignals, ManagerTake, WeeklySnapshot, ReflectData,
@@ -29,158 +26,101 @@ const glassStyle: React.CSSProperties = {
   border: "1px solid var(--aegen-glass-border)",
 };
 
-/* ---------- Trend arrow ---------- */
+/* ---------- Callout categorizer ---------- */
 
-function TrendArrow({ trend, good }: { trend: "up" | "down" | "flat"; good: boolean }) {
-  if (trend === "flat") return <IconMinus size={14} color="var(--aegen-dust-gray)" />;
-  const color = (trend === "up" && good) || (trend === "down" && !good)
-    ? "var(--mantine-color-green-5)"
-    : "var(--mantine-color-red-5)";
-  return trend === "up"
-    ? <IconArrowUp size={14} color={color} />
-    : <IconArrowDown size={14} color={color} />;
+type CalloutCategory = "win" | "risk" | "focus";
+
+function categorizeCallout(text: string): CalloutCategory {
+  const lower = text.toLowerCase();
+  if (lower.includes("risk") || lower.includes("attention") || lower.includes("behind") ||
+      lower.includes("concern") || lower.includes("slow") || lower.includes("blocked") ||
+      lower.includes("delay") || lower.includes("miss") || lower.includes("overdue")) {
+    return "risk";
+  }
+  if (lower.includes("focus") || lower.includes("priorit") || lower.includes("next") ||
+      lower.includes("should") || lower.includes("consider") || lower.includes("recommend") ||
+      lower.includes("action") || lower.includes("plan")) {
+    return "focus";
+  }
+  return "win";
 }
 
-/* ---------- Signal Card ---------- */
+const CATEGORY_CONFIG: Record<CalloutCategory, { label: string; icon: React.FC<{ size?: number; style?: React.CSSProperties }>; color: string }> = {
+  win: { label: "Wins", icon: IconCheck, color: "var(--mantine-color-green-5)" },
+  risk: { label: "Risks", icon: IconAlertTriangle, color: "var(--mantine-color-yellow-5)" },
+  focus: { label: "Focus Areas", icon: IconTarget, color: "var(--mantine-color-blue-5)" },
+};
 
-interface SignalCardProps {
-  icon: React.FC<{ size?: number }>;
-  label: string;
-  value: string;
-  subtext: string;
-  trend: "up" | "down" | "flat";
-  trendGood: boolean;
-  callout?: string;
+/* ---------- Session-level cache so data persists across tab switches ---------- */
+
+const CACHE_KEY = "relay-reflect-cache";
+
+function loadCache(): { signals: ReflectSignals | null; take: ManagerTake | null; history: WeeklySnapshot[] } | null {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
 }
 
-function SignalCard({ icon: Icon, label, value, subtext, trend, trendGood, callout }: SignalCardProps) {
-  return (
-    <div style={glassStyle}>
-      <Group gap={6} mb={8}>
-        <Icon size={14} />
-        <Text size="xs" fw={600} c="dimmed" style={{ textTransform: "uppercase", letterSpacing: "0.5px" }}>
-          {label}
-        </Text>
-      </Group>
-      <Group gap={6} align="baseline">
-        <Text size="xl" fw={700}>{value}</Text>
-        <TrendArrow trend={trend} good={trendGood} />
-      </Group>
-      <Text size="xs" c="dimmed">{subtext}</Text>
-      {callout && (
-        <Group gap={4} mt={6} wrap="nowrap" align="flex-start">
-          <IconAlertTriangle size={12} color="var(--mantine-color-yellow-5)" style={{ marginTop: 2, flexShrink: 0 }} />
-          <Text size="xs" c="yellow.5">{callout}</Text>
-        </Group>
-      )}
-    </div>
-  );
-}
-
-/* ---------- Weekly Bars ---------- */
-
-function WeeklyBars({ weeks }: { weeks: WeeklySnapshot[] }) {
-  const max = Math.max(1, ...weeks.map((w) => w.completed));
-  return (
-    <div style={glassStyle}>
-      <Text size="xs" fw={600} c="dimmed" mb={10} style={{ textTransform: "uppercase", letterSpacing: "0.5px" }}>
-        Weekly throughput
-      </Text>
-      <div style={{ display: "flex", gap: 8, alignItems: "flex-end", height: 120 }}>
-        {weeks.map((w, i) => {
-          const pct = Math.max(4, (w.completed / max) * 100);
-          const isLast = i === weeks.length - 1;
-          return (
-            <Tooltip key={w.weekStartISO} label={`${w.completed} completed`} position="top" withArrow>
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
-                <div style={{
-                  width: "100%",
-                  maxWidth: 32,
-                  height: `${pct}%`,
-                  borderRadius: 4,
-                  background: isLast ? "var(--aegen-cosmic-blue)" : "var(--aegen-dust-gray)",
-                  transition: "height 0.3s ease",
-                }} />
-                <Text size="xs" c="dimmed" mt={4} ta="center">{w.weekLabel}</Text>
-              </div>
-            </Tooltip>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/* ---------- Cycle Time by Type ---------- */
-
-function CycleTimeRows({ data }: { data: Record<string, number> }) {
-  const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
-  if (entries.length === 0) return null;
-  const max = Math.max(1, ...entries.map(([, v]) => v));
-  return (
-    <div style={glassStyle}>
-      <Text size="xs" fw={600} c="dimmed" mb={10} style={{ textTransform: "uppercase", letterSpacing: "0.5px" }}>
-        Avg cycle time by type
-      </Text>
-      <Stack gap={6}>
-        {entries.map(([type, hours]) => (
-          <Group key={type} gap={8} wrap="nowrap">
-            <Text size="xs" c="dimmed" style={{ width: 100, flexShrink: 0 }}>{type}</Text>
-            <div style={{ flex: 1, height: 8, borderRadius: 4, background: "var(--aegen-glass-border)" }}>
-              <div style={{
-                height: "100%",
-                width: `${(hours / max) * 100}%`,
-                borderRadius: 4,
-                background: "var(--aegen-cosmic-blue)",
-                transition: "width 0.3s ease",
-              }} />
-            </div>
-            <Text size="xs" c="dimmed" style={{ width: 40, textAlign: "right", flexShrink: 0 }}>{hours}h</Text>
-          </Group>
-        ))}
-      </Stack>
-    </div>
-  );
-}
-
-/* ---------- Helper: compute trend direction ---------- */
-
-function deltaTrend(delta: number): "up" | "down" | "flat" {
-  if (delta > 5) return "up";
-  if (delta < -5) return "down";
-  return "flat";
+function saveCache(signals: ReflectSignals, take: ManagerTake | null, history: WeeklySnapshot[]): void {
+  try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ signals, take, history })); } catch {}
 }
 
 /* ---------- Main page ---------- */
 
 export default function ReflectPage() {
-  const [signals, setSignals] = useState<ReflectSignals | null>(null);
-  const [managerTake, setManagerTake] = useState<ManagerTake | null>(null);
-  const [history, setHistory] = useState<WeeklySnapshot[]>([]);
-  const [loadingTake, setLoadingTake] = useState(true);
+  const cacheRef = useRef(loadCache());
+  const cached = cacheRef.current;
+
+  const [signals, setSignals] = useState<ReflectSignals | null>(cached?.signals ?? null);
+  const [managerTake, setManagerTake] = useState<ManagerTake | null>(cached?.take ?? null);
+  const [history, setHistory] = useState<WeeklySnapshot[]>(cached?.history ?? []);
+  const [loadingTake, setLoadingTake] = useState(!cached);
 
   useEffect(() => {
-    // Phase 1: fast signals
+    if (cacheRef.current) return;
+
+    let settled = false;
+    const done = () => { if (!settled) { settled = true; setLoadingTake(false); } };
+
+    const safetyTimer = setTimeout(done, 20000);
+
     window.deck?.getReflectSignals?.().then((s: ReflectSignals) => {
       if (s) setSignals(s);
     }).catch(() => {});
 
-    // Phase 2: full data with LLM manager take
-    window.deck?.getReflectData?.().then((d: ReflectData) => {
+    window.deck?.getReflectData?.().then((d: ReflectData | null) => {
       if (d) {
         setSignals(d.signals);
         setManagerTake(d.managerTake);
         setHistory(d.history);
+        saveCache(d.signals, d.managerTake, d.history);
       }
-      setLoadingTake(false);
-    }).catch(() => setLoadingTake(false));
+      done();
+    }).catch(done);
+
+    return () => clearTimeout(safetyTimer);
   }, []);
 
   const noData = !loadingTake && !signals;
 
+  // Categorize callouts into wins, risks, focus areas
+  const categorized = managerTake?.callouts.reduce<Record<CalloutCategory, string[]>>(
+    (acc, c) => { acc[categorizeCallout(c)].push(c); return acc; },
+    { win: [], risk: [], focus: [] },
+  );
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--aegen-void)" }}>
-      <AppHeader />
+      <AppHeader rightContent={
+        loadingTake ? (
+          <Group gap={6}>
+            <Loader size={12} />
+            <Text size="xs" c="dimmed">Loading...</Text>
+          </Group>
+        ) : undefined
+      } />
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", paddingTop: 8 }}>
         {/* Empty state */}
@@ -192,99 +132,60 @@ export default function ReflectPage() {
           </Stack>
         )}
 
-        {/* 1. Manager's Take */}
+        {/* Loading state */}
+        {loadingTake && !signals && (
+          <Stack align="center" py="xl" gap="sm">
+            <Loader size={24} />
+            <Text size="sm" c="dimmed">Analyzing your week...</Text>
+          </Stack>
+        )}
+
+        {/* Manager's Take — summary + rating */}
         {signals && (
           loadingTake ? (
             <Skeleton height={120} radius="md" mb={12} />
           ) : managerTake ? (
-            <div style={{ ...glassStyle, marginBottom: 12, position: "relative" }}>
-              <Badge
-                size="sm"
-                variant="light"
-                color={RATING_COLORS[managerTake.rating] ?? "gray"}
-                style={{ position: "absolute", top: 14, right: 16 }}
-              >
-                {managerTake.rating}
-              </Badge>
-              <Text size="xs" fw={600} c="dimmed" mb={8} style={{ textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                Manager's Take
-              </Text>
-              <Text size="sm" mb={managerTake.callouts.length > 0 ? 10 : 0}>
-                {managerTake.summary}
-              </Text>
-              {managerTake.callouts.map((c, i) => (
-                <Group key={i} gap={6} mb={4} wrap="nowrap" align="flex-start">
-                  {c.toLowerCase().includes("risk") || c.toLowerCase().includes("attention") || c.toLowerCase().includes("behind")
-                    ? <IconAlertTriangle size={12} color="var(--mantine-color-yellow-5)" style={{ marginTop: 3, flexShrink: 0 }} />
-                    : <IconTrendingUp size={12} color="var(--mantine-color-blue-5)" style={{ marginTop: 3, flexShrink: 0 }} />
-                  }
-                  <Text size="xs" c="dimmed">{c}</Text>
-                </Group>
-              ))}
-            </div>
+            <>
+              <div style={{ ...glassStyle, marginBottom: 12, position: "relative" }}>
+                <Badge
+                  size="sm"
+                  variant="light"
+                  color={RATING_COLORS[managerTake.rating] ?? "gray"}
+                  style={{ position: "absolute", top: 14, right: 16 }}
+                >
+                  {managerTake.rating}
+                </Badge>
+                <Text size="xs" fw={600} c="dimmed" mb={8} style={{ textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Manager's Take
+                </Text>
+                <Text size="sm">
+                  {managerTake.summary}
+                </Text>
+              </div>
+
+              {/* Categorized feedback sections */}
+              {categorized && (["win", "risk", "focus"] as CalloutCategory[]).map(cat => {
+                const items = categorized[cat];
+                if (items.length === 0) return null;
+                const config = CATEGORY_CONFIG[cat];
+                return (
+                  <div key={cat} style={{ ...glassStyle, marginBottom: 12 }}>
+                    <Group gap={6} mb={8}>
+                      <config.icon size={14} style={{ color: config.color, flexShrink: 0 }} />
+                      <Text size="xs" fw={600} style={{ color: config.color, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        {config.label}
+                      </Text>
+                    </Group>
+                    {items.map((c, i) => (
+                      <Text key={i} size="sm" mb={i < items.length - 1 ? 6 : 0} style={{ paddingLeft: 20 }}>
+                        {c}
+                      </Text>
+                    ))}
+                  </div>
+                );
+              })}
+            </>
           ) : null
-        )}
-
-        {/* 2. Signal Cards */}
-        {signals && (
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: 12,
-            marginBottom: 12,
-          }}>
-            <SignalCard
-              icon={IconMessageCircle}
-              label="Response Cadence"
-              value={`${signals.responseCadence.medianReplyMinutes}m`}
-              subtext="median reply"
-              trend={signals.responseCadence.medianReplyMinutes < 30 ? "up" : signals.responseCadence.medianReplyMinutes > 120 ? "down" : "flat"}
-              trendGood={signals.responseCadence.medianReplyMinutes < 60}
-              callout={signals.responseCadence.unansweredOver24h > 0
-                ? `${signals.responseCadence.unansweredOver24h} threads unanswered >24h`
-                : undefined}
-            />
-            <SignalCard
-              icon={IconTarget}
-              label="Focus Score"
-              value={`${signals.focus.score}/100`}
-              subtext={`${signals.focus.avgConcurrentWip} avg WIP`}
-              trend={signals.focus.score >= 70 ? "up" : signals.focus.score < 50 ? "down" : "flat"}
-              trendGood={signals.focus.score >= 50}
-              callout={signals.focus.score < 50 ? "High context switching" : undefined}
-            />
-            <SignalCard
-              icon={IconCalendarEvent}
-              label="Meeting Load"
-              value={`${signals.meetingLoad.meetingHoursThisWeek}h`}
-              subtext={`${signals.meetingLoad.meetingCount} meetings`}
-              trend={signals.meetingLoad.meetingFocusRatio > 0.3 ? "down" : signals.meetingLoad.meetingFocusRatio < 0.15 ? "up" : "flat"}
-              trendGood={signals.meetingLoad.meetingFocusRatio <= 0.3}
-              callout={signals.meetingLoad.meetingFocusRatio > 0.3
-                ? `${signals.meetingLoad.longestDeepWorkBlock}m longest deep work block`
-                : undefined}
-            />
-            <SignalCard
-              icon={IconTrendingUp}
-              label="Throughput"
-              value={`${signals.throughput.completedThisWeek}`}
-              subtext="completed this week"
-              trend={deltaTrend(signals.throughput.weekOverWeekDelta)}
-              trendGood={signals.throughput.weekOverWeekDelta >= 0}
-            />
-          </div>
-        )}
-
-        {/* 3. Weekly Trend */}
-        {history.length > 0 && (
-          <div style={{ marginBottom: 12 }}>
-            <WeeklyBars weeks={history} />
-          </div>
-        )}
-
-        {/* 4. Cycle Time by Type */}
-        {signals && Object.keys(signals.throughput.cycleTimeByType).length > 0 && (
-          <CycleTimeRows data={signals.throughput.cycleTimeByType} />
         )}
       </div>
     </div>

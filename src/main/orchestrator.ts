@@ -52,11 +52,22 @@ initThoughtSynthesizer(think);
 
 // ── Core loop ──
 
+let tickCount = 0;
+
 async function tick(): Promise<void> {
+  tickCount++;
   const notifications = getNotifications();
   const active = notifications.filter(n => n.stage && !["done", "skipped", "new"].includes(n.stage));
 
-  if (active.length === 0) return;
+  if (active.length === 0) {
+    // Emit ambient thought every ~60s (every 2nd tick at 30s interval)
+    if (tickCount % 2 === 0) {
+      const total = notifications.length;
+      const done = notifications.filter(n => n.stage === "done").length;
+      emitMonologue(`${total} tasks tracked, ${done} completed. Nothing active right now.`);
+    }
+    return;
+  }
 
   // 1. Check for parent tasks that need stage updates
   const parents = notifications.filter(n => n.subtaskIds && n.subtaskIds.length > 0);
@@ -112,6 +123,20 @@ async function tick(): Promise<void> {
       emitMonologue(`Plan for "${n.title}" was approved by judge — ready for user to start work`);
     }
   }
+
+  // 4. Ambient status every tick (~30s) when active tasks exist
+  if (tickCount % 2 === 0) {
+    const hacking = active.filter(n => n.stage === "hack");
+    const reviewing = active.filter(n => n.stage === "code_review" || n.stage === "pr_feedback");
+    const planning = active.filter(n => n.stage === "start_work" || n.stage === "plan_review");
+    const parts: string[] = [];
+    if (hacking.length > 0) parts.push(`${hacking.length} hacking`);
+    if (reviewing.length > 0) parts.push(`${reviewing.length} in review`);
+    if (planning.length > 0) parts.push(`${planning.length} planning`);
+    if (parts.length > 0) {
+      emitMonologue(`${active.length} active tasks: ${parts.join(", ")}`);
+    }
+  }
 }
 
 // ── Public API ──
@@ -121,12 +146,12 @@ export function startOrchestrator(): void {
   running = true;
   emitMonologue("Orchestrator started — monitoring all active tasks");
 
-  // Run every 60 seconds
+  // Run every 30 seconds for more responsive thought bubbles
   intervalId = setInterval(() => {
     tick().catch(err => {
       addDebugEntry("out", `❌ [ORCH] Tick error: ${String(err).slice(0, 100)}`, "orchestrator");
     });
-  }, 60000);
+  }, 30000);
 
   // Run immediately on start
   tick().catch(() => {});

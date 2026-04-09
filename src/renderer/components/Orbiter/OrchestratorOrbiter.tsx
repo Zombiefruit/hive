@@ -27,10 +27,10 @@ const ORB_CENTER_Y = CONTAINER_HEIGHT - ORB_RADIUS;
 const CONNECTOR_RADIUS = ORB_RADIUS + 13;
 
 const THOUGHT_SLOTS: ThoughtSlot[] = [
-  { left: 200, top: 220, width: 195, attachAngle: 225 },
-  { left: 188, top: 265, width: 200, attachAngle: 212 },
-  { left: 182, top: 310, width: 190, attachAngle: 198 },
-  { left: 212, top: 186, width: 185, attachAngle: 238 },
+  { left: 210, top: 260, width: 190, attachAngle: 220 },
+  { left: 198, top: 300, width: 195, attachAngle: 210 },
+  { left: 192, top: 335, width: 185, attachAngle: 200 },
+  { left: 220, top: 230, width: 180, attachAngle: 232 },
 ];
 
 const BUBBLE_MIDLINE_Y = 30;
@@ -74,6 +74,7 @@ export function OrchestratorOrbiter() {
   const [isEscalation, setIsEscalation] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const isPinned = useManagerStore((s) => s.isPinned);
+  const isOpenFromStore = useManagerStore((s) => s.isOpen);
   const slotIndex = useRef(0);
   const [prevCount, setPrevCount] = useState(0);
   const showTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -93,7 +94,8 @@ export function OrchestratorOrbiter() {
     if (thoughts.length > prevCount) {
       const latest = thoughts[thoughts.length - 1];
       setPrevCount(thoughts.length);
-      setIntensity(1);
+      // Spike intensity high so breathing visibly quickens
+      setIntensity(1.8);
 
       clearTimeout(showTimerRef.current);
       clearTimeout(hideTimerRef.current);
@@ -103,9 +105,13 @@ export function OrchestratorOrbiter() {
       showTimerRef.current = setTimeout(() => {
         addFloatingThought(latest.thought);
         if (latest.isEscalation) {
-          setIntensity(2);
+          setIntensity(2.5);
         } else {
-          intensityTimerRef.current = setTimeout(() => setIntensity(0), 2800);
+          // Gradually step down: 1.8 → 0.6 → 0
+          intensityTimerRef.current = setTimeout(() => {
+            setIntensity(0.6);
+            intensityTimerRef.current = setTimeout(() => setIntensity(0), 2000);
+          }, 2500);
         }
       }, 320);
     } else if (thoughts.length < prevCount) {
@@ -162,13 +168,18 @@ export function OrchestratorOrbiter() {
 
   // Also respond to manager streaming state — pulse orb during responses
   const isStreaming = useManagerStore((s) => s.isStreaming);
-  const effectiveIntensity = isStreaming && intensity < 0.5 ? 0.5 : intensity;
+  // Orb glows orange when panel is open, pulses during streaming
+  const effectiveIntensity = panelOpen ? 0.8 : isStreaming && intensity < 0.5 ? 0.5 : intensity;
+  const orbIsOpen = panelOpen || isPinned;
 
   const connector = floatingThought ? getConnectorGeometry(floatingThought.slot) : null;
 
   const handleOrbClick = () => {
+    // Pulse on click
+    setIntensity(1.5);
+    setTimeout(() => setIntensity(panelOpen ? 0 : 0.8), 600);
+
     setPanelOpen((prev) => !prev);
-    // Also sync with manager-store isOpen
     const store = useManagerStore.getState();
     if (!panelOpen) {
       store.setOpen(true);
@@ -179,12 +190,19 @@ export function OrchestratorOrbiter() {
 
   const handlePanelClose = () => {
     setPanelOpen(false);
+    useManagerStore.getState().setOpen(false);
+    useManagerStore.getState().setPinned(false);
   };
 
   // Keep panelOpen in sync with isPinned
   useEffect(() => {
     if (isPinned) setPanelOpen(true);
   }, [isPinned]);
+
+  // Open panel when isOpen is set externally (e.g. AddToManagerButton)
+  useEffect(() => {
+    if (isOpenFromStore && !panelOpen) setPanelOpen(true);
+  }, [isOpenFromStore]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
@@ -281,7 +299,7 @@ export function OrchestratorOrbiter() {
             whileTap={{ scale: 0.95 }}
             transition={{ type: "spring", stiffness: 400, damping: 18 }}
           >
-            <AiOrb intensity={effectiveIntensity} isEscalation={isEscalation} size={ORB_SIZE} />
+            <AiOrb intensity={effectiveIntensity} isEscalation={isEscalation || orbIsOpen} size={ORB_SIZE} />
           </motion.div>
         </div>
       )}

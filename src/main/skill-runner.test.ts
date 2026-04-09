@@ -2,20 +2,22 @@ import { describe, it, expect } from "vitest";
 import { buildSkillArgs, buildSkillEnv, extractSessionId, createWorktree, type SkillInvocation, type SkillResult } from "./skill-runner";
 
 describe("Skill Runner — buildSkillArgs", () => {
-  it("should build args without --resume on first invocation", () => {
-    const args = buildSkillArgs(null);
+  it("should build args with -p for new sessions (no stdin deadlock)", () => {
+    const args = buildSkillArgs(null, "/hack VEC-44");
     expect(args).toContain("--output-format");
     expect(args).toContain("stream-json");
-    expect(args).toContain("--input-format");
-    expect(args).toContain("--verbose");
-    expect(args).toContain("--no-chrome");
+    expect(args).toContain("-p");
+    expect(args).toContain("/hack VEC-44");
+    expect(args).not.toContain("--input-format");
     expect(args).not.toContain("--resume");
   });
 
-  it("should include --resume when sessionId is provided", () => {
+  it("should include --resume and --input-format for resumed sessions", () => {
     const args = buildSkillArgs("session-abc-123");
     expect(args).toContain("--resume");
     expect(args).toContain("session-abc-123");
+    expect(args).toContain("--input-format");
+    expect(args).toContain("stream-json");
   });
 
   it("should not include --no-session-persistence", () => {
@@ -67,7 +69,7 @@ describe("Skill Runner — SkillInvocation type", () => {
       repoPath: "/Users/kieran/repos/monolith-django",
       sessionId: null,
       notificationId: "poll-123-abc",
-      timeoutMs: 300000,
+      timeoutMs: undefined, // inactivity timeout used instead of wall-clock
     };
     expect(invocation.skill).toBe("/start-work");
     expect(invocation.sessionId).toBeNull();

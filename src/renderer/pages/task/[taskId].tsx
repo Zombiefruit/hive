@@ -61,7 +61,7 @@ export function TaskDetail() {
         flexShrink: 0,
       }}>
         <Group gap="sm" style={{ WebkitAppRegion: "no-drag" }}>
-          <UnstyledButton onClick={() => navigate("/notifications")} style={{ padding: 4 }}>
+          <UnstyledButton onClick={() => navigate("/")} style={{ padding: 4 }}>
             <IconArrowLeft size={16} />
           </UnstyledButton>
           <Title order={4}>Task</Title>

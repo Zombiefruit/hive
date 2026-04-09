@@ -320,6 +320,8 @@ export function Schedule() {
   const markDone = (id: string) => {
     // Update the SSoT (notifications) — schedule will rebuild from it
     window.deck?.updateNotificationById?.(id, { stage: "done" });
+    // Run /done skill to archive .work/ directory
+    window.deck?.runSkill?.({ skill: "/done", args: "", repoPath: "", sessionId: null, notificationId: id }).catch(() => {});
     // Optimistic local update so UI reflects immediately
     setItems(prev => prev.map(item => item.id === id ? { ...item, status: "done" as const } : item));
   };
@@ -758,12 +760,13 @@ export function Schedule() {
         const color = priorityColors[item.priority] ?? "var(--mantine-color-blue-filled)";
         return (
           <>
-            <div onClick={() => setSelectedId(null)} style={{ position: "fixed", inset: 0, top: 42, zIndex: 99, backgroundColor: "rgba(5, 8, 16, 0.4)", backdropFilter: "blur(2px)" }} />
+            <div onClick={() => setSelectedId(null)} style={{ position: "fixed", inset: 0, zIndex: 99, backgroundColor: "rgba(0,0,0,0.2)" }} />
             <div style={{
-              position: "fixed", top: 42, right: 0, bottom: 0, width: 380, zIndex: 100,
-              background: "var(--aegen-glass-bg)", backdropFilter: "var(--aegen-glass-blur)",
-              borderLeft: "1px solid var(--mantine-color-default-hover)",
+              position: "fixed", top: 0, right: 0, bottom: 0, width: 420, maxWidth: "60vw", zIndex: 100,
+              background: "var(--aegen-void)", borderLeft: "1px solid var(--aegen-glass-border)",
+              boxShadow: "-4px 0 20px rgba(0,0,0,0.3)",
               overflowY: "auto", padding: 20,
+              animation: "slideInRight 0.2s ease-out",
             }}>
               <Group justify="space-between" mb={12}>
                 <Badge size="xs" variant="light" color={color}>{item.priority}</Badge>

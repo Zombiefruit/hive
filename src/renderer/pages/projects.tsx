@@ -270,7 +270,7 @@ export default function ProjectsPage() {
                       return (
                         <UnstyledButton
                           key={n.id}
-                          onClick={() => navigate(`/notifications?select=${n.id}`)}
+                          onClick={() => navigate(`/?select=${n.id}`)}
                           className="notif-card"
                           style={{
                             padding: "10px 14px", borderRadius: 6,
@@ -331,6 +331,26 @@ export default function ProjectsPage() {
             <Text size="lg" fw={600}>Projects</Text>
           </Group>
 
+          {/* Explainer + stats card */}
+          <div style={{
+            padding: "12px 14px", borderRadius: 8, marginBottom: 12,
+            background: "var(--aegen-glass-bg)", border: "1px solid var(--aegen-glass-border)",
+          }}>
+            <Text size="xs" c="dimmed" style={{ lineHeight: 1.6 }}>
+              Projects are auto-created when Relay groups related tasks from your Slack, Linear, and GitHub activity. Each project collects tasks, context links, and progress across the workflow stages.
+            </Text>
+            {projects.length > 0 && (() => {
+              const allTasks = projects.flatMap(p => p.tasks.map(id => notifByTaskId.get(id)).filter(Boolean) as NotificationItem[]);
+              const active = allTasks.filter(n => n.stage && !["done", "skipped", "new"].includes(n.stage));
+              const done = allTasks.filter(n => n.stage === "done");
+              return (
+                <Text size="xs" fw={500} mt={8} pt={8} style={{ borderTop: "1px solid var(--aegen-glass-border)", lineHeight: 1.6 }}>
+                  {projects.length} project{projects.length !== 1 ? "s" : ""} · {allTasks.length} tasks ({done.length} done, {active.length} active)
+                </Text>
+              );
+            })()}
+          </div>
+
           {(() => {
             const visibleProjects = projects.filter(proj => {
               const relevantTasks = proj.tasks.filter(id => {
@@ -342,10 +362,20 @@ export default function ProjectsPage() {
             if (visibleProjects.length === 0) {
               return <EmptyState icon={IconFolder} message="No projects yet." detail="Projects are auto-created when the triage agent groups related tasks. Hit the refresh button to fetch your data." />;
             }
+            // Sort: projects with active (non-done) tasks first, all-done projects last
+            const sorted = [...visibleProjects].sort((a, b) => {
+              const aTasks = a.tasks.map(id => notifByTaskId.get(id)).filter(Boolean) as NotificationItem[];
+              const bTasks = b.tasks.map(id => notifByTaskId.get(id)).filter(Boolean) as NotificationItem[];
+              const aAllDone = aTasks.length > 0 && aTasks.every(t => t.stage === "done" || t.stage === "skipped");
+              const bAllDone = bTasks.length > 0 && bTasks.every(t => t.stage === "done" || t.stage === "skipped");
+              if (aAllDone && !bAllDone) return 1;
+              if (!aAllDone && bAllDone) return -1;
+              return 0;
+            });
+
             return (
             <Stack gap={8}>
-              {visibleProjects.map(proj => {
-                // Count all non-skipped tasks (including done)
+              {sorted.map(proj => {
                 const projNotifs = proj.tasks.map(id => notifByTaskId.get(id)).filter((n): n is NotificationItem => !!n && n.stage !== "skipped");
                 const taskCount = projNotifs.length;
                 const contextCount = proj.context.linearTickets.length + proj.context.slackChannels.length + proj.context.prs.length + proj.context.notionDocs.length;

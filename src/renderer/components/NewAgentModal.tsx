@@ -98,7 +98,7 @@ function ImportContextPanel({
         setResults([{ title: content.slice(0, 200), url: "" }]);
       }
     } catch {
-      setSearchError("Search failed. Make sure the Manager AI is connected.");
+      setSearchError("Search failed. Make sure Relay is connected.");
     } finally {
       setSearching(false);
     }

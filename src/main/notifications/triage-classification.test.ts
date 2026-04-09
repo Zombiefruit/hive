@@ -61,12 +61,12 @@ describe("Triage Classification — Type Sets", () => {
     expect(AGENT_ACTIONABLE_TYPES.has("implementation")).toBe(true);
   });
 
-  it("should have review in AGENT_ACTIONABLE_TYPES", () => {
-    expect(AGENT_ACTIONABLE_TYPES.has("review")).toBe(true);
+  it("should have review in HUMAN_ONLY_TYPES", () => {
+    expect(HUMAN_ONLY_TYPES.has("review")).toBe(true);
   });
 
-  it("should have investigation in AGENT_ACTIONABLE_TYPES", () => {
-    expect(AGENT_ACTIONABLE_TYPES.has("investigation")).toBe(true);
+  it("should have investigation in HUMAN_ONLY_TYPES", () => {
+    expect(HUMAN_ONLY_TYPES.has("investigation")).toBe(true);
   });
 
   it("should NOT have follow_up or planning as task types", () => {

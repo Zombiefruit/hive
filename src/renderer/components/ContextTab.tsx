@@ -50,11 +50,20 @@ export function ContextTab({ items, notificationLinks, onOpenUrl }: ContextTabPr
     }
   }
 
-  // Merge notification links with extracted tool links
-  const allLinks = [
+  // Merge notification links with extracted tool links, dedup by ticket/PR ID
+  const seenIds = new Set<string>();
+  const dedup = (list: Array<{ type: string; label: string; url: string }>) =>
+    list.filter(l => {
+      const idMatch = l.url.match(/([A-Z]+-\d+)|\/pull\/(\d+)|\/issues\/(\d+)/);
+      const key = idMatch ? (idMatch[1] || idMatch[2] || idMatch[3]).toUpperCase() : l.url;
+      if (seenIds.has(key)) return false;
+      seenIds.add(key);
+      return true;
+    });
+  const allLinks = dedup([
     ...(notificationLinks ?? []),
     ...links.filter(l => !(notificationLinks ?? []).some(nl => nl.url === l.url)),
-  ];
+  ]);
 
   return (
     <div style={{ padding: "16px 20px", overflowY: "auto", flex: 1 }}>

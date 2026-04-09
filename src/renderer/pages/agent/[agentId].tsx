@@ -178,7 +178,7 @@ export function AgentDetail() {
     return (
       <Stack align="center" justify="center" h="100%" gap="md">
         <Text c="dimmed">Agent not found</Text>
-        <Button variant="light" onClick={() => navigate("/")}>
+        <Button variant="light" onClick={() => navigate("/agents")}>
           Back to Dashboard
         </Button>
       </Stack>
@@ -215,7 +215,7 @@ export function AgentDetail() {
       >
         <Group justify="space-between" align="center">
           <Group gap="sm" style={{ WebkitAppRegion: "no-drag" }}>
-            <ActionIcon variant="subtle" onClick={() => navigate("/")} aria-label="Back">
+            <ActionIcon variant="subtle" onClick={() => navigate("/agents")} aria-label="Back">
               <IconArrowLeft size={16} stroke={1.5} />
             </ActionIcon>
             <Badge variant="light" color={statusColors[agent.status] ?? "gray"} size="sm">

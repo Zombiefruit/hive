@@ -670,7 +670,7 @@ export function Settings() {
             {sectionHeader(
               <IconPlug size={16} color="var(--mantine-color-teal-5)" />,
               "Integrations",
-              "Enable the sources you want Hive to monitor.",
+              "Enable the sources you want Relay to monitor.",
             )}
             <Stack gap={8}>
               {INTEGRATION_LIST.map(({ key, label, description }) => (
@@ -895,7 +895,7 @@ export function Settings() {
             {sectionHeader(
               <IconSettings size={16} color="var(--mantine-color-orange-5)" />,
               "Preferences",
-              "Configure how and when Hive works for you.",
+              "Configure how and when Relay works for you.",
             )}
             <Select
               label="Fetch cadence"

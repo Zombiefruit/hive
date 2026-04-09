@@ -166,9 +166,6 @@ if (!isElectron) {
     resumeSession: noop,
     listAllSessions: () => fetchApi("/api/sessions"),
     getNotifications: () => fetchApi("/api/notifications"),
-    dismissNotification: noop,
-    startWorkOnNotification: noop,
-    clearNotifications: noop,
     refreshNotifications: noop,
     prepareWorkPlan: noop,
     startWorkAgent: noop,
@@ -321,5 +318,34 @@ if (!isElectron) {
     onAgentStream: () => () => {},
     onApprovalRequest: () => () => {},
     onManagerStream: () => () => {},
+
+    // Orchestrator mocks
+    getOrchestratorStatus: () => Promise.resolve({ running: true, escalations: [], recentThoughts: [] }),
+    getOrchestratorThoughts: () => Promise.resolve([
+      { timestamp: new Date(Date.now() - 60000).toISOString(), thought: "Keeping an eye on 3 active tasks." },
+      { timestamp: new Date(Date.now() - 30000).toISOString(), thought: "Everything's running smoothly." },
+      { timestamp: new Date().toISOString(), thought: "New data came in. Sorting through it." },
+    ]),
+    onOrchestratorThought: (cb: (data: { timestamp: string; thought: string }) => void) => {
+      // Emit a mock thought every 8 seconds for testing
+      const thoughts = [
+        "Monitoring all active work.",
+        "Everything's quiet. Nothing new since last check.",
+        "Something new came in. Let me take a look.",
+        "Quality check passed. Good to go.",
+        "Keeping tabs on the workload.",
+        "Multiple streams in flight.",
+        "No changes. Good — means nothing's on fire.",
+      ];
+      let idx = 0;
+      const interval = setInterval(() => {
+        cb({ timestamp: new Date().toISOString(), thought: thoughts[idx % thoughts.length] });
+        idx++;
+      }, 8000);
+      // Emit one immediately
+      setTimeout(() => cb({ timestamp: new Date().toISOString(), thought: thoughts[0] }), 500);
+      return () => clearInterval(interval);
+    },
+    onOrchestratorEscalation: () => () => {},
   };
 }

@@ -207,7 +207,10 @@ function ChatContent() {
       setStreaming(true);
       try {
         await window.deck.sendManagerMessage(fullMessage);
-      } catch {
+      } finally {
+        // Always clear streaming when the IPC call completes.
+        // The stream handler should have already cleared it via message_complete,
+        // but this is a safety net in case events arrive out of order.
         setStreaming(false);
       }
     },
@@ -286,8 +289,9 @@ export function OrchestratorPanel({ thoughts, isEscalation, onClose }: Orchestra
   };
 
   const handleClose = () => {
-    setOpen(false);
+    // Always close entirely — back to orb state
     setPinned(false);
+    setOpen(false);
     onClose();
   };
 
@@ -401,8 +405,8 @@ export function OrchestratorPanel({ thoughts, isEscalation, onClose }: Orchestra
     <motion.div
       style={{
         position: "fixed",
-        bottom: 20,
-        right: 32,
+        bottom: 80,
+        right: 48,
         zIndex: 60,
         pointerEvents: "auto",
         width: PANEL_WIDTH,

@@ -1,83 +1,130 @@
 import { Badge, Group, Stack, Text, UnstyledButton, Loader, Tooltip } from "@mantine/core";
 import {
-  IconBulb, IconRefresh, IconAlertTriangle, IconTrendingUp,
+  IconBulb, IconAlertTriangle, IconTrendingUp,
   IconRocket, IconTools, IconCheck, IconX, IconExternalLink,
+  IconChevronDown, IconChevronRight,
 } from "@tabler/icons-react";
 import { useState, useEffect, useCallback } from "react";
 import { AppHeader } from "../components/AppHeader";
+import { useGlobalRefresh } from "../hooks/useGlobalRefresh";
 import type { Insight } from "../../shared/insight-types";
 
 const TYPE_CONFIG: Record<string, { label: string; color: string; Icon: React.FC<{ size?: number }> }> = {
-  feature_idea: { label: "Feature Idea", color: "blue", Icon: IconBulb },
-  customer_pain: { label: "Customer Pain", color: "red", Icon: IconAlertTriangle },
+  feature_idea: { label: "Feature", color: "blue", Icon: IconBulb },
+  customer_pain: { label: "Pain", color: "red", Icon: IconAlertTriangle },
   trend: { label: "Trend", color: "violet", Icon: IconTrendingUp },
   proactive_task: { label: "Proactive", color: "green", Icon: IconRocket },
-  optimization: { label: "Optimization", color: "orange", Icon: IconTools },
+  optimization: { label: "Optimize", color: "orange", Icon: IconTools },
 };
 
-function InsightCard({ insight, onAcknowledge, onDismiss, onConvert }: {
+const IMPACT_DOTS: Record<string, string> = {
+  high: "var(--mantine-color-red-5)",
+  medium: "var(--mantine-color-yellow-5)",
+  low: "var(--mantine-color-gray-5)",
+};
+
+/** Compact insight row — title, type dot, impact dot, and actions. Expandable for details. */
+function InsightRow({ insight, expanded, onToggle, onAcknowledge, onDismiss, onConvert }: {
   insight: Insight;
+  expanded: boolean;
+  onToggle: () => void;
   onAcknowledge: () => void;
   onDismiss: () => void;
   onConvert: () => void;
 }) {
   const config = TYPE_CONFIG[insight.type] ?? TYPE_CONFIG.feature_idea;
+  const impactColor = IMPACT_DOTS[insight.impactEstimate] ?? IMPACT_DOTS.medium;
 
   return (
     <div style={{
-      padding: "14px 16px", borderRadius: 10, marginBottom: 10,
-      background: "var(--aegen-glass-bg)",
-      backdropFilter: "var(--aegen-glass-blur)",
-      border: "1px solid var(--aegen-glass-border)",
+      borderRadius: 8, marginBottom: 4,
+      background: expanded ? "var(--aegen-glass-bg)" : "transparent",
+      border: expanded ? "1px solid var(--aegen-glass-border)" : "1px solid transparent",
+      transition: "background 0.15s ease, border 0.15s ease",
     }}>
-      <Group gap={8} mb={6} wrap="nowrap">
-        <Badge size="xs" variant="light" color={config.color} leftSection={<config.Icon size={10} />}>
+      {/* Compact row */}
+      <div
+        style={{
+          display: "flex", alignItems: "center", gap: 8,
+          padding: "8px 12px", cursor: "pointer",
+          borderRadius: 8,
+        }}
+        onClick={onToggle}
+        onMouseEnter={(e) => {
+          if (!expanded) e.currentTarget.style.backgroundColor = "var(--aegen-glass-bg)";
+        }}
+        onMouseLeave={(e) => {
+          if (!expanded) e.currentTarget.style.backgroundColor = "transparent";
+        }}
+      >
+        {/* Expand chevron */}
+        {expanded
+          ? <IconChevronDown size={12} color="var(--aegen-dust-gray)" style={{ flexShrink: 0 }} />
+          : <IconChevronRight size={12} color="var(--aegen-dust-gray)" style={{ flexShrink: 0 }} />
+        }
+
+        {/* Impact dot */}
+        <Tooltip label={`${insight.impactEstimate} impact`} position="top" withArrow>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: impactColor, flexShrink: 0 }} />
+        </Tooltip>
+
+        {/* Type badge */}
+        <Badge size="xs" variant="light" color={config.color} leftSection={<config.Icon size={9} />}
+          style={{ flexShrink: 0, fontSize: 10 }}>
           {config.label}
         </Badge>
-        <Badge size="xs" variant="light" color={insight.impactEstimate === "high" ? "red" : insight.impactEstimate === "medium" ? "yellow" : "gray"}>
-          {insight.impactEstimate} impact
-        </Badge>
+
+        {/* Title */}
+        <Text size="sm" fw={500} style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {insight.title}
+        </Text>
+
+        {/* Frequency */}
         {insight.frequency > 1 && (
-          <Badge size="xs" variant="outline" color="gray">
+          <Badge size="xs" variant="outline" color="gray" style={{ flexShrink: 0 }}>
             {insight.frequency}x
           </Badge>
         )}
-        <div style={{ flex: 1 }} />
-        <Group gap={4}>
-          <Tooltip label="Create task from this insight">
-            <UnstyledButton onClick={onConvert} style={{ padding: 4, borderRadius: 4, color: "var(--mantine-color-blue-5)" }}>
-              <IconRocket size={14} />
+
+        {/* Quick actions */}
+        <Group gap={2} style={{ flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+          <Tooltip label="Create task">
+            <UnstyledButton onClick={onConvert} style={{ padding: 3, borderRadius: 4, color: "var(--mantine-color-blue-5)" }}>
+              <IconRocket size={13} />
             </UnstyledButton>
           </Tooltip>
           <Tooltip label="Acknowledge">
-            <UnstyledButton onClick={onAcknowledge} style={{ padding: 4, borderRadius: 4, color: "var(--mantine-color-green-5)" }}>
-              <IconCheck size={14} />
+            <UnstyledButton onClick={onAcknowledge} style={{ padding: 3, borderRadius: 4, color: "var(--mantine-color-green-5)" }}>
+              <IconCheck size={13} />
             </UnstyledButton>
           </Tooltip>
           <Tooltip label="Dismiss">
-            <UnstyledButton onClick={onDismiss} style={{ padding: 4, borderRadius: 4, color: "var(--mantine-color-dimmed)" }}>
-              <IconX size={14} />
+            <UnstyledButton onClick={onDismiss} style={{ padding: 3, borderRadius: 4, color: "var(--mantine-color-dimmed)" }}>
+              <IconX size={13} />
             </UnstyledButton>
           </Tooltip>
         </Group>
-      </Group>
+      </div>
 
-      <Text size="sm" fw={600} mb={4}>{insight.title}</Text>
-      <Text size="xs" c="dimmed" lineClamp={3} mb={6}>{insight.description}</Text>
-
-      {insight.sources.length > 0 && (
-        <Group gap={6}>
-          {insight.sources.slice(0, 3).map((src, i) => (
-            <Badge
-              key={i} size="xs" variant="outline" color="gray" radius="sm"
-              style={{ cursor: src.url ? "pointer" : "default" }}
-              rightSection={src.url ? <IconExternalLink size={8} /> : undefined}
-              onClick={() => src.url && window.deck?.openExternal?.(src.url)}
-            >
-              {src.label}
-            </Badge>
-          ))}
-        </Group>
+      {/* Expanded details */}
+      {expanded && (
+        <div style={{ padding: "4px 12px 10px 32px" }}>
+          <Text size="xs" c="dimmed" mb={6}>{insight.description}</Text>
+          {insight.sources.length > 0 && (
+            <Group gap={6}>
+              {insight.sources.slice(0, 3).map((src, i) => (
+                <Badge
+                  key={i} size="xs" variant="outline" color="gray" radius="sm"
+                  style={{ cursor: src.url ? "pointer" : "default" }}
+                  rightSection={src.url ? <IconExternalLink size={8} /> : undefined}
+                  onClick={() => src.url && window.deck?.openExternal?.(src.url)}
+                >
+                  {src.label}
+                </Badge>
+              ))}
+            </Group>
+          )}
+        </div>
       )}
     </div>
   );
@@ -85,29 +132,33 @@ function InsightCard({ insight, onAcknowledge, onDismiss, onConvert }: {
 
 export default function InsightsPage() {
   const [insights, setInsights] = useState<Insight[]>([]);
-  const [localLoading, setLocalLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const { isRefreshing } = useGlobalRefresh();
   const [filter, setFilter] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Load insights on mount and whenever global refresh triggers
+  const loadInsights = useCallback(() => {
     window.deck?.getInsights?.().then((data: Insight[]) => {
       if (Array.isArray(data)) setInsights(data);
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setInitialLoading(false));
+  }, []);
+
+  useEffect(() => {
+    loadInsights();
 
     const unsub = window.deck?.onInsightsUpdate?.((data: Insight[]) => {
-      if (Array.isArray(data)) setInsights(data);
-      setLocalLoading(false);
+      // Only update if we received actual insights — never wipe existing data with empty array
+      if (Array.isArray(data) && data.length > 0) setInsights(data);
+      setInitialLoading(false);
     });
     return () => { unsub?.(); };
-  }, []);
+  }, [loadInsights]);
 
-  const handleRefresh = useCallback(async () => {
-    setLocalLoading(true);
-    try {
-      const data = await window.deck?.generateInsights?.();
-      if (Array.isArray(data)) setInsights(data);
-    } catch {}
-    setLocalLoading(false);
-  }, []);
+  // Reload when global refresh finishes
+  useEffect(() => {
+    if (!isRefreshing) loadInsights();
+  }, [isRefreshing, loadInsights]);
 
   const handleUpdateStatus = useCallback((id: string, status: string) => {
     window.deck?.updateInsight?.(id, { status });
@@ -124,27 +175,54 @@ export default function InsightsPage() {
     .filter(i => i.status === "new" || i.status === "acknowledged")
     .filter(i => !filter || i.type === filter)
     .sort((a, b) => {
-      // Sort by impact (high first), then by relevance score (highest first)
       const impactDiff = (IMPACT_ORDER[a.impactEstimate] ?? 1) - (IMPACT_ORDER[b.impactEstimate] ?? 1);
       if (impactDiff !== 0) return impactDiff;
       return b.relevanceScore - a.relevanceScore;
     });
 
+  // Group by impact for section headers
+  const high = filtered.filter(i => i.impactEstimate === "high");
+  const medium = filtered.filter(i => i.impactEstimate === "medium");
+  const low = filtered.filter(i => i.impactEstimate === "low");
+
+  const renderGroup = (items: Insight[]) => items.map(insight => (
+    <InsightRow
+      key={insight.id}
+      insight={insight}
+      expanded={expandedId === insight.id}
+      onToggle={() => setExpandedId(expandedId === insight.id ? null : insight.id)}
+      onAcknowledge={() => handleUpdateStatus(insight.id, "acknowledged")}
+      onDismiss={() => handleUpdateStatus(insight.id, "dismissed")}
+      onConvert={() => handleConvert(insight.id)}
+    />
+  ));
+
   const filterTypes = Object.entries(TYPE_CONFIG);
+
+  // Compute top trends for the summary card
+  const topTrends: string[] = [];
+  if (filtered.length > 0) {
+    if (high.length > 0) {
+      const topHigh = high[0];
+      topTrends.push(`${high.length} high-impact finding${high.length !== 1 ? "s" : ""} — top: "${topHigh.title}"`);
+    }
+    const typeCounts = Object.entries(
+      filtered.reduce<Record<string, number>>((acc, i) => { acc[i.type] = (acc[i.type] ?? 0) + 1; return acc; }, {}),
+    ).sort((a, b) => b[1] - a[1]);
+    if (typeCounts.length > 0) {
+      topTrends.push(`Most common: ${typeCounts.slice(0, 2).map(([t, c]) => `${TYPE_CONFIG[t]?.label ?? t} (${c})`).join(", ")}`);
+    }
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--aegen-void)" }}>
       <AppHeader rightContent={
-        <UnstyledButton
-          onClick={handleRefresh}
-          disabled={localLoading}
-          style={{ padding: "4px 12px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 500, backgroundColor: "var(--mantine-color-blue-5)", color: "white", opacity: localLoading ? 0.6 : 1 }}
-        >
+        isRefreshing ? (
           <Group gap={6}>
-            {localLoading ? <Loader size={12} color="white" /> : <IconRefresh size={12} />}
-            {localLoading ? "Scanning..." : "Refresh"}
+            <Loader size={12} />
+            <Text size="xs" c="dimmed">Refreshing...</Text>
           </Group>
-        </UnstyledButton>
+        ) : undefined
       } />
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", paddingTop: 8 }}>
@@ -162,6 +240,7 @@ export default function InsightsPage() {
           </UnstyledButton>
           {filterTypes.map(([key, cfg]) => {
             const count = insights.filter(i => i.type === key && (i.status === "new" || i.status === "acknowledged")).length;
+            if (count === 0) return null;
             return (
               <UnstyledButton
                 key={key}
@@ -178,33 +257,65 @@ export default function InsightsPage() {
           })}
         </Group>
 
+        {/* Explainer + trends card */}
+        <div style={{
+          padding: "12px 14px", borderRadius: 8, marginBottom: 12,
+          background: "var(--aegen-glass-bg)", border: "1px solid var(--aegen-glass-border)",
+        }}>
+          <Text size="xs" c="dimmed" style={{ lineHeight: 1.6 }}>
+            Relay scans your Slack channels, Linear tickets, and Gong calls to surface proactive insights — feature ideas, customer pain points, emerging trends, and optimization opportunities. Click Refresh to scan now, or insights update automatically each poll cycle.
+          </Text>
+          {topTrends.length > 0 && (
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--aegen-glass-border)" }}>
+              {topTrends.map((t, i) => (
+                <Text key={i} size="xs" fw={500} style={{ lineHeight: 1.6 }}>{t}</Text>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Loading state */}
+        {(initialLoading || isRefreshing) && filtered.length === 0 && (
+          <Stack align="center" py="xl" gap="sm">
+            <Loader size={24} />
+            <Text size="sm" c="dimmed">{isRefreshing ? "Scanning sources..." : "Loading insights..."}</Text>
+          </Stack>
+        )}
+
         {/* Empty state */}
-        {filtered.length === 0 && !localLoading && (
+        {filtered.length === 0 && !isRefreshing && !initialLoading && (
           <Stack align="center" py="xl" gap="sm">
             <IconBulb size={32} color="var(--aegen-dust-gray)" />
             <Text size="sm" c="dimmed">No insights yet.</Text>
-            <Text size="xs" c="dimmed">Click Refresh to scan your Slack channels, Gong calls, and Linear for proactive ideas.</Text>
+            <Text size="xs" c="dimmed">Click Refresh to scan sources.</Text>
           </Stack>
         )}
 
-        {/* Local loading state — only for page-specific "Refresh" action */}
-        {localLoading && filtered.length === 0 && (
-          <Stack align="center" py="xl" gap="sm">
-            <Loader size={24} />
-            <Text size="sm" c="dimmed">Scanning sources for insights...</Text>
-          </Stack>
+        {/* Grouped by impact */}
+        {high.length > 0 && (
+          <>
+            <Text size="xs" fw={700} c="red.5" mb={4} mt={4} style={{ textTransform: "uppercase", letterSpacing: "0.5px", fontSize: 10 }}>
+              High Impact ({high.length})
+            </Text>
+            {renderGroup(high)}
+          </>
         )}
-
-        {/* Insight cards */}
-        {filtered.map(insight => (
-          <InsightCard
-            key={insight.id}
-            insight={insight}
-            onAcknowledge={() => handleUpdateStatus(insight.id, "acknowledged")}
-            onDismiss={() => handleUpdateStatus(insight.id, "dismissed")}
-            onConvert={() => handleConvert(insight.id)}
-          />
-        ))}
+        {medium.length > 0 && (
+          <>
+            <Text size="xs" fw={700} c="yellow.5" mb={4} mt={8} style={{ textTransform: "uppercase", letterSpacing: "0.5px", fontSize: 10 }}>
+              Medium Impact ({medium.length})
+            </Text>
+            {renderGroup(medium)}
+          </>
+        )}
+        {low.length > 0 && (
+          <>
+            <Text size="xs" fw={700} c="dimmed" mb={4} mt={8} style={{ textTransform: "uppercase", letterSpacing: "0.5px", fontSize: 10 }}>
+              Low Impact ({low.length})
+            </Text>
+            {renderGroup(low)}
+          </>
+        )}
       </div>
     </div>
   );

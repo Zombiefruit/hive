@@ -24,7 +24,7 @@ Return a JSON object with FOUR arrays:
   "source": "slack|linear|github|notion|email",
   "priority": "critical|high|medium|low|backlog",
   "confidence": 1-10,
-  "task_type": "implementation|review|response|investigation|planning|meeting_prep|follow_up",
+  "task_type": "implementation|review|response|investigation|meeting_prep",
   "title": "Short descriptive title",
   "summary": "What this is and why it matters",
   "links": [{"type": "slack_thread|slack_dm|linear|github_pr|notion", "label": "#channel or ticket ID", "url": "https://..."}],
@@ -40,7 +40,7 @@ Return a JSON object with FOUR arrays:
   "existing_id": "poll-xxx-xxxx",
   "changes": {
     "priority": "high",
-    "stage": "working",
+    "stage": "done",
     "action_needed": "review and merge",
     "url": "https://...",
     "links": [{"type": "...", "label": "...", "url": "..."}]
@@ -52,7 +52,7 @@ Return a JSON object with FOUR arrays:
 - **timeline_event**: SHORT (1 line) status update describing what changed since last check. Examples: "Jane replied in DM asking for ETA", "PR approved by 2 reviewers", "Ticket moved to In Review". This builds a history log on the task.
 - Do NOT overwrite "summary" — that's the original description. Use timeline_event for progress.
 - You CAN and SHOULD update "url" and "links" when: (a) existing ones are broken, (b) you have better URLs from the raw data, or (c) you're adding a timeline_event that references a Slack DM/thread — include its permalink in "links" so the planning agent can fetch context from it.
-- Valid stages: new, follow_up, planning, prepared, working, backlog, done
+- Valid stages for updates: done, skipped, backlog (triage can only set terminal stages — workflow transitions are user-initiated)
 
 ## Projects Array (NEW)
 

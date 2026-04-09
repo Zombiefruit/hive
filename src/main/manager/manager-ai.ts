@@ -174,7 +174,21 @@ When ${userName} asks you to change a task's priority, mark it done, or change i
 include a JSON action block in your response (on its own line):
 {"action": "update_task", "task_title": "partial title match", "changes": {"priority": "low", "stage": "done", "confidence": 3}}
 
-Valid changes: priority (critical/high/medium/low/backlog), stage (new/follow_up/planning/working/backlog/done), confidence (1-10), status (done/dismissed)
+Valid changes: priority (critical/high/medium/low/backlog), stage (new/start_work/plan_review/hack/ship/code_review/pr_feedback/preparing/ready/backlog/done/skipped), confidence (1-10), status (done/dismissed)
+
+Stage descriptions:
+- new = inbox, untriaged
+- start_work = planning (agent tasks)
+- plan_review = plan ready for user review
+- hack = actively coding
+- ship = creating PR
+- code_review = awaiting review
+- pr_feedback = addressing review feedback
+- preparing = planning (human tasks: response, meeting_prep, review)
+- ready = human task planned, ready to execute
+- backlog = deprioritized
+- done = completed
+- skipped = not actionable
 
 Priority levels:
 - critical = do it NOW, direct ask from manager, blocking others

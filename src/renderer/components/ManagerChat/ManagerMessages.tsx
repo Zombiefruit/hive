@@ -88,10 +88,10 @@ export function ManagerMessages({ onSuggestedPrompt }: ManagerMessagesProps) {
     return (
       <Stack align="center" justify="center" gap="md" p="xl" style={{ flex: 1 }}>
         <Text size="lg" fw={600} c="dimmed">
-          Manager AI
+          Relay
         </Text>
         <Text size="sm" c="dimmed" ta="center">
-          I orchestrate your Claude Code agents. Ask me anything.
+          Your AI engineering manager. Ask me anything about your work.
         </Text>
         <Stack gap="xs" w="100%" maw={300}>
           {SUGGESTED_PROMPTS.map((prompt) => (

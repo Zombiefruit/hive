@@ -9,6 +9,7 @@
 
 import { describe, it, expect } from "vitest";
 import { AGENT_ACTIONABLE_TYPES, HUMAN_ONLY_TYPES, VALID_STAGES, STAGE_ORDER } from "../../shared/task-utils";
+import { isHumanTask } from "../../shared/stage-machine";
 
 const ALL_TASK_TYPES = new Set([...AGENT_ACTIONABLE_TYPES, ...HUMAN_ONLY_TYPES]);
 
@@ -17,12 +18,12 @@ describe("Task Type Coverage", () => {
     expect(AGENT_ACTIONABLE_TYPES.has("implementation")).toBe(true);
   });
 
-  it("should have review in agent actionable", () => {
-    expect(AGENT_ACTIONABLE_TYPES.has("review")).toBe(true);
+  it("should have review in human only (user reviews, not agent)", () => {
+    expect(HUMAN_ONLY_TYPES.has("review")).toBe(true);
   });
 
-  it("should have investigation in agent actionable", () => {
-    expect(AGENT_ACTIONABLE_TYPES.has("investigation")).toBe(true);
+  it("should have investigation in human only (user researches)", () => {
+    expect(HUMAN_ONLY_TYPES.has("investigation")).toBe(true);
   });
 
   it("should have response in human only", () => {
@@ -85,12 +86,15 @@ describe("Normalization Rules", () => {
     expect(normalize("new")).toBe("new");
   });
 
-  it("response task in start_work stage should normalize to preparing", () => {
+  it("human task in start_work stage should normalize to preparing", () => {
+    // Uses isHumanTask to determine the normalization — single source of truth
     const normalize = (taskType: string, stage: string) => {
-      if ((taskType === "response" || taskType === "meeting_prep") && stage === "start_work") return "preparing";
+      if (isHumanTask(taskType) && stage === "start_work") return "preparing";
       return stage;
     };
     expect(normalize("response", "start_work")).toBe("preparing");
+    expect(normalize("review", "start_work")).toBe("preparing");
+    expect(normalize("investigation", "start_work")).toBe("preparing");
     expect(normalize("implementation", "start_work")).toBe("start_work"); // unchanged
     expect(normalize("response", "new")).toBe("new"); // unchanged
   });

@@ -15,7 +15,13 @@ You are a response preparation agent. Your job is to fetch context and suggest r
 
 ## Instructions
 
-1. **Fetch context** from the links above using your MCP tools (Slack threads, Linear issues, etc.)
+1. **Fetch context** from the links above using your MCP tools (Slack threads, Linear issues, GitHub PRs, etc.)
+
+   **If any link is a GitHub PR**, check its status FIRST:
+   - Use `gh pr view <number> --repo <owner/repo>` to get: state (open/closed/merged), review status (approved/changes-requested/pending), checks status, merge conflicts
+   - If the PR is already approved and checks pass, the action is "merge" not "nudge reviewers"
+   - If the PR has changes requested, the action is to address the feedback
+   - Include PR status summary in your key points
 
    **CRITICAL — Slack "Also send to channel" replies are invisible to the thread API.** You MUST use all three methods below, every time:
 

@@ -16,8 +16,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 const PAGES = [
-  { path: "#/", label: "Agents" },
-  { path: "#/notifications", label: "Inbox" },
+  { path: "#/", label: "Inbox" },
+  { path: "#/agents", label: "Agents" },
   { path: "#/projects", label: "Projects" },
   { path: "#/schedule", label: "Schedule" },
   { path: "#/reflect", label: "Reflect" },
@@ -25,7 +25,6 @@ const PAGES = [
   { path: "#/memories", label: "Memories" },
   { path: "#/context", label: "Context" },
   { path: "#/usage", label: "Usage" },
-  { path: "#/architecture", label: "Pipeline" },
   { path: "#/settings", label: "Settings" },
 ];
 

@@ -247,6 +247,18 @@ export function createBridge(label: string, model = "claude-opus-4-6[1m]"): Brid
         log(`[${label}] STDERR: ${chunk.toString("utf-8").slice(0, 200)}`);
       });
 
+      // Send an initial no-op message to trigger Claude Code initialization.
+      // Without this, --input-format stream-json waits for the first message
+      // before emitting the system/init event (same deadlock as skill-runner had).
+      bridgeProcess.stdin?.write(
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: "Initialize. Respond with 'ready'." },
+          parent_tool_use_id: null,
+          session_id: "",
+        }) + "\n",
+      );
+
       const startGen = generation;
       bridgeProcess.on("exit", (code) => {
         if (bridgeProcess?.pid) untrackProcess(bridgeProcess.pid);
@@ -394,7 +406,7 @@ export interface PlanningEvent {
  */
 export function askMcpPlanningAgent(
   prompt: string,
-  timeoutMs = 300000,
+  _timeoutMs?: number, // DEPRECATED — kept for signature compat; inactivity timeout used instead
   onEvent?: (event: PlanningEvent) => void,
   model = "claude-opus-4-6[1m]",
 ): Promise<string> {
@@ -449,21 +461,55 @@ export function askMcpPlanningAgent(
     }, 10000);
     const startTs = Date.now();
 
-    const timeout = setTimeout(() => {
-      if (!done) {
+    // Two-phase timeout:
+    // Phase 1 (init): 5 min hard limit for MCP tool loading. If init never completes, kill.
+    // Phase 2 (working): 120s inactivity limit. If agent stops producing output, kill.
+    const INIT_TIMEOUT_MS = 120_000; // 120s for tool loading (normally ~10s, but can be slower on cold start)
+    const INACTIVITY_LIMIT_MS = 120_000; // 2 min silence after init = hung
+    let lastActivityTs = Date.now();
+    let inactivityCheck: ReturnType<typeof setInterval> | null = null;
+
+    // Phase 1: init timeout — kill if tools never finish loading
+    const initTimeout = setTimeout(() => {
+      if (!initialized && !done) {
         done = true;
         clearInterval(initTicker);
         if (proc.pid) untrackProcess(proc.pid);
-        addDebugEntry("out", `⏱️ [PLANNING] Timed out after ${Math.round(timeoutMs / 1000)}s (${bytesReceived} bytes received)`, "planning");
-        log(`[planning] Timed out after ${Math.round(timeoutMs / 1000)}s`);
-        emit("error", `Timed out after ${Math.round(timeoutMs / 1000)}s`);
+        const elapsed = Math.round((Date.now() - startTs) / 1000);
+        addDebugEntry("out", `⏱️ [PLANNING] MCP init never completed after ${elapsed}s — killing`, "planning");
+        log(`[planning] Init timeout: tools never loaded after ${elapsed}s`);
+        emit("error", `MCP tools failed to load after ${elapsed}s. Check MCP server connectivity.`);
         proc.kill();
-        resolve(resultText || "Request timed out");
+        resolve("MCP tools failed to load — check server connectivity");
       }
-    }, timeoutMs);
+    }, INIT_TIMEOUT_MS);
+
+    // Phase 2: starts after init — inactivity detection
+    const startInactivityTimer = () => {
+      if (inactivityCheck) return;
+      clearTimeout(initTimeout); // init succeeded, cancel init timeout
+      lastActivityTs = Date.now();
+      inactivityCheck = setInterval(() => {
+        if (done) return;
+        const silentMs = Date.now() - lastActivityTs;
+        if (silentMs >= INACTIVITY_LIMIT_MS) {
+          done = true;
+          clearInterval(initTicker);
+          if (inactivityCheck) clearInterval(inactivityCheck);
+          if (proc.pid) untrackProcess(proc.pid);
+          const elapsed = Math.round((Date.now() - startTs) / 1000);
+          addDebugEntry("out", `⏱️ [PLANNING] No activity for ${Math.round(silentMs / 1000)}s after init — killing (total ${elapsed}s, ${bytesReceived} bytes)`, "planning");
+          log(`[planning] Inactivity timeout: ${Math.round(silentMs / 1000)}s silent after init, total ${elapsed}s`);
+          emit("error", `Agent unresponsive for ${Math.round(silentMs / 1000)}s — killed`);
+          proc.kill();
+          resolve(resultText || assistantText || "Agent became unresponsive");
+        }
+      }, 10000);
+    };
 
     proc.stdout?.on("data", (chunk: Buffer) => {
       bytesReceived += chunk.length;
+      lastActivityTs = Date.now(); // Reset inactivity timer on any output
       outputBuffer += chunk.toString("utf-8");
       const lines = outputBuffer.split("\n");
       outputBuffer = lines.pop() ?? "";
@@ -479,6 +525,7 @@ export function askMcpPlanningAgent(
             addDebugEntry("out", `🔧 [PLANNING] MCP agent initialized: ${tools.length} tools (${mcpCount} MCP)`, "planning");
             log(`[planning] Initialized: ${tools.length} tools, ${mcpCount} MCP`);
             emit("init", `Agent ready — ${tools.length} tools (${mcpCount} MCP connectors)`);
+            startInactivityTimer();
           }
           if (msg.type === "assistant" && Array.isArray(msg.message?.content)) {
             for (const block of msg.message.content as Array<{ type: string; name?: string; text?: string; input?: Record<string, unknown> }>) {
@@ -500,20 +547,12 @@ export function askMcpPlanningAgent(
           }
           if (msg.type === "result" && !done) {
             resultText = String(msg.result ?? "");
-            // Use accumulated assistant text if result is empty (common with MCP agents)
             const finalText = resultText.trim() || assistantText.trim();
 
-            // Check if this is a REAL final result with plan content, or a premature
-            // result from an intermediate turn. MCP agents do multi-turn tool calling
-            // and can emit empty/partial results before the plan is ready.
-            const hasPlanContent = finalText.includes("---") && finalText.length > 200;
-            if (!hasPlanContent && finalText.length < 200) {
-              // Premature result — agent is still working. Keep waiting.
-              log(`[planning] Ignoring premature result (${finalText.length} chars, no plan markers)`);
-              emit("status", `Agent still working... (${finalText.length} chars so far)`);
-              // Don't resolve — wait for process to continue or exit
-              return;
-            }
+            // Always accept the result — Claude Code's `result` message is final.
+            // Previous code filtered short results as "premature", but this was wrong:
+            // it silently swallowed errors like "Prompt is too long" and left the
+            // process hanging until timeout killed it.
 
             addDebugEntry("out", `✅ [PLANNING] Result: ${finalText.length} chars (result=${resultText.length}, assistant=${assistantText.length})`, "planning");
             log(`[planning] Result: ${finalText.length} chars (result=${resultText.length}, assistant=${assistantText.length})`);
@@ -532,7 +571,8 @@ export function askMcpPlanningAgent(
             } catch {}
             done = true;
             clearInterval(initTicker);
-            clearTimeout(timeout);
+            clearTimeout(initTimeout);
+            if (inactivityCheck) clearInterval(inactivityCheck);
             if (proc.pid) untrackProcess(proc.pid);
             proc.kill();
             resolve(finalText);
@@ -541,13 +581,21 @@ export function askMcpPlanningAgent(
       }
     });
 
-    proc.stderr?.on("data", () => {});
+    proc.stderr?.on("data", (chunk: Buffer) => {
+      const text = chunk.toString("utf-8").trim();
+      if (!text) return;
+      log(`[planning] STDERR: ${text.slice(0, 200)}`);
+      if (!initialized && !done) {
+        emit("status", text.slice(0, 120));
+      }
+    });
     proc.on("exit", (code) => {
       clearInterval(initTicker);
+      clearTimeout(initTimeout);
+      if (inactivityCheck) clearInterval(inactivityCheck);
       if (proc.pid) untrackProcess(proc.pid);
       if (!done) {
         done = true;
-        clearTimeout(timeout);
         const finalText = resultText.trim() || assistantText.trim();
         addDebugEntry("out", `🛑 [PLANNING] Exited (code=${code}, bytes=${bytesReceived}, text=${finalText.length})`, "planning");
         log(`[planning] Exited code=${code}, bytes=${bytesReceived}, text=${finalText.length}`);
@@ -608,7 +656,8 @@ export function askEphemeralProcess(prompt: string, timeoutMs = 180000, model = 
     proc.stdout?.on("data", (chunk: Buffer) => {
       bytesReceived += chunk.length;
       outputBuffer += chunk.toString("utf-8");
-      const lines = outputBuffer.split("\n");
+      const normalized = outputBuffer.replace(/\}\s*\{/g, "}\n{");
+      const lines = normalized.split("\n");
       outputBuffer = lines.pop() ?? "";
       for (const line of lines) {
         if (!line.trim()) continue;
@@ -644,7 +693,9 @@ export function askEphemeralProcess(prompt: string, timeoutMs = 180000, model = 
       }
     });
 
-    proc.stderr?.on("data", () => {});
+    proc.stderr?.on("data", (chunk: Buffer) => {
+      log(`[ephemeral] STDERR: ${chunk.toString("utf-8").trim().slice(0, 200)}`);
+    });
     proc.on("exit", (code) => {
       if (proc.pid) untrackProcess(proc.pid);
       if (!done) {

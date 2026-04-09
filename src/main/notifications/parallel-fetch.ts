@@ -38,8 +38,23 @@ export interface SourceProgress {
 
 // ── Per-source prompt builder ──
 
-const FETCH_WRAPPER = (section: string, cutoff: string) =>
-  `Fetch data from this source. Execute all API calls — do not skip any.\n\n${section}\n\nRULES:\n- Only include data from after ${cutoff}\n- Return ALL results as plain text, organized with ## headers\n- Be thorough and complete — include everything relevant\n- NEVER add commentary like "Let me compile..." — return ONLY the data itself`;
+const FETCH_AND_SUMMARIZE = (source: string, section: string, cutoff: string, userName: string) =>
+  `You are a data-fetching agent for ${userName}. Fetch data from ${source}, then SUMMARIZE your findings.
+
+${section}
+
+RULES:
+- Only include data from after ${cutoff}
+- Execute ALL listed API calls — do not skip any
+- After fetching, produce a STRUCTURED SUMMARY (not raw data) organized as:
+  ## ${source.toUpperCase()} Summary
+  ### Items needing ${userName}'s attention
+  - [item]: who needs what, link/thread reference, urgency
+  ### FYI / informational
+  - [item]: brief description
+- Each item should be 1-2 lines max with enough context for triage
+- Include thread IDs, channel names, ticket numbers — triage needs these to create tasks
+- Do NOT return raw message dumps. Summarize and prioritize.`;
 
 export function buildSourcePrompt(source: SourceName, config: SourceFetchConfig): string {
   const { hours, cutoffStr } = config;
@@ -47,7 +62,7 @@ export function buildSourcePrompt(source: SourceName, config: SourceFetchConfig)
 
   switch (source) {
     case "slack": {
-      const slackLimit = 100;
+      const slackLimit = 50;
       const channelList = config.channels
         .map(ch => `- slack_read_channel: channel_id "${ch.id}" (${ch.name}), limit ${slackLimit}`)
         .join("\n");
@@ -65,7 +80,7 @@ export function buildSourcePrompt(source: SourceName, config: SourceFetchConfig)
         CHANNEL_LIST: channelList,
         SLACK_BASE_URL: config.slackBaseUrl,
       });
-      return FETCH_WRAPPER(`## SLACK\n${slackSearches}\n${channelList}\n${slackSkill}`, cutoffStr);
+      return FETCH_AND_SUMMARIZE("Slack", `## SLACK\n${slackSearches}\n${channelList}\n${slackSkill}`, cutoffStr, config.userName);
     }
 
     case "linear": {
@@ -76,14 +91,14 @@ export function buildSourcePrompt(source: SourceName, config: SourceFetchConfig)
         TEAM_NAME: config.teamName ?? "Vector",
         LINEAR_TEAM_LIMIT: String(Math.round(linearLimit / 2)),
       });
-      return FETCH_WRAPPER(`## LINEAR\n${linearSkill}`, cutoffStr);
+      return FETCH_AND_SUMMARIZE("Linear", `## LINEAR\n${linearSkill}`, cutoffStr, config.userName);
     }
 
     case "calendar": {
       const calSkill = loadSkillTemplate("fetch-calendar", {
         CURRENT_TIME: new Date().toISOString(),
       });
-      return FETCH_WRAPPER(`## CALENDAR\n${calSkill}`, cutoffStr);
+      return FETCH_AND_SUMMARIZE("Calendar", `## CALENDAR\n${calSkill}`, cutoffStr, config.userName);
     }
 
     case "gmail": {
@@ -92,14 +107,14 @@ export function buildSourcePrompt(source: SourceName, config: SourceFetchConfig)
         GMAIL_NEWER: hours <= 24 ? "1d" : hours <= 48 ? "2d" : "7d",
         GMAIL_LIMIT: String(gmailLimit),
       });
-      return FETCH_WRAPPER(`## GMAIL\n${gmailSkill}`, cutoffStr);
+      return FETCH_AND_SUMMARIZE("Gmail", `## GMAIL\n${gmailSkill}`, cutoffStr, config.userName);
     }
 
     case "notion": {
       const notionSkill = loadSkillTemplate("fetch-notion", {
         USER_NAME: config.userName,
       });
-      return FETCH_WRAPPER(`## NOTION\n${notionSkill}`, cutoffStr);
+      return FETCH_AND_SUMMARIZE("Notion", `## NOTION\n${notionSkill}`, cutoffStr, config.userName);
     }
   }
 }

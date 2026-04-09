@@ -55,7 +55,7 @@ export async function runSetupAgent(
   });
 
   try {
-    const response = await askMcpPlanningAgent(prompt, 300000, (event: PlanningEvent) => {
+    const response = await askMcpPlanningAgent(prompt, undefined, (event: PlanningEvent) => {
       if (event.type === "tool_use") {
         const toolMatch = event.content.match(/Tool:\s*(\S+)/);
         if (toolMatch) {

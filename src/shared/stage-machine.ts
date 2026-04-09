@@ -23,11 +23,11 @@ export const STAGE_ACTIONS: Record<string, StageAction> = {
   new:          { label: "Inbox", ctaLabel: "Move to Planning" },
   start_work:   { skill: "/start-work", label: "Planning", inProgress: true },
   plan_review:  { label: "Plan Review", ctaLabel: "Approve & Start" },
-  hack:         { skill: "/hack", label: "Hacking", inProgress: true },
-  ship:         { skill: "/ship", label: "Shipping", inProgress: true },
-  code_review:  { skill: "/code-review", label: "Reviewing", inProgress: true },
-  pr_feedback:  { skill: "/handle-pr-feedback", label: "Fixing Feedback", inProgress: true },
-  preparing:    { usePlanAgent: true, label: "Preparing", inProgress: true },
+  hack:         { skill: "/hack", label: "Hacking", inProgress: true, ctaLabel: "Ship" },
+  ship:         { skill: "/ship", label: "Shipping", inProgress: true, ctaLabel: "Run Agent Review" },
+  code_review:  { skill: "/code-review", label: "Agent Review", inProgress: true, ctaLabel: "Fix Feedback" },
+  pr_feedback:  { skill: "/handle-pr-feedback", label: "Fixing Feedback", inProgress: true, ctaLabel: "Mark Done" },
+  preparing:    { usePlanAgent: true, label: "Preparing", ctaLabel: "Mark Ready" },
   ready:        { label: "Ready", ctaLabel: "Mark Done" },
   done:         { skill: "/done", label: "Done" },
   backlog:      { label: "Backlog" },
@@ -40,7 +40,7 @@ const AGENT_TRACK = ["new", "start_work", "plan_review", "hack", "ship", "code_r
 const HUMAN_TRACK = ["new", "preparing", "ready", "done"];
 
 export function isHumanTask(taskType?: string): boolean {
-  return taskType === "response" || taskType === "meeting_prep";
+  return taskType === "response" || taskType === "meeting_prep" || taskType === "review" || taskType === "investigation";
 }
 
 /** Get the ordered track for a task type. */
@@ -82,8 +82,8 @@ export function getStageCTA(currentStage: string, taskType?: string): { label: s
  * plus backlog/done/skipped from anywhere.
  */
 export function canDropTo(from: string, to: string, taskType?: string): boolean {
-  // Always allowed targets
-  if (to === "backlog" || to === "done" || to === "skipped") return true;
+  // Always allowed targets (new = reset, backlog = archive, done = complete, skipped = dismiss)
+  if (to === "new" || to === "backlog" || to === "done" || to === "skipped") return true;
   // Same stage = no-op
   if (from === to) return false;
 
@@ -97,8 +97,11 @@ export function canDropTo(from: string, to: string, taskType?: string): boolean 
   // Allow one step forward
   if (toIdx === fromIdx + 1) return true;
 
-  // Special: plan_review→hack (plan_review is between start_work and hack in the track)
+  // Planning → hack: plan_review is between start_work and hack in the track,
+  // and both plan_review and start_work display in the same "Planning" column.
+  // Allow both to move to hack (user approves the plan).
   if (from === "plan_review" && to === "hack") return true;
+  if (from === "start_work" && to === "hack") return true;
 
   // Specific backward transitions that make sense:
   // hack → start_work: go back to revise/redo the plan

@@ -11,11 +11,11 @@ import {
   insertInsight, getInsights as dbGetInsights, updateInsight as dbUpdateInsight,
   upsertInsightSource, getInsightSources,
 } from "../db/database";
-import { getRelevantMemories, formatMemoriesForPrompt } from "../memory/service";
 import { addMemory } from "../memory/store";
 import { randomUUID } from "node:crypto";
 import { BrowserWindow } from "electron";
 import type { Insight, InsightSource } from "../../shared/insight-types";
+import { loadBusinessContextSummary } from "../business-context";
 
 let isGenerating = false;
 
@@ -40,30 +40,29 @@ export async function generateInsights(
       .sort((a, b) => b.usefulness - a.usefulness)
       .slice(0, 10);
 
-    // Get relevant memories for context
-    const memories = await getRelevantMemories(
-      "Proactive insights: feature ideas, customer pain points, trends, business priorities",
-      "shared",
-      10,
-    ).catch(() => []);
-    const memorySection = formatMemoriesForPrompt(memories);
-
-    // Build the insights extraction prompt
+    // Build the insights extraction prompt — keep it lean.
+    // The agent has full MCP tool access (Slack, Linear, Gong, Notion).
+    // We provide minimal orientation; it fetches details via tools.
     const skill = loadSkills(["extract-insights"]);
     const channelContext = topChannels.length > 0
       ? `\n## Channels to prioritize (by learned usefulness)\n${topChannels.map(c => `- #${c.channelName} (usefulness: ${c.usefulness.toFixed(2)})`).join("\n")}\n`
       : "";
 
+    // Brief business context summary (Haiku-generated, ~400 chars)
+    const summary = loadBusinessContextSummary();
+    const contextSection = summary ? `\n## Business Context\n${summary}\n` : "";
+
     const prompt = `${skill}
 
 ## Context
 You are scanning data sources for ${userName} to identify proactive insights.
-${channelContext}
-${memorySection ? `\n${memorySection}\n` : ""}
+${channelContext}${contextSection}
+
 ## Instructions
-1. Search Slack channels for feature discussions, customer feedback, pain points, and team trends. Focus on channels with product, customer, or engineering discussions. Look especially at #customer-intel if it exists.
+Use your MCP tools to scan sources. Do NOT rely on pre-loaded context — fetch live data:
+1. Search Slack channels for feature discussions, customer feedback, pain points, and team trends.
 2. If Gong is available, check recent call summaries for customer themes.
-3. Check Linear for ticket patterns — are certain areas getting repeated bugs? Are there stalled projects?
+3. Check Linear for ticket patterns — repeated bugs, stalled projects.
 
 Scan broadly but filter aggressively. Only surface genuinely useful insights.
 
@@ -71,7 +70,7 @@ Return your insights as a JSON array.`;
 
     onProgress?.("Analyzing sources with AI...");
 
-    const response = await askMcpPlanningAgent(prompt, 180000, (event) => {
+    const response = await askMcpPlanningAgent(prompt, undefined, (event) => {
       if (event.type === "tool_use") {
         onProgress?.(`Scanning: ${event.content.slice(0, 80)}`);
       }
@@ -137,14 +136,15 @@ Return your insights as a JSON array.`;
     addDebugEntry("out", `💡 [INSIGHTS] Generated ${insights.length} insights`, "insights");
     onProgress?.(`Found ${insights.length} insights`);
 
-    // Broadcast to UI
+    // Broadcast ALL insights from DB to UI (not just new ones)
+    const allInsights = getStoredInsights();
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) {
-        win.webContents.send("insights:update", insights);
+        win.webContents.send("insights:update", allInsights);
       }
     }
 
-    return insights;
+    return allInsights;
   } catch (err) {
     addDebugEntry("out", `❌ [INSIGHTS] Error: ${String(err).slice(0, 100)}`, "insights");
     return [];

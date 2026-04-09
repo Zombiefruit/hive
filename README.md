@@ -1,4 +1,4 @@
-# Hive
+# Relay
 
 An autonomous engineering manager built on Electron. Monitors your work channels (Slack, Linear, Gmail, GitHub, Calendar, Notion), triages incoming items with AI priority classification, groups tasks into projects, designs your daily schedule, and spawns Claude Code agents to execute the actionable ones.
 
@@ -13,8 +13,8 @@ An autonomous engineering manager built on Electron. Monitors your work channels
 
 ```bash
 # Clone and install
-git clone https://github.com/kieranwilliams/hive.git
-cd hive
+git clone https://github.com/kieranwilliams/relay.git
+cd relay
 pnpm install
 
 # Run in development
@@ -41,7 +41,7 @@ pnpm run package
 pnpm run make
 ```
 
-The `.zip` will be in `out/make/zip/`. Share it directly -- the recipient unzips, moves Hive.app to Applications, and runs it.
+The `.zip` will be in `out/make/zip/`. Share it directly -- the recipient unzips, moves Relay.app to Applications, and runs it.
 
 **Note:** The app is unsigned, so macOS will show a Gatekeeper warning on first launch. The recipient needs to right-click > Open (or System Settings > Privacy > Open Anyway).
 
@@ -84,11 +84,11 @@ pnpm run dev:clean
 
 ## Configuration
 
-Config is stored at `~/Library/Application Support/hive/config.json`. Edit via Settings page or manually.
+Config is stored at `~/Library/Application Support/relay/config.json`. Edit via Settings page or manually.
 
-Notification cache: `~/Library/Application Support/hive/notifications-cache.json`
-Database: `~/Library/Application Support/hive/hive.db`
-Logs: `~/Library/Application Support/hive/*.log`
+Notification cache: `~/Library/Application Support/relay/notifications-cache.json`
+Database: `~/Library/Application Support/relay/relay.db`
+Logs: `~/Library/Application Support/relay/*.log`
 
 ## License
 

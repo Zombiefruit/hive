@@ -253,14 +253,20 @@ export function NextStepsCard({
 
   if (actions.length === 0) return null;
 
-  const executeAction = (action: Action, index: number) => {
+  const executeAction = async (action: Action, index: number) => {
     // Only show loading for async actions (skills, updates, messages)
     const isAsync = action.type === "run_skill" || action.type === "update_linear" || action.type === "send_slack" || action.type === "send_email";
     if (isAsync) setExecutingIndex(index);
 
-    switch (action.type) {
-      case "run_skill": onRunSkill(action.skill, action.params); break;
-      case "update_linear": onUpdateLinear(action.ticket, action.field, action.value); break;
+    try {
+      switch (action.type) {
+        case "run_skill": onRunSkill(action.skill, action.params); break;
+        case "update_linear": {
+          // Agent sometimes puts fields in params instead of top-level
+          const p = (action as unknown as { params?: Record<string, string> }).params;
+          await onUpdateLinear(action.ticket || p?.ticket || "", action.field || p?.field || "", action.value || p?.value || "");
+          break;
+        }
       case "open_url": onOpenUrl(action.url); break;
       case "send_slack": onSendSlack(action.channel, action.message, action.threadTs); break;
       case "send_email": onSendEmail(action.to, action.subject, action.body); break;
@@ -273,6 +279,9 @@ export function NextStepsCard({
       case "dismiss": onDismiss(action.reason); break;
       case "snooze": onSnooze(action.reason); break;
       case "no_action": break;
+      }
+    } finally {
+      if (isAsync) setExecutingIndex(null);
     }
   };
 

@@ -25,10 +25,10 @@ describe("stage-machine", () => {
       expect(canDropTo("new", "start_work", "implementation")).toBe(true);
       expect(canDropTo("plan_review", "hack", "implementation")).toBe(true);
     });
-    it("blocks large backward jumps", () => {
-      expect(canDropTo("ship", "new", "implementation")).toBe(false);
+    it("blocks large backward jumps (except to new which is always allowed as reset)", () => {
+      expect(canDropTo("ship", "new", "implementation")).toBe(true); // reset always allowed
       expect(canDropTo("code_review", "start_work", "implementation")).toBe(false);
-      expect(canDropTo("done", "new", "implementation")).toBe(false);
+      expect(canDropTo("done", "new", "implementation")).toBe(true); // reset always allowed
     });
     it("allows specific backward revisions", () => {
       expect(canDropTo("hack", "start_work", "implementation")).toBe(true);     // revise plan
@@ -42,6 +42,46 @@ describe("stage-machine", () => {
     });
     it("blocks same stage", () => {
       expect(canDropTo("hack", "hack", "implementation")).toBe(false);
+    });
+
+    // Regression tests for drag scenarios
+    it("drag: new → start_work (forward one step)", () => {
+      expect(canDropTo("new", "start_work", "implementation")).toBe(true);
+    });
+    it("drag: new → hack (skip stages — should block)", () => {
+      expect(canDropTo("new", "hack", "implementation")).toBe(false);
+    });
+    it("drag: any stage → new (reset — always allowed)", () => {
+      expect(canDropTo("start_work", "new", "implementation")).toBe(true);
+      expect(canDropTo("hack", "new", "implementation")).toBe(true);
+      expect(canDropTo("preparing", "new", "response")).toBe(true);
+    });
+    it("drag: hack → start_work (allowed backward for re-plan)", () => {
+      expect(canDropTo("hack", "start_work", "implementation")).toBe(true);
+    });
+    it("drag: any → backlog (archive always allowed)", () => {
+      expect(canDropTo("new", "backlog", "implementation")).toBe(true);
+      expect(canDropTo("hack", "backlog", "implementation")).toBe(true);
+      expect(canDropTo("plan_review", "backlog", "implementation")).toBe(true);
+    });
+    it("human task: new → preparing (forward)", () => {
+      expect(canDropTo("new", "preparing", "response")).toBe(true);
+    });
+    it("human task: preparing → new (reset — always allowed)", () => {
+      expect(canDropTo("preparing", "new", "response")).toBe(true);
+    });
+    it("new → preparing with undefined taskType uses agent track (preparing not found → blocks)", () => {
+      expect(canDropTo("new", "preparing", undefined)).toBe(false);
+      expect(canDropTo("new", "preparing", "response")).toBe(true);
+      expect(canDropTo("new", "preparing", "meeting_prep")).toBe(true);
+    });
+    it("review/investigation tasks use human track (can drop to preparing)", () => {
+      // review and investigation are human tasks — they use the HUMAN_TRACK
+      expect(canDropTo("new", "preparing", "review")).toBe(true);
+      expect(canDropTo("new", "preparing", "investigation")).toBe(true);
+      // implementation is the only agent task — uses AGENT_TRACK, no "preparing"
+      expect(canDropTo("new", "preparing", "implementation")).toBe(false);
+      expect(canDropTo("new", "start_work", "implementation")).toBe(true);
     });
   });
 
@@ -58,8 +98,10 @@ describe("stage-machine", () => {
       const cta = getStageCTA("plan_review", "implementation");
       expect(cta).toEqual({ label: "Approve & Start", targetStage: "hack" });
     });
-    it("hack returns null (in progress)", () => {
-      expect(getStageCTA("hack", "implementation")).toBeNull();
+    it("hack returns Ship CTA", () => {
+      const cta = getStageCTA("hack", "implementation");
+      expect(cta).not.toBeNull();
+      expect(cta!.label).toBe("Ship");
     });
   });
 
@@ -80,6 +122,8 @@ describe("stage-machine", () => {
   describe("isHumanTask", () => {
     it("response is human", () => expect(isHumanTask("response")).toBe(true));
     it("meeting_prep is human", () => expect(isHumanTask("meeting_prep")).toBe(true));
+    it("review is human", () => expect(isHumanTask("review")).toBe(true));
+    it("investigation is human", () => expect(isHumanTask("investigation")).toBe(true));
     it("implementation is not human", () => expect(isHumanTask("implementation")).toBe(false));
   });
 });

@@ -15,7 +15,6 @@ import InsightsPage from "./pages/insights";
 import ReflectPage from "./pages/reflect";
 import MemoriesPage from "./pages/memories";
 import UsagePage from "./pages/usage";
-import ArchitecturePage from "./pages/architecture";
 import BusinessContextPage from "./pages/context";
 import { AppSidebar } from "./components/AppSidebar";
 import { GlobalLoadingBanner } from "./components/GlobalLoadingBanner";
@@ -81,17 +80,17 @@ const router = createHashRouter([
       {
         element: <ConfigGuard />,
         children: [
-          { path: "/", element: <Dashboard /> },
+          { path: "/", element: <Notifications /> },
+          { path: "/notifications", element: <Navigate to="/" replace /> },
+          { path: "/agents", element: <Dashboard /> },
           { path: "/agent/:agentId", element: <AgentDetail /> },
           { path: "/history", element: <History /> },
-          { path: "/notifications", element: <Notifications /> },
           { path: "/schedule", element: <Schedule /> },
           { path: "/projects", element: <ProjectsPage /> },
           { path: "/projects/:projectId", element: <ProjectsPage /> },
           { path: "/task/:taskId", element: <TaskDetail /> },
           { path: "/reflect", element: <ReflectPage /> },
           { path: "/usage", element: <UsagePage /> },
-          { path: "/architecture", element: <ArchitecturePage /> },
           { path: "/memories", element: <MemoriesPage /> },
           { path: "/context", element: <BusinessContextPage /> },
           { path: "/insights", element: <InsightsPage /> },

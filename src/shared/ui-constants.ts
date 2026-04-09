@@ -21,7 +21,7 @@ export const STAGE_META: Record<Stage, StageMeta> = {
   plan_review:  { label: "Planning",           color: "var(--mantine-color-violet-filled)", tip: "Plan ready — drag to Hacking to approve." },
   hack:         { label: "Hacking",            color: "var(--mantine-color-green-filled)", tip: "Agent implementing the plan." },
   ship:         { label: "Shipping",           color: "var(--mantine-color-cyan-filled)", tip: "Running tests, pushing branch, opening PR." },
-  code_review:  { label: "Reviewing",          color: "var(--mantine-color-orange-filled)", tip: "Agent reviewing the pull request." },
+  code_review:  { label: "Agent Review",        color: "var(--mantine-color-orange-filled)", tip: "AI agent reviewing the code changes." },
   pr_feedback:  { label: "Fixing Feedback",    color: "var(--mantine-color-pink-filled)", tip: "Agent addressing PR reviewer comments." },
   preparing:    { label: "Preparing",          color: "var(--mantine-color-violet-filled)", tip: "Gathering context." },
   ready:        { label: "Ready",              color: "var(--mantine-color-green-filled)", tip: "Context ready — review and act." },

@@ -65,6 +65,15 @@ const LOG_PATH = path.join(os.homedir(), "Library", "Application Support", "clau
 
 const activeWorkAgents = new Map<string, { process: ChildProcess; title: string; startedAt: number }>();
 
+/** Tracks which notifications currently have a planning agent running.
+ *  Prevents spawning duplicate planners for the same notification. */
+const activePlanningIds = new Set<string>();
+
+/** Check if planning is already in progress for a notification. */
+export function isPlanningActive(notificationId: string): boolean {
+  return activePlanningIds.has(notificationId);
+}
+
 export function getActiveWorkAgents(): Array<{ agentId: string; title: string; elapsedMs: number }> {
   return Array.from(activeWorkAgents.entries()).map(([id, a]) => ({
     agentId: id,
@@ -119,6 +128,11 @@ export function getPlan(notificationId: string): WorkPlan | null {
   return plans.get(notificationId) ?? null;
 }
 
+export function setPlan(notificationId: string, plan: WorkPlan): void {
+  plans.set(notificationId, plan);
+  savePlans();
+}
+
 export function clearPlan(notificationId: string): void {
   plans.delete(notificationId);
   savePlans();
@@ -141,6 +155,15 @@ export async function prepareWorkPlan(notification: {
   taskType?: string;
   links?: Array<{ type: string; label: string; url: string }>;
 }): Promise<WorkPlan> {
+  // Guard: prevent concurrent planning for the same notification
+  if (activePlanningIds.has(notification.id)) {
+    log(`prepareWorkPlan: SKIPPED — already planning "${notification.title}" (${notification.id})`);
+    const existing = plans.get(notification.id);
+    if (existing) return existing;
+    throw new Error(`Planning already in progress for ${notification.id}`);
+  }
+
+  activePlanningIds.add(notification.id);
   log(`prepareWorkPlan: ${notification.title}`);
 
   // ═══ SINGLE MCP AGENT — fetches context and produces plan ═══
@@ -197,14 +220,17 @@ export async function prepareWorkPlan(notification: {
     }
   };
 
-  // Pre-fetch GitHub context via gh CLI (faster than MCP agent for GH)
+  // ═══ MCP PLANNING AGENT — fetches context via tools and produces plan ═══
+  // MCP init takes ~10s (confirmed by timing test). The agent has full read access
+  // to Slack, Linear, Notion, Gmail, Calendar via MCP tools.
+
+  // Pre-fetch GitHub context via gh CLI (faster than MCP for GH)
   const ghContext = await fetchGitHubContext(notification.links);
 
-  // Build task-type-specific prompt
   const taskType = notification.taskType ?? "implementation";
+  const cfg = hasConfig() ? getConfig() : null;
   let prompt: string;
   if (taskType === "response") {
-    const cfg = hasConfig() ? getConfig() : null;
     prompt = buildResponsePrompt({
       title: notification.title,
       summary: notification.summary,
@@ -229,20 +255,38 @@ export async function prepareWorkPlan(notification: {
     });
   }
 
-  // Append pre-fetched GitHub context if available
   if (ghContext) {
     prompt += `\n\n## Pre-fetched GitHub Context\n${ghContext}\n\n(This GitHub data was already fetched — do not re-fetch it.)`;
   }
 
   const startTime = Date.now();
-  let response = await askMcpPlanningAgent(prompt, 300000, broadcastEvent); // 5 min timeout
+  let response: string;
+  try {
+    response = await askMcpPlanningAgent(prompt, undefined, broadcastEvent);
+  } catch (err) {
+    activePlanningIds.delete(notification.id);
+    throw err;
+  }
   const elapsed = Math.round((Date.now() - startTime) / 1000);
 
-  // Auto-retry once on timeout
-  if (response.includes("timed out") || response.includes("not ready")) {
-    log(`Plan timed out after ${elapsed}s — retrying once`);
-    addDebugEntry("out", `⏱️ [PLANNING] Timed out after ${elapsed}s, retrying...`, "planning");
-    response = await askMcpPlanningAgent(prompt, 300000, broadcastEvent);
+  // If agent became unresponsive (inactivity timeout) or exited without result
+  if (response.includes("unresponsive") || response.includes("timed out") || response.includes("not ready") || response.includes("exited without")) {
+    log(`Plan failed after ${elapsed}s: ${response.slice(0, 100)}`);
+    addDebugEntry("out", `⏱️ [PLANNING] Failed after ${elapsed}s: ${response.slice(0, 80)}`, "planning");
+    broadcastEvent({ type: "error", content: `Planning failed after ${elapsed}s. Click "Re-plan" to try again.`, timestamp: new Date().toISOString() });
+    activePlanningIds.delete(notification.id);
+    const errorPlan: WorkPlan = {
+      notificationId: notification.id,
+      title: notification.title,
+      context: "",
+      plan: `Planning failed after ${elapsed}s: ${response}\n\nClick "Re-plan" to try again.`,
+      estimatedModel: "",
+      estimatedCost: "",
+      conversationHistory: [],
+    };
+    plans.set(notification.id, errorPlan);
+    savePlans();
+    return errorPlan;
   }
 
   // Flush any remaining buffered events to disk now that the agent is done
@@ -332,13 +376,32 @@ export async function prepareWorkPlan(notification: {
     }
     const linearMatch = c.match(/get_issue.*?([A-Z]+-\d+)/i) || c.match(/issue["\s:]+([A-Z]+-\d+)/i);
     if (linearMatch) {
-      discoveredLinks.push({ type: "linear", label: linearMatch[1], url: `https://linear.app/issue/${linearMatch[1]}` });
+      // Only add if we haven't already seen this ticket ID in discovered links
+      const ticketId = linearMatch[1].toUpperCase();
+      if (!discoveredLinks.some(l => l.label.toUpperCase() === ticketId)) {
+        discoveredLinks.push({ type: "linear", label: ticketId, url: `https://linear.app/issue/${ticketId}` });
+      }
     }
   }
-  // Merge with existing links (dedup by URL)
+  // Merge with existing links — dedup by URL AND by ticket/PR identifier
   if (discoveredLinks.length > 0) {
     const existingUrls = new Set((notification.links ?? []).map(l => l.url));
-    const newLinks = discoveredLinks.filter(l => !existingUrls.has(l.url));
+    // Also extract ticket IDs from existing link URLs to catch format variants
+    // e.g. "linear.app/montecarlodata/issue/VEC-44/..." vs "linear.app/issue/VEC-44"
+    const existingTicketIds = new Set<string>();
+    for (const l of (notification.links ?? [])) {
+      const m = l.url?.match(/([A-Z]+-\d+)/);
+      if (m) existingTicketIds.add(m[1].toUpperCase());
+    }
+    const newLinks = discoveredLinks.filter(l => {
+      if (existingUrls.has(l.url)) return false;
+      // For Linear links, also check ticket ID
+      if (l.type === "linear") {
+        const m = l.label?.match(/([A-Z]+-\d+)/i);
+        if (m && existingTicketIds.has(m[1].toUpperCase())) return false;
+      }
+      return true;
+    });
     if (newLinks.length > 0) {
       const mergedLinks = [...(notification.links ?? []), ...newLinks];
       // Update notification via IPC-style direct import
@@ -350,6 +413,7 @@ export async function prepareWorkPlan(notification: {
     }
   }
 
+  activePlanningIds.delete(notification.id);
   return plan;
 }
 
@@ -448,7 +512,7 @@ Write the prompt as if you're giving instructions to a skilled developer. Be tho
     const notification2 = getNotifications().find(n => n.id === notificationId);
     if (notification2?.repoPath) {
       const { createWorktree } = await import("../skill-runner");
-      const branch = notification2.branch ?? `hive-work-${Date.now()}`;
+      const branch = notification2.branch ?? `relay-work-${Date.now()}`;
       try {
         worktreePath = createWorktree(notification2.repoPath, branch);
         effectiveCwd = worktreePath;

@@ -1,4 +1,4 @@
-# Hive — Backlog
+# Relay — Backlog
 
 Persistent backlog of planned features and improvements. Items here survive across sessions.
 

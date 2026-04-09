@@ -4,7 +4,7 @@
  * Refreshed weekly via MCP bridge scan, stored as a markdown file.
  */
 
-import { askMcpPlanningAgent, addDebugEntry, type PlanningEvent } from "./mcp-bridge";
+import { askMcpPlanningAgent, askEphemeralProcess, addDebugEntry, type PlanningEvent } from "./mcp-bridge";
 import { loadSkillTemplate } from "../shared/skill-loader";
 import { getConfig } from "./config";
 import { BrowserWindow } from "electron";
@@ -13,6 +13,7 @@ import path from "node:path";
 import os from "node:os";
 
 const CONTEXT_PATH = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "business-context.md");
+const SUMMARY_PATH = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "business-context-summary.txt");
 const LOG_PATH = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "business-context.log");
 
 function log(msg: string): void {
@@ -39,30 +40,39 @@ export function saveBusinessContext(content: string): void {
   fs.writeFileSync(CONTEXT_PATH, content, "utf-8");
 }
 
+/** Load the Haiku-generated summary (1-2 paragraphs). Returns empty string if not available. */
+export function loadBusinessContextSummary(): string {
+  try {
+    return fs.readFileSync(SUMMARY_PATH, "utf-8").trim();
+  } catch {
+    return "";
+  }
+}
+
+/** Save the Haiku-generated summary. */
+function saveBusinessContextSummary(summary: string): void {
+  const dir = path.dirname(SUMMARY_PATH);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(SUMMARY_PATH, summary, "utf-8");
+}
+
 /**
- * Get a truncated version of the business context for injection into agent prompts.
- * Keeps it under ~1500 chars to avoid bloating prompts.
+ * Get a brief business context summary for prompt grounding.
+ * Uses the Haiku-generated summary if available, otherwise builds a minimal one-liner.
+ * This is intentionally short — agents should use MCP tools to fetch details they need.
  */
 export function getBusinessContextForPrompt(): string {
+  const summary = loadBusinessContextSummary();
+  if (summary) return `\n## Business Context\n${summary}\n`;
+
+  // Minimal fallback from structured data
   const full = loadBusinessContext();
   if (!full) return "";
   try {
     const parsed = JSON.parse(full);
-    const lines: string[] = [];
-    lines.push(`Company: ${parsed.company?.name} — ${parsed.company?.mission}`);
-    if (parsed.priorities?.length) {
-      lines.push("Priorities: " + parsed.priorities.map((p: { title: string }) => p.title).join(", "));
-    }
-    if (parsed.productFocus?.length) {
-      lines.push("Product focus: " + parsed.productFocus.map((p: { area: string }) => p.area).join(", "));
-    }
-    if (parsed.customerIntel?.length) {
-      lines.push("Customer themes: " + parsed.customerIntel.map((c: { theme: string }) => c.theme).join(", "));
-    }
-    return `\n## Business Context\n${lines.join("\n")}\n`;
+    return `\n## Business Context\n${parsed.company?.name ?? "Company"} — ${parsed.company?.mission ?? ""}\n`;
   } catch {
-    // Fallback for old markdown format
-    return `\n## Business Context\n${full.slice(0, 2000)}\n`;
+    return "";
   }
 }
 
@@ -113,7 +123,7 @@ export async function refreshBusinessContext(
 
   try {
     log("🏢 [CONTEXT] Spawning MCP planning agent...");
-    const response = await askMcpPlanningAgent(prompt, 300000, (event: PlanningEvent) => {
+    const response = await askMcpPlanningAgent(prompt, undefined, (event: PlanningEvent) => {
       if (event.type === "tool_use") {
         log(`🏢 [CONTEXT] Tool: ${event.content.slice(0, 80)}`);
         onProgress?.(`Scanning: ${event.content.slice(0, 60)}`);
@@ -211,6 +221,20 @@ export async function refreshBusinessContext(
     if (context.length > 50) {
       saveBusinessContext(context);
       log("🏢 [CONTEXT] Auto-saved to disk");
+
+      // Generate a Haiku summary (1-2 paragraphs) for prompt grounding.
+      // Agents use MCP tools for details — this is just quick orientation.
+      try {
+        log("🏢 [CONTEXT] Generating Haiku summary...");
+        const summaryPrompt = `Summarize this business context in 2 short paragraphs (max 400 chars total). First paragraph: company mission and top priorities. Second paragraph: current product focus and key themes. Be specific and concise — this will orient AI agents before they fetch details via tools.\n\n${context}`;
+        const summary = await askEphemeralProcess(summaryPrompt, 30000, "claude-haiku-4-5-20251001");
+        if (summary && summary.length > 50 && summary.length < 800) {
+          saveBusinessContextSummary(summary);
+          log(`🏢 [CONTEXT] Summary saved: ${summary.length} chars`);
+        }
+      } catch (err) {
+        log(`🏢 [CONTEXT] Summary generation failed (non-fatal): ${String(err).slice(0, 100)}`);
+      }
     }
 
     // Broadcast to UI

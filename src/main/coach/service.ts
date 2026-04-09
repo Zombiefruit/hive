@@ -1,13 +1,19 @@
 /**
- * Reflect Service — computes work habit signals from notification data.
- * Powers the Reflect page: response cadence, focus score, meeting load,
- * throughput, weekly snapshots, and LLM-generated manager assessments.
+ * Reflect Service — weekly work analysis powered by MCP data from all sources.
+ *
+ * Architecture:
+ * - Weekly background job fetches data from Slack, Linear, GitHub, Calendar via MCP
+ * - Produces a structured assessment (ManagerTake) cached to disk
+ * - Reflect page reads cached result instantly — no on-demand LLM calls
+ * - Also computes fast signals from notification data (no LLM needed)
  */
 
 import { getNotifications } from "../notifications/poll-service";
 import type { PollNotification } from "../notifications/poll-service";
-import { askEphemeralProcess, addDebugEntry } from "../mcp-bridge";
-import { getRelevantMemories, formatMemoriesForPrompt } from "../memory/service";
+import { askMcpPlanningAgent, addDebugEntry } from "../mcp-bridge";
+import { getConfig, hasConfig } from "../config";
+import { loadBusinessContextSummary } from "../business-context";
+import { loadSkillTemplate } from "../../shared/skill-loader";
 import type {
   ResponseCadence, FocusScore, MeetingLoad, Throughput,
   WeeklySnapshot, ReflectSignals, ManagerTake, ReflectData,
@@ -252,43 +258,116 @@ export function computeAllSignals(): ReflectSignals {
   return { responseCadence, focus, meetingLoad, throughput, weekLabel };
 }
 
-export async function generateManagerTake(signals: ReflectSignals, history: WeeklySnapshot[]): Promise<ManagerTake> {
-  const generatedAt = new Date().toISOString();
+const REFLECT_CACHE_PATH = () => join(getDataDir(), "reflect-cache.json");
+const REFLECT_REFRESH_INTERVAL = 7 * 86400000; // 7 days
+
+/** Check if the cached reflect analysis needs refreshing. */
+export function reflectNeedsRefresh(): boolean {
   try {
-    const memories = await getRelevantMemories("work habits, focus, response time, meetings");
-    const memoryBlock = formatMemoriesForPrompt(memories);
+    const stat = require("node:fs").statSync(REFLECT_CACHE_PATH());
+    return Date.now() - stat.mtimeMs > REFLECT_REFRESH_INTERVAL;
+  } catch {
+    return true;
+  }
+}
 
-    const historyTable = history.length > 0
-      ? history.map(h =>
-        `${h.weekLabel}: completed=${h.completed}, cycleHrs=${h.avgCycleHours}, meetings=${h.meetingHours}h, focus=${h.focusScore}, response=${h.responseCadenceMinutes}min`,
-      ).join("\n")
-      : "No prior history available.";
+/** Load cached manager take from disk. */
+function loadCachedManagerTake(): ManagerTake | null {
+  try {
+    const raw = readFileSync(REFLECT_CACHE_PATH(), "utf-8");
+    return JSON.parse(raw) as ManagerTake;
+  } catch {
+    return null;
+  }
+}
 
-    const prompt = `You are an engineering manager in a 1:1 with this engineer. Based on the data, write a candid 2-3 paragraph assessment of their work patterns this week. Be specific — reference actual numbers. Include a rating label (one of: 'Strong week', 'Good progress', 'Steady', 'Needs attention', 'Falling behind'). Also include 2-4 specific actionable callouts. Return JSON: { summary: string, callouts: string[], rating: string }
+/** Save manager take to disk cache. */
+function saveCachedManagerTake(take: ManagerTake): void {
+  writeFileSync(REFLECT_CACHE_PATH(), JSON.stringify(take, null, 2), "utf-8");
+}
 
-## This Week's Signals
-- Response cadence: median ${signals.responseCadence.medianReplyMinutes}min, ${signals.responseCadence.respondedWithin1h} responded within 1h, ${signals.responseCadence.unansweredOver24h} unanswered >24h
-- Focus: score ${signals.focus.score}/100, avg WIP ${signals.focus.avgConcurrentWip}, max WIP ${signals.focus.maxConcurrentWip}, context switches ${signals.focus.contextSwitchCount}
-- Meetings: ${signals.meetingLoad.meetingCount} meetings, ${signals.meetingLoad.meetingHoursThisWeek}h total, longest deep work block ${signals.meetingLoad.longestDeepWorkBlock}min
-- Throughput: ${signals.throughput.completedThisWeek} completed this week, rolling 4-week avg ${signals.throughput.rollingFourWeekAvg}, WoW delta ${signals.throughput.weekOverWeekDelta}%
+/**
+ * Run the weekly reflect analysis via MCP agent.
+ * Fetches live data from Slack, Linear, GitHub, Calendar and produces
+ * a structured assessment. Cached for 7 days.
+ */
+export async function refreshReflectAnalysis(): Promise<ManagerTake> {
+  const generatedAt = new Date().toISOString();
+  addDebugEntry("out", "[reflect] Starting weekly analysis via MCP", "coach");
 
-## History
-${historyTable}
+  try {
+    const cfg = hasConfig() ? getConfig() : null;
+    const userName = cfg?.name ?? "the user";
+    const businessContext = loadBusinessContextSummary();
 
-${memoryBlock}
+    // Load the weekly-reflect skill template
+    let skillPrompt = "";
+    try {
+      skillPrompt = loadSkillTemplate("weekly-reflect", { USER_NAME: userName });
+    } catch {
+      skillPrompt = "";
+    }
 
-Return ONLY valid JSON — no markdown fences, no commentary.`;
+    const prompt = `${skillPrompt}
 
-    addDebugEntry("out", "[reflect] generating manager take", "coach");
-    const raw = await askEphemeralProcess(prompt, 30000, "claude-haiku-4-5-20251001", "reflect");
+## User
+Name: ${userName}
+${businessContext ? `\n## Business Context\n${businessContext}\n` : ""}
+
+## Inbox Summary (from notification data)
+${(() => {
+  const notifs = getNotifications();
+  const done = notifs.filter(n => n.stage === "done").length;
+  const active = notifs.filter(n => n.stage === "hack" || n.stage === "ship" || n.stage === "code_review").length;
+  const pending = notifs.filter(n => n.stage === "new" || n.stage === "start_work" || n.stage === "preparing").length;
+  const unanswered = notifs.filter(n => n.taskType === "response" && n.stage !== "done" && n.stage !== "skipped").length;
+  return `Completed: ${done}, Active work: ${active}, Pending: ${pending}, Unanswered responses: ${unanswered}`;
+})()}
+
+Analyze this engineer's work week. Use your MCP tools to fetch live data from Slack, Linear, GitHub, and Calendar. Return ONLY the JSON specified in the skill instructions.`;
+
+    const raw = await askMcpPlanningAgent(prompt, undefined, (event) => {
+      if (event.type === "tool_use") {
+        addDebugEntry("out", `[reflect] ${event.content.slice(0, 80)}`, "coach");
+      }
+    }, "claude-sonnet-4-6");
+
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON found in response");
-    const parsed = JSON.parse(jsonMatch[0]) as { summary: string; callouts: string[]; rating: string };
-    return { summary: parsed.summary, callouts: parsed.callouts, rating: parsed.rating, generatedAt };
+    const parsed = JSON.parse(jsonMatch[0]) as {
+      summary: string;
+      rating: string;
+      wins?: string[];
+      risks?: string[];
+      focusAreas?: string[];
+    };
+
+    // Map the new format to ManagerTake (callouts = wins + risks + focusAreas)
+    const callouts = [
+      ...(parsed.wins ?? []),
+      ...(parsed.risks ?? []),
+      ...(parsed.focusAreas ?? []),
+    ];
+
+    const take: ManagerTake = {
+      summary: parsed.summary,
+      callouts,
+      rating: parsed.rating,
+      generatedAt,
+    };
+
+    saveCachedManagerTake(take);
+    addDebugEntry("out", `[reflect] Analysis complete: ${take.rating}`, "coach");
+    return take;
   } catch (err) {
-    addDebugEntry("out", `[reflect] manager take failed: ${err}`, "coach");
-    return { summary: "Assessment unavailable \u2014 not enough data or LLM error.", callouts: [], rating: "Unknown", generatedAt };
+    addDebugEntry("out", `[reflect] Analysis failed: ${err}`, "coach");
+    return { summary: "Assessment unavailable — analysis failed.", callouts: [], rating: "Unknown", generatedAt };
   }
+}
+
+/** Get manager take — returns cached if fresh, otherwise returns null (caller triggers refresh). */
+export function getCachedManagerTake(): ManagerTake | null {
+  return loadCachedManagerTake();
 }
 
 export function getReflectSignals(): ReflectSignals {
@@ -301,6 +380,17 @@ export async function getReflectData(): Promise<ReflectData> {
   const signals = computeAllSignals();
   maybeSnapshotWeek(signals);
   const history = loadHistory();
-  const managerTake = await generateManagerTake(signals, history);
+
+  // Return cached take if fresh, otherwise trigger background refresh
+  let managerTake = getCachedManagerTake();
+  if (!managerTake || reflectNeedsRefresh()) {
+    // Try to generate now — if it fails, return cached or empty
+    try {
+      managerTake = await refreshReflectAnalysis();
+    } catch {
+      managerTake = managerTake ?? { summary: "Generating analysis...", callouts: [], rating: "Unknown", generatedAt: new Date().toISOString() };
+    }
+  }
+
   return { signals, managerTake, history };
 }

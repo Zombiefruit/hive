@@ -27,6 +27,8 @@ const api = {
     ipcRenderer.invoke("work:get-plan", notificationId),
   clearPlan: (notificationId: string) =>
     ipcRenderer.invoke("work:clear-plan", notificationId),
+  setPlan: (notificationId: string, plan: unknown) =>
+    ipcRenderer.invoke("work:set-plan", notificationId, plan),
   startWorkAgent: (notificationId: string) =>
     ipcRenderer.invoke("work:start-agent", notificationId),
 
@@ -71,9 +73,6 @@ const api = {
 
   // Notifications
   getNotifications: () => ipcRenderer.invoke("notifications:get"),
-  dismissNotification: (id: string) => ipcRenderer.invoke("notifications:dismiss", id),
-  startWorkOnNotification: (id: string) => ipcRenderer.invoke("notifications:start-work", id),
-  clearNotifications: () => ipcRenderer.invoke("notifications:clear"),
   updateNotificationByTitle: (titleSubstring: string, changes: Record<string, unknown>) =>
     ipcRenderer.invoke("notifications:update-by-title", { titleSubstring, changes }),
   updateNotificationById: (id: string, changes: Record<string, unknown>) =>
@@ -192,8 +191,14 @@ const api = {
     ipcRenderer.invoke("skill:send-message", notificationId, message) as Promise<{ sent: boolean }>,
   isSkillRunning: (notificationId: string) =>
     ipcRenderer.invoke("skill:is-running", notificationId) as Promise<boolean>,
+  getRunningSkillIds: () =>
+    ipcRenderer.invoke("skill:running-ids") as Promise<string[]>,
   checkSkills: () => ipcRenderer.invoke("skill:check"),
+  findPrForBranch: (branch: string) => ipcRenderer.invoke("github:find-pr", branch) as Promise<string | null>,
+  postReviewToPr: (branch: string, body: string) => ipcRenderer.invoke("github:post-review", branch, body) as Promise<{ ok: boolean; error?: string }>,
   readPlan: (repoPath: string, workSlug: string) => ipcRenderer.invoke("skill:read-plan", repoPath, workSlug),
+  getWorkDiff: (repoPath: string, branch?: string) => ipcRenderer.invoke("work:get-diff", repoPath, branch),
+  writePlan: (repoPath: string, workSlug: string, planText: string) => ipcRenderer.invoke("skill:write-plan", repoPath, workSlug, planText),
   readReviews: (repoPath: string, workSlug: string) => ipcRenderer.invoke("skill:read-review", repoPath, workSlug),
 
   // Projects

@@ -7,7 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import type { DeckConfig } from "../../shared/config-types";
-import { normalizePriority, extractKey as extractKeyUtil, STAGE_ORDER, CONFIDENCE_THRESHOLD, sanitizeUrl, cadenceToMs, setSlackWorkspace, getSlackBaseUrl } from "../../shared/task-utils";
+import { normalizePriority, extractKey as extractKeyUtil, STAGE_ORDER, CONFIDENCE_THRESHOLD, sanitizeUrl, cadenceToMs, setSlackWorkspace, getSlackBaseUrl, VALID_STAGES } from "../../shared/task-utils";
 import { initSlackChannels } from "../agents/message-parser";
 import { loadSkills, loadSkillTemplate } from "../../shared/skill-loader";
 import { computeLookbackHours, migrateCacheFormat, buildCachePayload } from "../../shared/poll-cache";
@@ -16,6 +16,9 @@ import { judgeTriage } from "../judge-bridge";
 import { parseTriageResponse } from "../../shared/triage-parser";
 import type { TriageVerdict } from "../../shared/judge-types";
 import { emitThought as orchEmitThought } from "../orchestrator";
+import { getBusinessContextForPrompt } from "../business-context";
+import { isHumanTask } from "../../shared/stage-machine";
+import { buildSourcePrompt, fetchSourcesParallel, type SourceName, type SourceFetchConfig } from "./parallel-fetch";
 
 export interface PollNotification {
   id: string;
@@ -167,6 +170,13 @@ export function forcePoll(lookbackHours?: number): void {
 export function updateNotificationByTitle(titleSubstring: string, changes: Record<string, unknown>): boolean {
   const n = notifications.find(n => n.title.toLowerCase().includes(titleSubstring.toLowerCase()));
   if (!n) return false;
+  // Validate stage if provided — reject invalid stage names
+  if (changes.stage && typeof changes.stage === "string") {
+    if (!(VALID_STAGES as readonly string[]).includes(changes.stage)) {
+      logPoll(`BLOCKED invalid stage "${changes.stage}" for "${n.title.slice(0, 40)}" (valid: ${VALID_STAGES.join(", ")})`);
+      delete changes.stage;
+    }
+  }
   Object.assign(n, changes);
   saveCacheToFile();
   broadcastNotifications();
@@ -230,7 +240,7 @@ export function updateNotificationById(id: string, changes: Record<string, unkno
   if (changes.stage && changes.stage !== n.stage) {
     const currentOrder = STAGE_ORDER[n.stage ?? "new"] ?? 0;
     const newOrder = STAGE_ORDER[changes.stage as string] ?? 0;
-    const alwaysAllowed = changes.stage === "done" || changes.stage === "backlog" || changes.stage === "skipped";
+    const alwaysAllowed = changes.stage === "done" || changes.stage === "backlog" || changes.stage === "skipped" || changes.stage === "new";
     // Specific backward transitions the user can initiate (revise plan, rework code)
     const allowedBackward =
       (n.stage === "hack" && changes.stage === "start_work") ||
@@ -299,8 +309,8 @@ function loadCachedNotifications(): void {
       // Fix follow_up → response (follow_up merged into response). Cast needed for legacy cached data.
       if ((n.taskType as string) === "follow_up") n.taskType = "response" as PollNotification["taskType"];
       if (n.stage === "follow_up") n.stage = "new";
-      // Fix response/meeting_prep tasks stuck in agent-only stages
-      if ((n.taskType === "response" || n.taskType === "meeting_prep") && n.stage === "start_work") n.stage = "preparing";
+      // Fix human tasks stuck in agent-only stages (uses isHumanTask from stage-machine)
+      if (isHumanTask(n.taskType) && n.stage === "start_work") n.stage = "preparing";
       // Sanitize URLs on load (fix cached broken URLs like "https://slack//channel/...")
       if (n.url) n.url = sanitizeUrl(n.url);
       if (n.links) n.links = n.links.filter(l => sanitizeUrl(l.url) !== undefined).map(l => ({ ...l, url: sanitizeUrl(l.url)! }));
@@ -454,131 +464,47 @@ async function poll(): Promise<void> {
         .map(c => `- ${c.name} (${c.role}) direct ask = ${c.role === "lead" ? "critical" : c.role === "pm" ? "high" : "high"} priority`),
     ].join("\n");
 
-    // PASS 1: Fetch ALL sources in a SINGLE prompt.
-    // Claude Code parallelizes tool calls within a turn — one prompt fires off
-    // Slack, Linear, Calendar, Gmail, Notion calls simultaneously.
-    logPoll("Pass 1: Fetching all sources (single prompt, model parallelizes tools)");
+    // PASS 1: Fetch each source in parallel with its own Haiku agent.
+    // Each agent fetches + summarizes its findings. Summaries are small enough
+    // that triage never hits context limits.
+    logPoll("Pass 1: Fetching sources in parallel (one agent per source, each summarizes)");
 
-    // Build the combined fetch prompt from enabled integrations
-    const fetchSections: string[] = [];
-    const enabledSourceNames: string[] = [];
+    const enabledSources: SourceName[] = [];
+    if (integrations.slack && userSlackId) enabledSources.push("slack");
+    if (integrations.linear && linearUser) enabledSources.push("linear");
+    if (integrations.calendar) enabledSources.push("calendar");
+    if (integrations.gmail) enabledSources.push("gmail");
+    if (integrations.notion) enabledSources.push("notion");
 
-    if (integrations.slack && userSlackId) {
-      enabledSourceNames.push("Slack");
-      const slackLimit = hours <= 24 ? 200 : hours <= 48 ? 150 : 100;
-      const channelList = channels.map(ch => `- slack_read_channel: channel_id "${ch.id}" (${ch.name}), limit ${slackLimit}`).join("\n");
-      const slackSearches = [
-        `- slack_search_public_and_private: query "<@${userSlackId}> after:${slackAfter}"`,
-        `- slack_search_public_and_private: query "to:${userSlackId} after:${slackAfter}"`,
-        ...(managerSlackId ? [`- slack_search_public_and_private: query "from:<@${managerSlackId}> after:${slackAfter}" (messages from ${managerName || "manager"})`] : []),
-      ].join("\n");
-      const slackSkill = loadSkillTemplate("fetch-slack", {
-        SLACK_LIMIT: String(slackLimit),
-        USER_NAME: userName,
-        USER_SLACK_ID: userSlackId,
-        CHANNEL_LIST: channelList,
-        SLACK_BASE_URL: getSlackBaseUrl(),
-      });
-      fetchSections.push(`## SLACK\n${slackSearches}\n${channelList}\n${slackSkill}`);
-    }
-
-    if (integrations.linear && linearUser) {
-      enabledSourceNames.push("Linear");
-      const linearLimit = hours > 48 ? 250 : 100;
-      const linearSkill = loadSkillTemplate("fetch-linear", {
-        LINEAR_USER: linearUser,
-        LINEAR_LIMIT: String(linearLimit),
-        TEAM_NAME: config?.teamName ?? "Vector",
-        LINEAR_TEAM_LIMIT: String(Math.round(linearLimit / 2)),
-      });
-      fetchSections.push(`## LINEAR\n${linearSkill}`);
-    }
-
-    if (integrations.calendar) {
-      enabledSourceNames.push("Calendar");
-      const calSkill = loadSkillTemplate("fetch-calendar", {
-        CURRENT_TIME: new Date().toISOString(),
-      });
-      fetchSections.push(`## CALENDAR\n${calSkill}`);
-    }
-
-    if (integrations.gmail) {
-      enabledSourceNames.push("Gmail");
-      const gmailLimit = hours > 48 ? 50 : 30;
-      const gmailSkill = loadSkillTemplate("fetch-gmail", {
-        GMAIL_NEWER: hours <= 24 ? "1d" : hours <= 48 ? "2d" : "7d",
-        GMAIL_LIMIT: String(gmailLimit),
-      });
-      fetchSections.push(`## GMAIL\n${gmailSkill}`);
-    }
-
-    if (integrations.notion) {
-      enabledSourceNames.push("Notion");
-      const notionSkill = loadSkillTemplate("fetch-notion", {
-        USER_NAME: userName,
-      });
-      fetchSections.push(`## NOTION\n${notionSkill}`);
-    }
+    const enabledSourceNames = enabledSources.map(s => s.charAt(0).toUpperCase() + s.slice(1));
 
     for (const win of BrowserWindow.getAllWindows()) {
       try {
         if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", {
           source: `Fetching ${enabledSourceNames.join(", ")}`,
           current: 1,
-          total: 2, // fetch + triage
+          total: 2,
         });
       } catch {}
     }
 
-    // For long lookbacks (>48h), batch Slack fetches by day for better coverage.
-    // Other sources (Linear, Calendar, Gmail, Notion) handle their own date filtering.
-    const needsBatchedSlack = hours > 48 && integrations.slack && userSlackId;
+    const sourceFetchConfig: SourceFetchConfig = {
+      userName,
+      userSlackId,
+      linearUser: linearUser ?? undefined,
+      teamName: config?.teamName ?? "Vector",
+      slackBaseUrl: getSlackBaseUrl(),
+      channels,
+      managerSlackId: managerSlackId || undefined,
+      managerName: managerName || undefined,
+      hours,
+      cutoffStr,
+    };
 
-    let fetchPrompt: string;
-    if (needsBatchedSlack) {
-      // Build day-by-day Slack instructions
-      const days = Math.min(Math.ceil(hours / 24), 7);
-      const slackDayInstructions: string[] = [];
-      for (let d = days - 1; d >= 0; d--) {
-        const dayStart = new Date(Date.now() - (d + 1) * 86400000);
-        const dayEnd = new Date(Date.now() - d * 86400000);
-        const afterDate = dayStart.toISOString().split("T")[0];
-        const beforeDate = dayEnd.toISOString().split("T")[0];
-        const dayLabel = dayStart.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-        slackDayInstructions.push(`### ${dayLabel}
-- slack_search_public_and_private: query "<@${userSlackId}> after:${afterDate} before:${beforeDate}"
-- slack_search_public_and_private: query "to:${userSlackId} after:${afterDate} before:${beforeDate}"
-${channels.map(ch => `- slack_read_channel: channel_id "${ch.id}" (${ch.name}), limit 50, oldest="${dayStart.getTime() / 1000}", latest="${dayEnd.getTime() / 1000}"`).join("\n")}
-For each thread where ${userName} is mentioned or tagged, also read the FULL thread with slack_read_thread to check if ${userName} already replied.`);
-      }
-
-      const nonSlackSections = fetchSections.filter(s => !s.startsWith("## SLACK"));
-      fetchPrompt = `Fetch data from ALL sources. Execute ALL API calls — do not skip any day.
-
-## SLACK — Fetch EACH DAY separately for complete coverage
-${slackDayInstructions.join("\n\n")}
-
-## CRITICAL: For EVERY thread where ${userName} is mentioned, use slack_read_thread to check if ${userName} (${userSlackId}) already replied. If they did, note "USER ALREADY REPLIED" next to that thread.
-
-${nonSlackSections.join("\n\n")}
-
-RULES:
-- Execute EVERY search and channel read listed above — do NOT skip any day or channel
-- For Slack: include the FULL thread context for any thread mentioning ${userName}
-- Return ALL results as plain text, organized by source with ## headers
-- NEVER add commentary — return ONLY the data itself`;
-
-      logPoll(`  Batched Slack fetch: ${days} days × ${channels.length} channels + searches`);
-    } else {
-      fetchPrompt = `Fetch data from ALL of these sources. Execute all API calls — do not skip any. Call tools in parallel where possible.
-
-${fetchSections.join("\n\n")}
-
-RULES:
-- Only include data from after ${cutoffStr}
-- Return ALL results as plain text, organized by source with ## headers
-- Be thorough and complete — include everything relevant
-- NEVER add commentary like "Let me compile..." or "I have enough data..." — return ONLY the data itself`;
+    // Build per-source prompts and fetch in parallel
+    const sourcePrompts = new Map<SourceName, string>();
+    for (const source of enabledSources) {
+      sourcePrompts.set(source, buildSourcePrompt(source, sourceFetchConfig));
     }
 
     // Pre-fetch: get GitHub PR status directly via gh CLI (fast, no MCP needed)
@@ -612,13 +538,10 @@ RULES:
     }
 
     const fetchStart = Date.now();
-    logPoll(`  Sending combined fetch prompt for: ${enabledSourceNames.join(", ")}`);
-    addDebugEntry("in", `📤 Fetching all: ${enabledSourceNames.join(", ")}`, "fetch");
+    logPoll(`  Fetching ${enabledSources.length} sources in parallel: ${enabledSourceNames.join(", ")}`);
+    addDebugEntry("in", `📤 Fetching: ${enabledSourceNames.join(", ")} (parallel)`, "fetch");
 
-    // First fetch gets generous timeout (10 min), subsequent fetches get 5 min.
-    const fetchTimeout = hasCompletedFirstPoll ? 300000 : 600000;
-
-    // Broadcast elapsed time every 10s so the UI shows progress
+    // Broadcast elapsed time every 10s
     const broadcastElapsed = (phase: string, startMs: number) => {
       const elapsed = Math.round((Date.now() - startMs) / 1000);
       for (const win of BrowserWindow.getAllWindows()) {
@@ -628,7 +551,6 @@ RULES:
           total: 2,
         });
       }
-      // Also emit as orchestrator thought every 30s
       if (elapsed > 0 && elapsed % 30 === 0) {
         emitThought(`still ${phase.toLowerCase()}... (${elapsed}s)`);
       }
@@ -637,15 +559,23 @@ RULES:
 
     let rawData = "";
     try {
-      rawData = await askFetchBridge(fetchPrompt, fetchTimeout);
-      logPoll(`  Fetch complete (Haiku): ${rawData.length} chars`);
-      emitThought(`fetched ${Math.round(rawData.length / 1000)}K chars — computing diff...`);
-      // Log data volume per source for debugging coverage
-      const slackLines = (rawData.match(/## SLACK/gi) || []).length;
-      const slackMentions = (rawData.match(new RegExp(userSlackId, "g")) || []).length;
-      const threadCount = (rawData.match(/slack_read_thread|thread_ts|in thread/gi) || []).length;
-      logPoll(`  Data breakdown: ${slackMentions} user mentions, ~${threadCount} threads referenced`);
-      addDebugEntry("out", `✅ All sources: ${rawData.length} chars`, "fetch");
+      const fetchResult = await fetchSourcesParallel(
+        enabledSources,
+        async (source: string) => {
+          const prompt = sourcePrompts.get(source as SourceName) ?? "";
+          return askFetchBridge(prompt);
+        },
+        (progress) => {
+          logPoll(`  Source ${progress.source}: ${progress.status} (${progress.chars ?? 0} chars)`);
+          emitThought(`${progress.source} ${progress.status}${progress.chars ? ` (${Math.round(progress.chars / 1000)}K)` : ""}`);
+        },
+      );
+      rawData = fetchResult.mergedData;
+      logPoll(`  Fetch complete: ${fetchResult.succeeded.length}/${enabledSources.length} sources, ${rawData.length} chars total`);
+      if (fetchResult.errors.length > 0) {
+        logPoll(`  Fetch errors: ${fetchResult.errors.map(e => `${e.source}: ${e.error}`).join(", ")}`);
+      }
+      addDebugEntry("out", `✅ ${fetchResult.succeeded.length} sources: ${rawData.length} chars`, "fetch");
     } catch (err) {
       logPoll(`  Fetch ERROR: ${String(err).slice(0, 100)}`);
       addDebugEntry("out", `❌ Fetch error: ${String(err).slice(0, 100)}`, "fetch");
@@ -739,7 +669,7 @@ IMPORTANT: Assign tasks to these existing projects by name. Do NOT create duplic
 `;
     })()}
 Process this like ${userName} would going through their inbox.
-
+${getBusinessContextForPrompt()}
 ${triageSkills}
 
 ## Context-Specific Rules
@@ -854,14 +784,14 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
         if (!isDoneTransition) existing.priority = newPri;
       }
       if (changes.stage && typeof changes.stage === "string") {
-        const currentOrder = STAGE_ORDER[existing.stage ?? "new"] ?? 0;
-        const newOrder = STAGE_ORDER[changes.stage] ?? 0;
-        // PROTECT user-initiated stages: triage can only move tasks FORWARD or to done
-        // Never regress a task that's already in-progress (preparing, start_work, hack, etc.)
-        if (newOrder >= currentOrder || changes.stage === "done") {
+        // Triage can ONLY set terminal stages: done, skipped, backlog.
+        // ALL forward workflow transitions (new→start_work, preparing→ready, etc.)
+        // are user-initiated via drag or CTA clicks — never auto-advanced by triage.
+        const TRIAGE_ALLOWED_STAGES = new Set(["done", "skipped", "backlog"]);
+        if (TRIAGE_ALLOWED_STAGES.has(changes.stage)) {
           existing.stage = changes.stage;
         } else {
-          logPoll(`  BLOCKED stage regression: "${existing.title}" ${existing.stage} → ${changes.stage} (order ${currentOrder} → ${newOrder})`);
+          logPoll(`  BLOCKED triage stage change: "${existing.title}" ${existing.stage ?? "new"} → ${changes.stage} (triage can only set done/skipped/backlog)`);
         }
       }
       if (changes.summary && typeof changes.summary === "string") existing.summary = changes.summary;
@@ -1010,6 +940,7 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
             source: item.source as PollNotification["source"],
             priority: normalizePriority(item.priority),
             status: "new",
+            stage: "new",
             title: sub.title,
             summary: sub.summary ?? item.summary,
             url: sanitizeUrl(item.url),
@@ -1033,6 +964,7 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
           source: item.source as PollNotification["source"],
           priority: normalizePriority(item.priority),
           status: "new",
+          stage: "new",
           title: item.title,
           summary: item.summary,
           url: sanitizeUrl(item.url ?? item.links?.[0]?.url),
@@ -1056,6 +988,7 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
         source: item.source as PollNotification["source"],
         priority: normalizePriority(item.priority),
         status: "new",
+        stage: "new",
         title: item.title,
         summary: item.summary,
         url: sanitizeUrl(item.url ?? item.links?.[0]?.url),

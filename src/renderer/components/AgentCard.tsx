@@ -29,7 +29,7 @@ export function AgentCard({ agent }: { agent: Agent }) {
   const navigate = useNavigate();
   const elapsed = Math.round((Date.now() - new Date(agent.createdAt).getTime()) / 60000);
   const elapsedStr = elapsed < 60 ? `${elapsed}m` : `${Math.floor(elapsed / 60)}h ${String(elapsed % 60).padStart(2, "0")}m`;
-  const cwdShort = agent.cwd.split("/").pop() ?? agent.cwd;
+  const cwdShort = agent.cwd.replace(/^\/Users\/\w+\//, "~/").replace(/Documents\/GitHub\//, "");
   const tokenPct = agent.maxBudgetUsd ? Math.min(100, (agent.costUsd / agent.maxBudgetUsd) * 100) : 0;
 
   return (

@@ -87,12 +87,13 @@ describe("getEmptyStateMessage", () => {
     expect(getEmptyStateMessage("start_work")).toBeNull();
   });
 
-  it("returns null for preparing (should show loader, not static text)", () => {
-    expect(getEmptyStateMessage("preparing")).toBeNull();
+  it("returns message for preparing (agent done, user reviews)", () => {
+    // preparing no longer has inProgress — it shows a CTA "Mark Ready" once agent finishes
+    expect(getEmptyStateMessage("preparing")).toBe("No conversation yet.");
   });
 
-  it("returns null for plan_review (plan exists, agent tab shows conversation)", () => {
-    expect(getEmptyStateMessage("plan_review")).toBeNull();
+  it("returns message for plan_review directing user to Plan tab", () => {
+    expect(getEmptyStateMessage("plan_review")).toBe("Plan ready — switch to the Plan tab to review.");
   });
 
   it("returns null for hack (work agent should be running)", () => {

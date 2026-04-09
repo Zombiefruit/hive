@@ -13,16 +13,16 @@ export type Stage = typeof VALID_STAGES[number];
 
 /** Stage ordering for consolidation — higher = more progress. */
 export const STAGE_ORDER: Record<string, number> = {
-  skipped: 0, backlog: 1, new: 2, preparing: 3, ready: 3,
-  start_work: 4, plan_review: 5, hack: 6, ship: 7,
-  code_review: 8, pr_feedback: 9, done: 10,
+  skipped: 0, backlog: 1, new: 2, preparing: 3, ready: 4,
+  start_work: 5, plan_review: 6, hack: 7, ship: 8,
+  code_review: 9, pr_feedback: 10, done: 11,
 };
 
 export const CONFIDENCE_THRESHOLD = 5;
 
 /** Task type categorization. */
-export const AGENT_ACTIONABLE_TYPES = new Set(["implementation", "investigation", "review"]);
-export const HUMAN_ONLY_TYPES = new Set(["meeting_prep", "response"]);
+export const AGENT_ACTIONABLE_TYPES = new Set(["implementation"]);
+export const HUMAN_ONLY_TYPES = new Set(["meeting_prep", "response", "review", "investigation"]);
 
 /** Valid stage transitions — maps each stage to its allowed next stages. */
 const VALID_TRANSITIONS: Record<string, string[]> = {

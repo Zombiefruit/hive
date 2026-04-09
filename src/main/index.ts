@@ -1,6 +1,7 @@
 import { app, BrowserWindow, shell } from "electron";
 import path from "node:path";
 import fs from "node:fs";
+import os from "node:os";
 import http from "node:http";
 import { initDatabase, closeDatabase, getAllAgents, getMessages, getPendingApprovals, getAllContextRefs, getRecentEvents, upsertExternalAgent, cleanupStaleExternalAgents } from "./db/database";
 import { registerIpcHandlers, startStoreSync, stopStoreSync } from "./ipc/bridge";
@@ -11,10 +12,10 @@ import { enrichExternalAgents } from "./agents/session-enricher";
 import { startSessionTailing, stopSessionTailing } from "./agents/session-tailer";
 import { addContextFromUrl } from "./agents/context-tracker";
 import { listAllSessions } from "./agents/session-history";
-import { startPolling, stopPolling, getNotifications, dismissNotification, startWorkOnNotification, clearAllNotifications, forcePoll, hasPolledOnce, getSkippedItems, updateNotificationByTitle, updateNotificationById, upsertNotification, createManualNotification } from "./notifications/poll-service";
+import { startPolling, stopPolling, getNotifications, forcePoll, hasPolledOnce, getSkippedItems, updateNotificationByTitle, updateNotificationById, upsertNotification, createManualNotification } from "./notifications/poll-service";
 import { startBridge, stopBridge, restartBridge, getBridgeDebugLog, clearBridgeDebugLog, getBridgeStatus, startFetchBridge, stopFetchBridge } from "./mcp-bridge";
 import { getProcessStats, startProcessSampling, stopProcessSampling } from "./process-monitor";
-import { prepareWorkPlan, iteratePlan, startWorkAgent, getPlan, clearPlan, getAllPlans, getActiveWorkAgents } from "./notifications/work-dispatcher";
+import { prepareWorkPlan, iteratePlan, startWorkAgent, getPlan, setPlan, clearPlan, getAllPlans, getActiveWorkAgents } from "./notifications/work-dispatcher";
 import { startMonitoring, stopMonitoring } from "./notifications/agent-monitor";
 import {
   initManager,
@@ -27,7 +28,7 @@ import {
   getActiveManagerMessages,
   stopManager,
 } from "./manager/manager-ai";
-import { runSkill, checkRequiredSkills, sendToSkill, isSkillRunning, type SkillInvocation } from "./skill-runner";
+import { runSkill, checkRequiredSkills, sendToSkill, isSkillRunning, getRunningSkillIds, type SkillInvocation } from "./skill-runner";
 import type { PlanningEvent } from "./mcp-bridge";
 import { getAllProjects, getProject } from "../shared/project-model";
 import { startSlackHook, stopSlackHook } from "./notifications/slack-hook-service";
@@ -258,15 +259,6 @@ app.whenReady().then(() => {
   ipcMain.handle("notifications:get", () => {
     return { items: getNotifications(), skipped: getSkippedItems(), hasPolled: hasPolledOnce() };
   });
-  ipcMain.handle("notifications:dismiss", (_event, id: string) => {
-    dismissNotification(id);
-  });
-  ipcMain.handle("notifications:start-work", (_event, id: string) => {
-    startWorkOnNotification(id);
-  });
-  ipcMain.handle("notifications:clear", () => {
-    clearAllNotifications();
-  });
   ipcMain.handle("notifications:refresh", (_event, lookbackHours?: number) => {
     forcePoll(lookbackHours);
   });
@@ -297,6 +289,16 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("work:clear-plan", (_event, notificationId: string) => {
     clearPlan(notificationId);
+    // Also clear the events cache so old events don't mix with new runs
+    try {
+      const cachePath = path.join(app.getPath("userData"), "planning-events-cache.json");
+      const cache = JSON.parse(fs.readFileSync(cachePath, "utf-8"));
+      delete cache[notificationId];
+      fs.writeFileSync(cachePath, JSON.stringify(cache));
+    } catch {}
+  });
+  ipcMain.handle("work:set-plan", (_event, notificationId: string, plan: unknown) => {
+    setPlan(notificationId, plan as Parameters<typeof setPlan>[1]);
   });
 
   ipcMain.handle("work:get-all-plans", () => {
@@ -436,6 +438,11 @@ app.whenReady().then(() => {
     return isSkillRunning(notificationId);
   });
 
+  // Get all notification IDs with running skills (for Kanban card indicators)
+  ipcMain.handle("skill:running-ids", () => {
+    return getRunningSkillIds();
+  });
+
   ipcMain.handle("skill:check", () => checkRequiredSkills());
 
   // Worktree operations
@@ -496,26 +503,38 @@ app.whenReady().then(() => {
   // Send a Slack message via the poll bridge (for response tasks)
   ipcMain.handle("slack:send-message", async (_event, channel: string, threadTs: string, text: string) => {
     try {
-      const { askBridge } = require("./mcp-bridge");
-      const result = await askBridge(
-        `Use mcp__claude_ai_Slack__slack_send_message with channel_id "${channel}", thread_ts "${threadTs}", and text "${text.replace(/"/g, '\\"')}". Return "sent" on success.`,
-        60000
-      );
-      return { ok: true, data: result };
+      // Run the /send-slack skill — has slack_send_message in allowed tools
+      const result = await runSkill({
+        skill: "/send-slack",
+        args: `Send to channel ${channel}${threadTs ? ` in thread ${threadTs}` : ""}: "${text}"`,
+        repoPath: app.isPackaged ? os.homedir() : app.getAppPath(),
+        sessionId: null,
+        notificationId: `slack-send-${Date.now()}`,
+      });
+      return { ok: result.success, data: result.resultText, error: result.error ?? undefined };
     } catch (err) {
       return { ok: false, error: String(err) };
     }
   });
 
   ipcMain.handle("linear:update", async (_event, data: { ticket: string; field: string; value: string }) => {
+    const logPath = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "linear-update.log");
+    const log = (msg: string) => { try { fs.appendFileSync(logPath, `${new Date().toISOString()} ${msg}\n`); } catch {} };
+    log(`IPC received: ${JSON.stringify(data)}`);
     try {
-      const { askBridge } = require("./mcp-bridge");
-      const result = await askBridge(
-        `Use mcp__claude_ai_Linear__save_issue to update issue ${data.ticket}: set ${data.field} to "${data.value}". Return "updated" on success.`,
-        30000,
-      );
-      return { ok: true, data: result };
+      const linearField = data.field === "status" ? "state" : data.field;
+      log(`Running /update-linear skill: ${data.ticket} ${linearField}=${data.value}`);
+      const result = await runSkill({
+        skill: "/update-linear",
+        args: `Update ${data.ticket}: set ${linearField} to "${data.value}"`,
+        repoPath: app.isPackaged ? os.homedir() : app.getAppPath(),
+        sessionId: null,
+        notificationId: `linear-update-${Date.now()}`,
+      });
+      log(`Skill result: success=${result.success} text=${result.resultText?.slice(0, 100)} error=${result.error}`);
+      return { ok: result.success, data: result.resultText, error: result.error ?? undefined };
     } catch (err) {
+      log(`ERROR: ${String(err)}`);
       return { ok: false, error: String(err) };
     }
   });
@@ -529,11 +548,82 @@ app.whenReady().then(() => {
     } catch { return []; }
   });
 
+  ipcMain.handle("github:find-pr", async (_event, branch: string) => {
+    try {
+      const { execFileSync } = await import("node:child_process");
+      const result = execFileSync("gh", ["pr", "list", "--head", branch, "--json", "url", "--limit", "1"], { timeout: 10000 }).toString();
+      const prs = JSON.parse(result);
+      return prs.length > 0 ? prs[0].url : null;
+    } catch { return null; }
+  });
+
+  ipcMain.handle("github:post-review", async (_event, branch: string, reviewBody: string) => {
+    try {
+      const { execFileSync } = await import("node:child_process");
+      // Find PR number for this branch
+      const prJson = execFileSync("gh", ["pr", "list", "--head", branch, "--json", "number", "--limit", "1"], { timeout: 10000 }).toString();
+      const prs = JSON.parse(prJson);
+      if (prs.length === 0) return { ok: false, error: "No PR found for this branch" };
+      const prNumber = prs[0].number;
+      // Post comment
+      execFileSync("gh", ["pr", "comment", String(prNumber), "--body", reviewBody], { timeout: 15000 });
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String(err).slice(0, 200) };
+    }
+  });
+
   ipcMain.handle("skill:read-plan", async (_event, repoPath: string, workSlug: string) => {
     try {
       const planPath = path.join(repoPath, ".work", workSlug, "plan.md");
       return fs.readFileSync(planPath, "utf-8");
     } catch { return null; }
+  });
+
+  ipcMain.handle("work:get-diff", async (_event, repoPath: string, branch?: string) => {
+    try {
+      const { execFileSync } = await import("node:child_process");
+      const cwd = repoPath;
+
+      // Determine base branch (main or master)
+      let base = "main";
+      try {
+        execFileSync("git", ["rev-parse", "--verify", "main"], { cwd, timeout: 5000 });
+      } catch {
+        base = "master";
+      }
+
+      let diffStatRaw: string;
+      if (branch) {
+        // Diff the feature branch against base — shows all changes on the branch
+        try {
+          diffStatRaw = execFileSync("git", ["diff", "--numstat", `${base}...${branch}`], { cwd, timeout: 10000 }).toString();
+        } catch {
+          // Branch might not exist locally — fall back to HEAD diff
+          diffStatRaw = execFileSync("git", ["diff", "--numstat", "HEAD"], { cwd, timeout: 10000 }).toString();
+        }
+      } else {
+        diffStatRaw = execFileSync("git", ["diff", "--numstat", "HEAD"], { cwd, timeout: 10000 }).toString();
+      }
+
+      const files = diffStatRaw.trim().split("\n").filter(Boolean).map(line => {
+        const [add, del, ...pathParts] = line.split("\t");
+        return { path: pathParts.join("\t"), additions: parseInt(add) || 0, deletions: parseInt(del) || 0 };
+      });
+      const totalAdditions = files.reduce((s, f) => s + f.additions, 0);
+      const totalDeletions = files.reduce((s, f) => s + f.deletions, 0);
+      return { files, totalAdditions, totalDeletions, diffText: "" };
+    } catch { return null; }
+  });
+
+  ipcMain.handle("skill:write-plan", async (_event, repoPath: string, workSlug: string, planText: string) => {
+    try {
+      const workDir = path.join(repoPath, ".work", workSlug);
+      fs.mkdirSync(workDir, { recursive: true });
+      const planPath = path.join(workDir, "plan.md");
+      fs.writeFileSync(planPath, planText, "utf-8");
+      return true;
+    } catch { return false; }
   });
 
   ipcMain.handle("skill:read-review", async (_event, repoPath: string, workSlug: string) => {
@@ -581,6 +671,15 @@ app.whenReady().then(() => {
         results.context = "fresh";
       }
     } catch { results.context = "failed"; }
+    try {
+      const { reflectNeedsRefresh, refreshReflectAnalysis } = await import("./coach/service");
+      if (reflectNeedsRefresh()) {
+        refreshReflectAnalysis().catch(() => {});
+        (results as Record<string, string>).reflect = "triggered";
+      } else {
+        (results as Record<string, string>).reflect = "fresh";
+      }
+    } catch { (results as Record<string, string>).reflect = "failed"; }
     return results;
   });
 
@@ -615,7 +714,11 @@ app.whenReady().then(() => {
   });
   ipcMain.handle("reflect:data", async () => {
     const { getReflectData } = await import("./coach/service");
-    return getReflectData();
+    // 45s timeout to prevent perpetual loading in the renderer
+    return Promise.race([
+      getReflectData(),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 45000)),
+    ]);
   });
 
   // Usage tracking
