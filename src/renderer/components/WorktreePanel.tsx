@@ -26,15 +26,17 @@ export function WorktreePanel({ repoPath, branch, sessionId }: WorktreePanelProp
     return () => { cancelled = true; };
   }, [repoPath, branch]);
 
-  if (!worktree) return null;
+  // Show panel even without a worktree — just display repo/branch info
+  const effectiveWorktree = worktree ?? (repoPath ? { path: repoPath, branch: branch ?? "", head: "", headMessage: "", modifiedFiles: 0, untrackedFiles: 0 } as WorktreeInfo : null);
+  if (!effectiveWorktree) return null;
 
   // Truncate path for display: show last 3 segments
-  const pathParts = worktree.path.split("/");
+  const pathParts = effectiveWorktree.path.split("/");
   const shortPath = pathParts.length > 3
     ? ".../" + pathParts.slice(-3).join("/")
-    : worktree.path;
+    : effectiveWorktree.path;
 
-  const totalChanges = worktree.modifiedFiles + worktree.untrackedFiles;
+  const totalChanges = effectiveWorktree.modifiedFiles + effectiveWorktree.untrackedFiles;
 
   return (
     <div
@@ -52,7 +54,7 @@ export function WorktreePanel({ repoPath, branch, sessionId }: WorktreePanelProp
           <Group gap={6} mb={2} wrap="nowrap">
             <IconGitBranch size={12} color="var(--mantine-color-teal-5)" style={{ flexShrink: 0 }} />
             <Text size="xs" fw={600} truncate style={{ color: "var(--mantine-color-teal-4)" }}>
-              {worktree.branch}
+              {effectiveWorktree.branch}
             </Text>
             {totalChanges > 0 && (
               <Badge size="xs" variant="light" color="yellow" style={{ flexShrink: 0 }}>
@@ -62,7 +64,7 @@ export function WorktreePanel({ repoPath, branch, sessionId }: WorktreePanelProp
           </Group>
 
           {/* Path (truncated, mono) */}
-          <Tooltip label={worktree.path} position="bottom" withArrow>
+          <Tooltip label={effectiveWorktree.path} position="bottom" withArrow>
             <Text
               size="xs"
               c="dimmed"
@@ -78,13 +80,13 @@ export function WorktreePanel({ repoPath, branch, sessionId }: WorktreePanelProp
           </Tooltip>
 
           {/* Commit info */}
-          {worktree.head && (
+          {effectiveWorktree.head && (
             <Text size="xs" c="dimmed" truncate style={{ fontSize: "0.6rem", marginTop: 2 }}>
               <span style={{ fontFamily: "var(--mantine-font-family-monospace)", color: "var(--mantine-color-violet-4)" }}>
-                {worktree.head}
+                {effectiveWorktree.head}
               </span>
-              {worktree.headMessage && (
-                <span style={{ marginLeft: 4 }}>{worktree.headMessage}</span>
+              {effectiveWorktree.headMessage && (
+                <span style={{ marginLeft: 4 }}>{effectiveWorktree.headMessage}</span>
               )}
             </Text>
           )}
@@ -95,7 +97,7 @@ export function WorktreePanel({ repoPath, branch, sessionId }: WorktreePanelProp
           {sessionId && (
             <Tooltip label="Resume in Terminal" position="left" withArrow>
               <UnstyledButton
-                onClick={() => window.deck.resumeInTerminal?.(worktree.path, sessionId)}
+                onClick={() => window.deck.resumeInTerminal?.(effectiveWorktree.path, sessionId)}
                 style={{
                   padding: "6px",
                   borderRadius: 6,
@@ -112,7 +114,7 @@ export function WorktreePanel({ repoPath, branch, sessionId }: WorktreePanelProp
           )}
           <Tooltip label="Open in editor" position="left" withArrow>
             <UnstyledButton
-              onClick={() => window.deck.openWorktreeInEditor(worktree.path)}
+              onClick={() => window.deck.openWorktreeInEditor(effectiveWorktree.path)}
               style={{
                 padding: "6px",
                 borderRadius: 6,
