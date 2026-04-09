@@ -464,19 +464,13 @@ async function poll(): Promise<void> {
         .map(c => `- ${c.name} (${c.role}) direct ask = ${c.role === "lead" ? "critical" : c.role === "pm" ? "high" : "high"} priority`),
     ].join("\n");
 
-    // PASS 1: Fetch each source in parallel with its own Haiku agent.
-    // Each agent fetches + summarizes its findings. Summaries are small enough
-    // that triage never hits context limits.
-    logPoll("Pass 1: Fetching sources in parallel (one agent per source, each summarizes)");
+    // PASS 1: Fetch ALL sources in a SINGLE prompt.
+    // One Haiku agent fetches everything — per-source splitting caused Haiku to
+    // short-circuit and return empty results instead of calling MCP tools.
+    logPoll("Pass 1: Fetching all sources (single prompt)");
 
-    const enabledSources: SourceName[] = [];
-    if (integrations.slack && userSlackId) enabledSources.push("slack");
-    if (integrations.linear && linearUser) enabledSources.push("linear");
-    if (integrations.calendar) enabledSources.push("calendar");
-    if (integrations.gmail) enabledSources.push("gmail");
-    if (integrations.notion) enabledSources.push("notion");
-
-    const enabledSourceNames = enabledSources.map(s => s.charAt(0).toUpperCase() + s.slice(1));
+    const fetchSections: string[] = [];
+    const enabledSourceNames: string[] = [];
 
     for (const win of BrowserWindow.getAllWindows()) {
       try {
@@ -488,23 +482,54 @@ async function poll(): Promise<void> {
       } catch {}
     }
 
-    const sourceFetchConfig: SourceFetchConfig = {
-      userName,
-      userSlackId,
-      linearUser: linearUser ?? undefined,
-      teamName: config?.teamName ?? "Vector",
-      slackBaseUrl: getSlackBaseUrl(),
-      channels,
-      managerSlackId: managerSlackId || undefined,
-      managerName: managerName || undefined,
-      hours,
-      cutoffStr,
-    };
-
-    // Build per-source prompts and fetch in parallel
-    const sourcePrompts = new Map<SourceName, string>();
-    for (const source of enabledSources) {
-      sourcePrompts.set(source, buildSourcePrompt(source, sourceFetchConfig));
+    // Build the combined fetch prompt from enabled integrations
+    if (integrations.slack && userSlackId) {
+      enabledSourceNames.push("Slack");
+      const slackLimit = hours <= 8 ? 50 : hours <= 24 ? 75 : 50;
+      const channelList = channels.map(ch => `- slack_read_channel: channel_id "${ch.id}" (${ch.name}), limit ${slackLimit}`).join("\n");
+      const slackSearches = [
+        `- slack_search_public_and_private: query "<@${userSlackId}> after:${slackAfter}"`,
+        `- slack_search_public_and_private: query "to:${userSlackId} after:${slackAfter}"`,
+        ...(managerSlackId ? [`- slack_search_public_and_private: query "from:<@${managerSlackId}> after:${slackAfter}" (messages from ${managerName || "manager"})`] : []),
+      ].join("\n");
+      const slackSkill = loadSkillTemplate("fetch-slack", {
+        SLACK_LIMIT: String(slackLimit),
+        USER_NAME: userName,
+        USER_SLACK_ID: userSlackId,
+        CHANNEL_LIST: channelList,
+        SLACK_BASE_URL: getSlackBaseUrl(),
+      });
+      fetchSections.push(`## SLACK\n${slackSearches}\n${channelList}\n${slackSkill}`);
+    }
+    if (integrations.linear && linearUser) {
+      enabledSourceNames.push("Linear");
+      const linearLimit = hours > 48 ? 250 : 100;
+      const linearSkill = loadSkillTemplate("fetch-linear", {
+        LINEAR_USER: linearUser,
+        LINEAR_LIMIT: String(linearLimit),
+        TEAM_NAME: config?.teamName ?? "Vector",
+        LINEAR_TEAM_LIMIT: String(Math.round(linearLimit / 2)),
+      });
+      fetchSections.push(`## LINEAR\n${linearSkill}`);
+    }
+    if (integrations.calendar) {
+      enabledSourceNames.push("Calendar");
+      const calSkill = loadSkillTemplate("fetch-calendar", { CURRENT_TIME: new Date().toISOString() });
+      fetchSections.push(`## CALENDAR\n${calSkill}`);
+    }
+    if (integrations.gmail) {
+      enabledSourceNames.push("Gmail");
+      const gmailLimit = hours > 48 ? 50 : 30;
+      const gmailSkill = loadSkillTemplate("fetch-gmail", {
+        GMAIL_NEWER: hours <= 24 ? "1d" : hours <= 48 ? "2d" : "7d",
+        GMAIL_LIMIT: String(gmailLimit),
+      });
+      fetchSections.push(`## GMAIL\n${gmailSkill}`);
+    }
+    if (integrations.notion) {
+      enabledSourceNames.push("Notion");
+      const notionSkill = loadSkillTemplate("fetch-notion", { USER_NAME: userName });
+      fetchSections.push(`## NOTION\n${notionSkill}`);
     }
 
     // Pre-fetch: get GitHub PR status directly via gh CLI (fast, no MCP needed)
@@ -537,11 +562,20 @@ async function poll(): Promise<void> {
       }
     }
 
-    const fetchStart = Date.now();
-    logPoll(`  Fetching ${enabledSources.length} sources in parallel: ${enabledSourceNames.join(", ")}`);
-    addDebugEntry("in", `📤 Fetching: ${enabledSourceNames.join(", ")} (parallel)`, "fetch");
+    const fetchPrompt = `Fetch data from ALL of these sources. Execute all API calls — do not skip any. Call tools in parallel where possible.
 
-    // Broadcast elapsed time every 10s
+${fetchSections.join("\n\n")}
+
+RULES:
+- Only include data from after ${cutoffStr}
+- Return ALL results as plain text, organized by source with ## headers
+- Be thorough and complete — include everything relevant
+- NEVER add commentary like "Let me compile..." or "I have enough data..." — return ONLY the data itself`;
+
+    const fetchStart = Date.now();
+    logPoll(`  Sending combined fetch prompt for: ${enabledSourceNames.join(", ")}`);
+    addDebugEntry("in", `📤 Fetching all: ${enabledSourceNames.join(", ")}`, "fetch");
+
     const broadcastElapsed = (phase: string, startMs: number) => {
       const elapsed = Math.round((Date.now() - startMs) / 1000);
       for (const win of BrowserWindow.getAllWindows()) {
@@ -559,24 +593,10 @@ async function poll(): Promise<void> {
 
     let rawData = "";
     try {
-      const fetchResult = await fetchSourcesParallel(
-        enabledSources,
-        async (source: string) => {
-          const prompt = sourcePrompts.get(source as SourceName) ?? "";
-          // 120s timeout per source — prevents one hung MCP server from blocking all sources
-          return askFetchBridge(prompt, 120000);
-        },
-        (progress) => {
-          logPoll(`  Source ${progress.source}: ${progress.status} (${progress.chars ?? 0} chars)`);
-          emitThought(`${progress.source} ${progress.status}${progress.chars ? ` (${Math.round(progress.chars / 1000)}K)` : ""}`);
-        },
-      );
-      rawData = fetchResult.mergedData;
-      logPoll(`  Fetch complete: ${fetchResult.succeeded.length}/${enabledSources.length} sources, ${rawData.length} chars total`);
-      if (fetchResult.errors.length > 0) {
-        logPoll(`  Fetch errors: ${fetchResult.errors.map(e => `${e.source}: ${e.error}`).join(", ")}`);
-      }
-      addDebugEntry("out", `✅ ${fetchResult.succeeded.length} sources: ${rawData.length} chars`, "fetch");
+      rawData = await askFetchBridge(fetchPrompt);
+      logPoll(`  Fetch complete (Haiku): ${rawData.length} chars`);
+      emitThought(`fetched ${Math.round(rawData.length / 1000)}K chars — computing diff...`);
+      addDebugEntry("out", `✅ All sources: ${rawData.length} chars`, "fetch");
     } catch (err) {
       logPoll(`  Fetch ERROR: ${String(err).slice(0, 100)}`);
       addDebugEntry("out", `❌ Fetch error: ${String(err).slice(0, 100)}`, "fetch");
