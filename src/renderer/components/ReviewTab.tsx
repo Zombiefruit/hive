@@ -5,8 +5,7 @@
 
 import { Badge, Group, Loader, Stack, Text, UnstyledButton } from "@mantine/core";
 import { IconCheck, IconFileText, IconBrandGithub } from "@tabler/icons-react";
-import { useEffect, useState, useMemo } from "react";
-import { marked } from "marked";
+import { useEffect, useState } from "react";
 
 interface ReviewTabProps {
   repoPath?: string;
@@ -41,14 +40,6 @@ export function ReviewTab({ repoPath, workSlug, branch, prUrl }: ReviewTabProps)
 
     return () => { cancelled = true; clearInterval(interval); };
   }, [repoPath, workSlug]);
-
-  // Render markdown
-  const renderedHtml = useMemo(() => {
-    if (reviews.length === 0) return "";
-    return reviews.map(r => {
-      try { return marked.parse(r) as string; } catch { return r; }
-    }).join("<hr/>");
-  }, [reviews]);
 
   const handlePostToPr = async () => {
     if (!branch || posting) return;
@@ -92,7 +83,7 @@ export function ReviewTab({ repoPath, workSlug, branch, prUrl }: ReviewTabProps)
         <Group gap={8}>
           {criticals > 0 && <Badge color="red" size="sm">{criticals} critical</Badge>}
           {warnings > 0 && <Badge color="yellow" size="sm">{warnings} warning</Badge>}
-          {criticals === 0 && warnings === 0 && <Badge color="green" size="sm"><IconCheck size={10} /> Clean</Badge>}
+          {/* No summary badges if clean — the review content speaks for itself */}
         </Group>
         {(prUrl || branch) && (
           <UnstyledButton
@@ -112,17 +103,18 @@ export function ReviewTab({ repoPath, workSlug, branch, prUrl }: ReviewTabProps)
         )}
       </Group>
 
-      {/* Rendered markdown */}
-      <div
-        className="review-markdown"
-        style={{
+      {/* Raw markdown — preserves formatting without ugly HTML rendering */}
+      {reviews.map((review, i) => (
+        <div key={i} style={{
           padding: "10px 12px", borderRadius: 8,
           background: "var(--aegen-glass-bg)", border: "1px solid var(--aegen-glass-border)",
-          fontSize: "0.8rem", lineHeight: 1.6,
           overflow: "auto",
-        }}
-        dangerouslySetInnerHTML={{ __html: renderedHtml }}
-      />
+        }}>
+          <Text size="xs" style={{ whiteSpace: "pre-wrap", lineHeight: 1.6, fontSize: "0.75rem" }}>
+            {review}
+          </Text>
+        </div>
+      ))}
     </div>
   );
 }
