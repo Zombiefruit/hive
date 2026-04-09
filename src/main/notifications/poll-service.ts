@@ -364,7 +364,7 @@ export function flushCache(): void {
 }
 
 async function poll(): Promise<void> {
-  if (isPolling) return;
+  if (isPolling) { pendingRefresh = true; return; }
   isPolling = true;
   currentPollCycle++;
   logPoll(`poll starting (cycle ${currentPollCycle})`);
@@ -1398,6 +1398,21 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
       for (const idx of indices) {
         notifications.splice(idx, 1);
       }
+    }
+
+    // Cap notification count — remove oldest terminal (done/skipped) items beyond 500
+    const MAX_NOTIFICATIONS = 500;
+    if (notifications.length > MAX_NOTIFICATIONS) {
+      const terminalStages = new Set(["done", "skipped"]);
+      // Remove oldest terminal items first
+      let removed = 0;
+      for (let i = notifications.length - 1; i >= 0 && notifications.length > MAX_NOTIFICATIONS; i--) {
+        if (terminalStages.has(notifications[i].stage ?? "")) {
+          notifications.splice(i, 1);
+          removed++;
+        }
+      }
+      if (removed > 0) logPoll(`Trimmed ${removed} old terminal notifications (cap: ${MAX_NOTIFICATIONS})`);
     }
 
     // Await triage judge verdict (should be done by now — ran in parallel with parsing)

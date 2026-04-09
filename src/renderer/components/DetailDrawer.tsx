@@ -156,12 +156,9 @@ export function DetailDrawer({
       } catch {}
       // Auto-discover PR if task has a branch but no PR link
       const hasPrLink = (n.links ?? []).some(l => l.type === "github_pr");
-      console.log(`[DetailDrawer] PR discovery: branch=${n.branch}, hasPrLink=${hasPrLink}`);
       if (n.branch && !hasPrLink) {
         try {
-          console.log(`[DetailDrawer] Calling findPrForBranch(${n.branch})`);
           const prUrl = await window.deck.findPrForBranch?.(n.branch);
-          console.log(`[DetailDrawer] findPrForBranch result: ${prUrl}`);
           if (!cancelled && prUrl) {
             window.deck?.updateNotificationById?.(n.id, {
               links: [...(n.links ?? []), { type: "github_pr", label: `PR ${prUrl.split("/").pop()}`, url: prUrl }],

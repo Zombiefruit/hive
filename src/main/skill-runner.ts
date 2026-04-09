@@ -9,7 +9,7 @@
  * - Streams PlanningEvents for real-time UI updates
  */
 
-import { spawn, ChildProcess, execSync } from "node:child_process";
+import { spawn, ChildProcess, execFileSync } from "node:child_process";
 import { getClaudeCodePath } from "./claude-path";
 import { trackProcess, untrackProcess } from "./process-monitor";
 import { recordUsage } from "./usage-ledger";
@@ -186,7 +186,7 @@ export function createWorktree(repoPath: string, branch: string): string {
 
   // 2. Check if this branch already has a worktree somewhere (via git worktree list)
   try {
-    const listOutput = execSync("git worktree list --porcelain", { cwd: repoPath, timeout: 10000 }).toString();
+    const listOutput = execFileSync("git", ["worktree", "list", "--porcelain"], { cwd: repoPath, timeout: 10000 }).toString();
     const lines = listOutput.split("\n");
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].startsWith("branch refs/heads/") && lines[i].endsWith(branch)) {
@@ -215,7 +215,7 @@ export function createWorktree(repoPath: string, branch: string): string {
   // 3a. Try checking out existing branch into new worktree
   const errors: string[] = [];
   try {
-    execSync(`git worktree add "${worktreePath}" "${branch}"`, { cwd: repoPath, timeout: 30000 });
+    execFileSync("git", ["worktree", "add", worktreePath, branch], { cwd: repoPath, timeout: 30000 });
     log(`[worktree] Created: ${worktreePath} (branch: ${branch})`);
     return worktreePath;
   } catch (err) {
@@ -226,7 +226,7 @@ export function createWorktree(repoPath: string, branch: string): string {
 
   // 3b. Branch might not exist — create from HEAD
   try {
-    execSync(`git worktree add -b "${branch}" "${worktreePath}" HEAD`, { cwd: repoPath, timeout: 30000 });
+    execFileSync("git", ["worktree", "add", "-b", branch, worktreePath, "HEAD"], { cwd: repoPath, timeout: 30000 });
     log(`[worktree] Created with new branch: ${worktreePath}`);
     return worktreePath;
   } catch (err) {
@@ -237,7 +237,7 @@ export function createWorktree(repoPath: string, branch: string): string {
 
   // 3c. Branch exists but worktree add failed — try detached HEAD at branch tip
   try {
-    execSync(`git worktree add --detach "${worktreePath}" "${branch}"`, { cwd: repoPath, timeout: 30000 });
+    execFileSync("git", ["worktree", "add", "--detach", worktreePath, branch], { cwd: repoPath, timeout: 30000 });
     log(`[worktree] Created detached at ${branch}: ${worktreePath}`);
     return worktreePath;
   } catch (err) {
@@ -248,8 +248,8 @@ export function createWorktree(repoPath: string, branch: string): string {
 
   // 3d. Last resort: prune stale worktrees and retry once
   try {
-    execSync("git worktree prune", { cwd: repoPath, timeout: 10000 });
-    execSync(`git worktree add "${worktreePath}" "${branch}"`, { cwd: repoPath, timeout: 30000 });
+    execFileSync("git", ["worktree", "prune"], { cwd: repoPath, timeout: 10000 });
+    execFileSync("git", ["worktree", "add", worktreePath, branch], { cwd: repoPath, timeout: 30000 });
     log(`[worktree] Created after prune: ${worktreePath}`);
     return worktreePath;
   } catch {
@@ -268,7 +268,7 @@ export function createWorktree(repoPath: string, branch: string): string {
 export function cleanupWorktree(repoPath: string, worktreePath: string): void {
   if (worktreePath === repoPath) return; // Not a worktree
   try {
-    execSync(`git worktree remove "${worktreePath}" --force`, { cwd: repoPath, timeout: 15000 });
+    execFileSync("git", ["worktree", "remove", worktreePath, "--force"], { cwd: repoPath, timeout: 15000 });
     log(`[worktree] Cleaned up: ${worktreePath}`);
   } catch {
     log(`[worktree] Cleanup failed (may already be removed): ${worktreePath}`);
@@ -338,7 +338,7 @@ export function runSkill(
       } catch {}
       if (!branch) {
         try {
-          branch = execSync("git rev-parse --abbrev-ref HEAD", { cwd: invocation.repoPath, timeout: 5000 }).toString().trim();
+          branch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: invocation.repoPath, timeout: 5000 }).toString().trim();
         } catch {}
       }
       if (branch && branch !== "HEAD" && branch !== "main" && branch !== "master") {

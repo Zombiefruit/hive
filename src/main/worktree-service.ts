@@ -2,7 +2,7 @@
  * Worktree Service — list git worktrees, find worktree for a task, open in editor.
  */
 
-import { execSync, exec } from "node:child_process";
+import { execSync, execFile } from "node:child_process";
 import fs from "node:fs";
 import type { WorktreeInfo, EditorCommand } from "../shared/worktree-types";
 
@@ -114,27 +114,28 @@ export function openInEditor(worktreePath: string, editor: EditorCommand, custom
     throw new Error(`Worktree path does not exist: ${worktreePath}`);
   }
 
-  let cmd: string;
+  let bin: string;
   switch (editor) {
     case "code":
-      cmd = `code "${worktreePath}"`;
+      bin = "code";
       break;
     case "cursor":
-      cmd = `cursor "${worktreePath}"`;
+      bin = "cursor";
       break;
     case "zed":
-      cmd = `zed "${worktreePath}"`;
+      bin = "zed";
       break;
     case "custom":
       if (!customCmd) throw new Error("Custom editor command not configured");
-      cmd = `${customCmd} "${worktreePath}"`;
+      bin = customCmd;
       break;
     default:
-      cmd = `code "${worktreePath}"`;
+      bin = "code";
   }
 
-  // Fire-and-forget — don't block on editor launch
-  exec(cmd, (err) => {
+  // Fire-and-forget — don't block on editor launch.
+  // Use execFile (no shell) to avoid command injection via worktreePath or customCmd.
+  execFile(bin, [worktreePath], (err) => {
     if (err) console.error(`[worktree-service] Failed to open editor: ${err.message}`);
   });
 }

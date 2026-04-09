@@ -406,6 +406,8 @@ app.whenReady().then(() => {
   // Skill runner
   ipcMain.handle("skill:run", async (_event, invocation: SkillInvocation) => {
     const cachePath = path.join(app.getPath("userData"), "planning-events-cache.json");
+    let eventCacheMemory: Record<string, Array<{ type: string; content: string; timestamp: string }>> = {};
+    let eventCacheTimer: ReturnType<typeof setTimeout> | null = null;
     const onEvent = (event: PlanningEvent) => {
       // Broadcast to all renderer windows
       for (const win of BrowserWindow.getAllWindows()) {
@@ -414,16 +416,21 @@ app.whenReady().then(() => {
         }
       }
       // Persist to event cache so events survive page navigation / drawer re-open
-      try {
-        let cache: Record<string, Array<{ type: string; content: string; timestamp: string }>> = {};
-        try { cache = JSON.parse(fs.readFileSync(cachePath, "utf-8")); } catch {}
-        if (!cache[invocation.notificationId]) cache[invocation.notificationId] = [];
-        cache[invocation.notificationId].push({ type: event.type, content: event.content, timestamp: event.timestamp });
-        if (cache[invocation.notificationId].length > 100) {
-          cache[invocation.notificationId] = cache[invocation.notificationId].slice(-100);
-        }
-        fs.writeFileSync(cachePath, JSON.stringify(cache));
-      } catch {}
+      // Debounced cache write — accumulate events in memory, flush every 500ms
+      if (Object.keys(eventCacheMemory).length === 0) {
+        try { eventCacheMemory = JSON.parse(fs.readFileSync(cachePath, "utf-8")); } catch { eventCacheMemory = {}; }
+      }
+      if (!eventCacheMemory[invocation.notificationId]) eventCacheMemory[invocation.notificationId] = [];
+      eventCacheMemory[invocation.notificationId].push({ type: event.type, content: event.content, timestamp: event.timestamp });
+      if (eventCacheMemory[invocation.notificationId].length > 100) {
+        eventCacheMemory[invocation.notificationId] = eventCacheMemory[invocation.notificationId].slice(-100);
+      }
+      if (!eventCacheTimer) {
+        eventCacheTimer = setTimeout(() => {
+          try { fs.writeFileSync(cachePath, JSON.stringify(eventCacheMemory)); } catch {}
+          eventCacheTimer = null;
+        }, 500);
+      }
     };
     return runSkill(invocation, onEvent);
   });
@@ -460,10 +467,23 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("worktree:resume-terminal", async (_event, cwd: string, sessionId: string) => {
-    const { exec } = await import("node:child_process");
-    // Open Terminal.app and run claude --resume
-    const cmd = `cd "${cwd}" && claude --resume "${sessionId}"`;
-    exec(`osascript -e 'tell application "Terminal" to do script "${cmd.replace(/"/g, '\\"')}"'`);
+    const { execFile } = await import("node:child_process");
+    const { writeFileSync, unlinkSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const nodePath = await import("node:path");
+
+    // Write a temp script to avoid shell injection via cwd/sessionId
+    const scriptPath = nodePath.join(tmpdir(), `relay-resume-${Date.now()}.sh`);
+    writeFileSync(
+      scriptPath,
+      `#!/bin/bash\ncd ${JSON.stringify(cwd)} && claude --resume ${JSON.stringify(sessionId)}\n`,
+      { mode: 0o755 },
+    );
+    execFile("open", ["-a", "Terminal", scriptPath], (err) => {
+      if (err) console.error(`[resume-terminal] Failed to open Terminal: ${err.message}`);
+    });
+    // Clean up the temp script after Terminal has had time to read it
+    setTimeout(() => { try { unlinkSync(scriptPath); } catch {} }, 5000);
     return { ok: true };
   });
 

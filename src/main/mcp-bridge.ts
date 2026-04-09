@@ -265,6 +265,13 @@ export function createBridge(label: string, model = "claude-opus-4-6[1m]"): Brid
         log(`[${label}] Exited (code ${code})`);
         bridgeProcess = null;
         isReady = false;
+        // Resolve all pending requests with an error so callers don't hang forever
+        for (const [reqId, req] of pendingRequests) {
+          if (req.timeout) clearTimeout(req.timeout);
+          req.resolve(`Bridge process exited (code ${code})`);
+          log(`[${label}] Rejected pending request ${reqId.slice(0, 8)} due to exit`);
+        }
+        pendingRequests.clear();
         if (startGen === generation) {
           log(`[${label}] Unexpected exit — auto-restarting in 5s`);
           setTimeout(() => instance.start(), 5000);

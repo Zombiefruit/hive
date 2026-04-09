@@ -7,6 +7,70 @@ marked.setOptions({
   gfm: true,
 });
 
+// --- HTML sanitization (XSS prevention) ---
+// Allowlisted tags that marked legitimately produces.
+const SAFE_TAG_SET = new Set([
+  "p", "br", "h1", "h2", "h3", "h4", "h5", "h6",
+  "ul", "ol", "li", "code", "pre", "em", "strong", "a",
+  "blockquote", "hr", "table", "thead", "tbody", "tr", "th", "td",
+  "span", "div", "img", "del", "input", "sup", "sub",
+]);
+
+// Attributes that are always safe regardless of tag.
+const SAFE_ATTR_SET = new Set([
+  "class", "id", "align", "colspan", "rowspan", "scope",
+  "type", "checked", "disabled", // for GFM task-list checkboxes
+]);
+
+// Per-tag extra allowed attributes.
+const TAG_ATTRS: Record<string, Set<string>> = {
+  a: new Set(["href", "title", "target", "rel"]),
+  img: new Set(["src", "alt", "title", "width", "height"]),
+};
+
+// Dangerous URI scheme prefixes (case-insensitive check).
+const DANGEROUS_URI_RE = /^\s*(javascript|vbscript|data)\s*:/i;
+
+/**
+ * Strip disallowed tags entirely; for allowed tags, strip disallowed or
+ * dangerous attributes (e.g. event handlers like onerror, onclick, etc.).
+ */
+function sanitizeHtml(html: string): string {
+  return html.replace(/<\/?([a-z][a-z0-9]*)\b([^>]*)?\/?>/gi, (full, tag: string, attrs: string) => {
+    const lower = tag.toLowerCase();
+    if (!SAFE_TAG_SET.has(lower)) return "";
+
+    // Closing tags have no attributes to worry about.
+    if (full.startsWith("</")) return `</${lower}>`;
+
+    // Parse and filter attributes.
+    const cleanAttrs: string[] = [];
+    const attrRe = /([a-z][a-z0-9-]*)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|(\S+)))?/gi;
+    let m: RegExpExecArray | null;
+    while ((m = attrRe.exec(attrs || "")) !== null) {
+      const name = m[1].toLowerCase();
+      const value = m[2] ?? m[3] ?? m[4] ?? "";
+
+      // Block all event handlers (on*).
+      if (name.startsWith("on")) continue;
+      // Block style (can contain expressions in old IE, and is an injection vector).
+      if (name === "style") continue;
+
+      // Must be in global safe set or tag-specific set.
+      if (!SAFE_ATTR_SET.has(name) && !TAG_ATTRS[lower]?.has(name)) continue;
+
+      // For URI-bearing attributes, block dangerous schemes.
+      if ((name === "href" || name === "src") && DANGEROUS_URI_RE.test(value)) continue;
+
+      cleanAttrs.push(`${name}="${value.replace(/"/g, "&quot;")}"`);
+    }
+
+    const selfClose = full.endsWith("/>") ? " /" : "";
+    const attrStr = cleanAttrs.length > 0 ? " " + cleanAttrs.join(" ") : "";
+    return `<${lower}${attrStr}${selfClose}>`;
+  });
+}
+
 const MARKDOWN_STYLES = `
 .md-content {
   font-size: 0.875rem;
@@ -94,7 +158,8 @@ const MARKDOWN_STYLES = `
 export function Markdown({ content }: { content: string }) {
   const html = useMemo(() => {
     try {
-      return marked.parse(content, { async: false }) as string;
+      const raw = marked.parse(content, { async: false }) as string;
+      return sanitizeHtml(raw);
     } catch {
       return content;
     }
