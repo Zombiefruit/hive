@@ -714,10 +714,11 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
 ## CRITICAL: Task Type Classification
 - **response**: Any DM, thread, or message where someone asked ${userName} something and they haven't replied. ANY unanswered message directed at ${userName} = response type. This includes: DMs, @mentions, "could you look at", "when can you", "thoughts on", thread replies asking for input.
 - **meeting_prep**: Calendar events happening in the future that ${userName} is attending.
-- **review**: PR reviews assigned to or requested from ${userName}. Code review requests.
+- **review**: PR reviews assigned to or requested from ${userName}. Code review requests. ALSO include reviews where the original assignee is mentioned as unavailable/OOO/PTO and ${userName} is tagged as a fallback — this is an implicit review request.
 - **implementation**: Linear tickets assigned to ${userName} that require building/coding.
 - **investigation**: Tasks that need research/analysis before building.
-- DO NOT classify everything as implementation. A DM asking "can you take a look?" is a RESPONSE, not an implementation task.`;
+- DO NOT classify everything as implementation. A DM asking "can you take a look?" is a RESPONSE, not an implementation task.
+- IMPLICIT REQUESTS: If someone tags ${userName} in a thread about a PR/task assigned to someone else AND mentions that person is OOO/PTO/unavailable, treat this as a direct request to ${userName}. The implication is "${userName} should handle this."`;
 
     const triageTimeout = hasCompletedFirstPoll ? 300000 : 600000;
     logPoll(`  Triage timeout: ${triageTimeout / 1000}s (first poll: ${!hasCompletedFirstPoll}), delta: ${triageData.length} chars`);
@@ -857,6 +858,17 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
         }
       }
       existing.pollCycle = currentPollCycle; // Mark as modified this cycle
+
+      // If the update has meaningful new info (new links, new action_needed, priority bump)
+      // and the task is past inbox, bump it back to inbox so the user re-evaluates.
+      // The plan, context, and links are preserved — only the stage changes.
+      const hasMeaningfulUpdate = Array.isArray(changes.links) || changes.action_needed || changes.priority;
+      const isPastInbox = existing.stage && existing.stage !== "new" && existing.stage !== "done" && existing.stage !== "skipped" && existing.stage !== "backlog";
+      if (hasMeaningfulUpdate && isPastInbox) {
+        logPoll(`  BUMPED to inbox: "${existing.title}" (was ${existing.stage}) — meaningful update received`);
+        existing.stage = "new";
+      }
+
       updated++;
       logPoll(`  UPDATE: "${existing.title}" — ${JSON.stringify(changes)}${upd.timeline_event ? ` | timeline: ${upd.timeline_event}` : ""}`);
     }
