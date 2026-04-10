@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, powerSaveBlocker } from "electron";
 import { askBridge, isBridgeReady, restartBridge, askFetchBridge, isFetchBridgeReady, restartFetchBridge, addDebugEntry, askEphemeralProcess } from "../mcp-bridge";
 import { computeDiff, computeSectionHashes } from "../../shared/poll-diff";
 import { getConfig } from "../config";
@@ -367,6 +367,9 @@ async function poll(): Promise<void> {
   if (isPolling) { pendingRefresh = true; return; }
   isPolling = true;
   currentPollCycle++;
+
+  // Prevent computer sleep during fetch/triage
+  const sleepBlockId = powerSaveBlocker.start("prevent-app-suspension");
   logPoll(`poll starting (cycle ${currentPollCycle})`);
 
   // Emit orchestrator thoughts during fetch so the orb shows activity
@@ -718,7 +721,10 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
 
     const triageTimeout = hasCompletedFirstPoll ? 300000 : 600000;
     logPoll(`  Triage timeout: ${triageTimeout / 1000}s (first poll: ${!hasCompletedFirstPoll}), delta: ${triageData.length} chars`);
-    const response = await askEphemeralProcess(triagePrompt, triageTimeout, "claude-sonnet-4-6", "poll-triage");
+    // Use advisor tool (Haiku + Opus) if available, else Sonnet ephemeral
+    const { triageWithAdvisor } = await import("../advisor-triage");
+    const { response, usedAdvisor } = await triageWithAdvisor(triagePrompt, triageTimeout);
+    if (usedAdvisor) logPoll(`  Triage used advisor tool (Haiku executor + Opus advisor)`);
     clearInterval(triageTicker);
     const triageElapsed = Math.round((Date.now() - triageStart) / 1000);
     if (response.includes("timed out")) {
@@ -1500,6 +1506,7 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
   } finally {
     isPolling = false;
     hasCompletedFirstPoll = true;
+    if (powerSaveBlocker.isStarted(sleepBlockId)) powerSaveBlocker.stop(sleepBlockId);
     broadcastNotifications();
 
     // Broadcast that polling is complete so UI can stop loading indicator

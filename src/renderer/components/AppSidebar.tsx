@@ -87,12 +87,13 @@ export function AppSidebar() {
         zIndex: 20,
       }}
     >
-      {/* Brand / drag region for macOS title bar */}
+      {/* Brand / drag region for macOS title bar — fixed height prevents layout shift */}
       <div
         style={{
           paddingTop: topPadding,
           paddingBottom: 2,
           paddingLeft: collapsed ? 0 : 12,
+          minHeight: 44,
           display: "flex",
           alignItems: "center",
           gap: 8,
