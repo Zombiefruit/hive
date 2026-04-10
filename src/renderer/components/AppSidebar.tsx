@@ -307,7 +307,7 @@ export function AppSidebar() {
               </Tooltip>
             </Menu.Target>
             <Menu.Dropdown>
-              <Menu.Item onClick={() => refresh()} disabled={isRefreshing} style={{ fontSize: "0.8rem" }}>Refresh now</Menu.Item>
+              <Menu.Item onClick={() => refresh()} disabled={isRefreshing} style={{ fontSize: "0.8rem" }}>Refresh (since last fetch)</Menu.Item>
               <Menu.Divider />
               <Menu.Label style={{ fontSize: "0.7rem" }}>Catch-up</Menu.Label>
               <Menu.Item onClick={() => refresh(24)} disabled={isRefreshing} style={{ fontSize: "0.8rem" }}>Last 24 hours</Menu.Item>

@@ -672,6 +672,13 @@ app.whenReady().then(() => {
     }
 
     try {
+      // For catch-up refreshes (>2h), clear fetch hashes so diff detects all data as new
+      if (lookbackHours && lookbackHours > 4) {
+        try {
+          const hashPath = path.join(app.getPath("userData"), "fetch-hashes.json");
+          fs.unlinkSync(hashPath);
+        } catch {}
+      }
       const { forcePoll } = await import("./notifications/poll-service");
       forcePoll(lookbackHours);
       results.notifications = "triggered";
