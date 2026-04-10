@@ -309,10 +309,10 @@ export function AppSidebar() {
             <Menu.Dropdown>
               <Menu.Item onClick={() => refresh()} disabled={isRefreshing} style={{ fontSize: "0.8rem" }}>Refresh (since last fetch)</Menu.Item>
               <Menu.Divider />
-              <Menu.Label style={{ fontSize: "0.7rem" }}>Catch-up</Menu.Label>
-              <Menu.Item onClick={() => refresh(24)} disabled={isRefreshing} style={{ fontSize: "0.8rem" }}>Last 24 hours</Menu.Item>
-              <Menu.Item onClick={() => refresh(72)} disabled={isRefreshing} style={{ fontSize: "0.8rem" }}>Last 3 days</Menu.Item>
-              <Menu.Item onClick={() => refresh(168)} disabled={isRefreshing} style={{ fontSize: "0.8rem" }}>Last 7 days</Menu.Item>
+              <Menu.Label style={{ fontSize: "0.7rem" }}>{isRefreshing ? "Queue catch-up (runs next)" : "Catch-up"}</Menu.Label>
+              <Menu.Item onClick={() => refresh(24)} style={{ fontSize: "0.8rem" }}>Last 24 hours</Menu.Item>
+              <Menu.Item onClick={() => refresh(72)} style={{ fontSize: "0.8rem" }}>Last 3 days</Menu.Item>
+              <Menu.Item onClick={() => refresh(168)} style={{ fontSize: "0.8rem" }}>Last 7 days</Menu.Item>
             </Menu.Dropdown>
           </Menu>
 
