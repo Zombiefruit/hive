@@ -711,14 +711,15 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
 - The user's Slack user ID is ${userSlackId ?? "unknown"}.
 - ${userName}'s manager is ${managerName || "unknown"}.
 
-## CRITICAL: Task Type Classification
-- **response**: Any DM, thread, or message where someone asked ${userName} something and they haven't replied. ANY unanswered message directed at ${userName} = response type. This includes: DMs, @mentions, "could you look at", "when can you", "thoughts on", thread replies asking for input.
-- **meeting_prep**: Calendar events happening in the future that ${userName} is attending.
-- **review**: PR reviews assigned to or requested from ${userName}. Code review requests. ALSO include reviews where the original assignee is mentioned as unavailable/OOO/PTO and ${userName} is tagged as a fallback — this is an implicit review request.
-- **implementation**: Linear tickets assigned to ${userName} that require building/coding.
-- **investigation**: Tasks that need research/analysis before building.
-- DO NOT classify everything as implementation. A DM asking "can you take a look?" is a RESPONSE, not an implementation task.
-- IMPLICIT REQUESTS: If someone tags ${userName} in a thread about a PR/task assigned to someone else AND mentions that person is OOO/PTO/unavailable, treat this as a direct request to ${userName}. The implication is "${userName} should handle this."`;
+## Task Type Classification
+- **response**: Unanswered message directed at ${userName} — DMs, @mentions, thread replies asking for input.
+- **meeting_prep**: Future calendar events ${userName} is attending.
+- **review**: PR review requests — formal (GitHub) OR informal (Slack channel posts, thread tags).
+- **implementation**: Linear tickets assigned to ${userName} requiring code.
+- **investigation**: Tasks needing research before building.
+
+## Intent Detection
+Read between the lines. If ${userName} is tagged in a context that implies action — even if not explicitly asked — treat it as actionable. Examples: someone mentions a blocker and tags ${userName}, a reviewer is unavailable and ${userName} is tagged as fallback, a thread asks "thoughts?" without a direct question mark. When in doubt, create the task — false positives are better than missed work.`;
 
     const triageTimeout = hasCompletedFirstPoll ? 300000 : 600000;
     logPoll(`  Triage timeout: ${triageTimeout / 1000}s (first poll: ${!hasCompletedFirstPoll}), delta: ${triageData.length} chars`);
