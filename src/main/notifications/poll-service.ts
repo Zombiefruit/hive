@@ -593,12 +593,18 @@ RULES:
 
     let rawData = "";
     try {
-      rawData = await askFetchBridge(fetchPrompt);
-      logPoll(`  Fetch complete (Haiku): ${rawData.length} chars`);
-      // Log headers found in raw data for debugging diff system
+      // Use a FRESH process for each fetch — the persistent bridge accumulates
+      // conversation context and stops executing tools after the first request.
+      const { askMcpPlanningAgent } = await import("../mcp-bridge");
+      rawData = await askMcpPlanningAgent(fetchPrompt, undefined, (event) => {
+        if (event.type === "tool_use") {
+          logPoll(`  Tool: ${event.content.slice(0, 80)}`);
+        }
+      }, "claude-haiku-4-5-20251001");
+      logPoll(`  Fetch complete (Haiku, fresh process): ${rawData.length} chars`);
       const headers = rawData.match(/^## .+$/gm) ?? [];
       logPoll(`  Headers in raw data: ${headers.length > 0 ? headers.join(", ") : "NONE — all data goes to PREAMBLE"}`);
-      logPoll(`  Raw data start: ${rawData.slice(0, 300).replace(/\n/g, "\\n")}`);
+      if (rawData.length < 100) logPoll(`  Raw data: ${rawData.replace(/\n/g, "\\n")}`);
       emitThought(`fetched ${Math.round(rawData.length / 1000)}K chars — computing diff...`);
       addDebugEntry("out", `✅ All sources: ${rawData.length} chars`, "fetch");
     } catch (err) {
