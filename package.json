@@ -29,6 +29,7 @@
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.81",
+    "@anthropic-ai/sdk": "^0.88.0",
     "@hello-pangea/dnd": "^18.0.1",
     "@icons-pack/react-simple-icons": "^13.13.0",
     "@mantine/core": "^8.3.18",

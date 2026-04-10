@@ -41,6 +41,7 @@ export interface BridgeConnectorStatus {
     calendar: boolean;
     notion: boolean;
   };
+  mcpServers?: Array<{ name: string; status: string }>;
 }
 
 // ── Debug log (shared across both bridges) ──
@@ -173,6 +174,8 @@ export function createBridge(label: string, model = "claude-opus-4-6[1m]"): Brid
           sessionId = msg.session_id ?? "";
           const allTools: string[] = msg.tools ?? [];
           const mcpTools = allTools.filter((t: string) => t.includes("mcp__claude_ai"));
+          // Capture MCP server list from init message
+          const mcpServers = (msg.mcp_servers as Array<{ name: string; status: string }> | undefined) ?? [];
           connectorStatus = {
             ready: true, mcpToolCount: mcpTools.length,
             connectors: {
@@ -182,6 +185,7 @@ export function createBridge(label: string, model = "claude-opus-4-6[1m]"): Brid
               calendar: mcpTools.some((t: string) => t.includes("Google_Calendar")),
               notion: mcpTools.some((t: string) => t.includes("Notion")),
             },
+            mcpServers,
           };
           isReady = true;
           log(`[${label}] Initialized: ${allTools.length} tools, ${mcpTools.length} MCP`);

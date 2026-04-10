@@ -1,18 +1,48 @@
 import { Group, Stack, Text } from "@mantine/core";
-import { SiLinear, SiNotion, SiGmail, SiGithub, SiGooglecalendar } from "@icons-pack/react-simple-icons";
-import { IconBrandSlack } from "@tabler/icons-react";
+import { IconPlug, IconCheck, IconX, IconClock } from "@tabler/icons-react";
 import { StatusDot } from "./StatusDot";
+import { useState, useEffect } from "react";
 
-const integrations = [
-  { name: "Linear", Icon: SiLinear, color: "#5E6AD2", description: "Issues & project tracking" },
-  { name: "Slack", Icon: IconBrandSlack, color: "#E01E5A", description: "Channels, threads & messages" },
-  { name: "Notion", Icon: SiNotion, color: "var(--aegen-star-white)", description: "Pages, docs & databases" },
-  { name: "Gmail", Icon: SiGmail, color: "#EA4335", description: "Email inbox" },
-  { name: "GitHub", Icon: SiGithub, color: "var(--aegen-star-white)", description: "Repos, PRs & issues" },
-  { name: "Google Calendar", Icon: SiGooglecalendar, color: "#4285F4", description: "Events & scheduling" },
-];
+interface McpServer {
+  name: string;
+  status: "connected" | "failed" | "needs-auth" | "pending" | "disabled";
+}
+
+const statusConfig: Record<string, { color: string; label: string; icon: typeof IconCheck }> = {
+  connected: { color: "green", label: "Active", icon: IconCheck },
+  failed: { color: "red", label: "Failed", icon: IconX },
+  "needs-auth": { color: "yellow", label: "Needs Auth", icon: IconClock },
+  pending: { color: "blue", label: "Connecting", icon: IconClock },
+  disabled: { color: "gray", label: "Disabled", icon: IconX },
+};
 
 export function IntegrationPanel() {
+  const [servers, setServers] = useState<McpServer[]>([]);
+
+  useEffect(() => {
+    window.deck?.getBridgeStatus?.().then((status: unknown) => {
+      const s = status as { mcpServers?: McpServer[] } | null;
+      if (s?.mcpServers) setServers(s.mcpServers);
+    }).catch(() => {});
+
+    const interval = setInterval(() => {
+      window.deck?.getBridgeStatus?.().then((status: unknown) => {
+        const s = status as { mcpServers?: McpServer[] } | null;
+        if (s?.mcpServers) setServers(s.mcpServers);
+      }).catch(() => {});
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Sort: connected first, then by name
+  const sorted = [...servers].sort((a, b) => {
+    if (a.status === "connected" && b.status !== "connected") return -1;
+    if (b.status === "connected" && a.status !== "connected") return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  const connectedCount = servers.filter(s => s.status === "connected").length;
+
   return (
     <div
       style={{
@@ -26,34 +56,36 @@ export function IntegrationPanel() {
         p="sm"
         style={{ borderBottom: "1px solid var(--aegen-glass-border)" }}
       >
-        <Text size="sm" fw={600}>Connectors</Text>
-        <Text size="xs" c="dimmed">via Claude Code MCP</Text>
+        <Text size="sm" fw={600}>MCP Connectors</Text>
+        <Text size="xs" c="dimmed">{connectedCount}/{servers.length} active</Text>
       </Group>
-      <Stack gap={0}>
-        {integrations.map((integration, i) => (
-          <div
-            key={integration.name}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "8px 12px",
-              borderBottom: i < integrations.length - 1
-                ? "1px solid rgba(68, 73, 85, 0.12)"
-                : undefined,
-            }}
-          >
-            <integration.Icon size={16} color={integration.color} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <Text size="xs" fw={500}>{integration.name}</Text>
-              <Text size="xs" c="dimmed" style={{ fontSize: "0.65rem" }}>{integration.description}</Text>
+      <Stack gap={0} style={{ maxHeight: 300, overflowY: "auto" }}>
+        {sorted.length === 0 ? (
+          <Text size="xs" c="dimmed" ta="center" py="md">No MCP servers detected</Text>
+        ) : sorted.map((server, i) => {
+          const cfg = statusConfig[server.status] ?? statusConfig.pending;
+          // Clean up server name: remove "claude.ai " prefix
+          const name = server.name.replace(/^claude\.ai\s+/i, "").replace(/^claude_ai_/i, "");
+          return (
+            <div
+              key={server.name}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "6px 12px",
+                borderBottom: i < sorted.length - 1 ? "1px solid rgba(68, 73, 85, 0.12)" : undefined,
+              }}
+            >
+              <IconPlug size={12} color="var(--aegen-dust-gray)" style={{ flexShrink: 0 }} />
+              <Text size="xs" fw={500} truncate style={{ flex: 1 }}>{name}</Text>
+              <Group gap={4}>
+                <StatusDot status={server.status === "connected" ? "active" : server.status === "failed" ? "errored" : "idle"} size={5} pulse={false} />
+                <Text size="xs" c={cfg.color} style={{ fontSize: "0.6rem" }}>{cfg.label}</Text>
+              </Group>
             </div>
-            <Group gap={4}>
-              <StatusDot status="active" size={5} pulse={false} />
-              <Text size="xs" c="green" style={{ fontSize: "0.65rem" }}>Active</Text>
-            </Group>
-          </div>
-        ))}
+          );
+        })}
       </Stack>
     </div>
   );

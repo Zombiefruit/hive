@@ -112,6 +112,16 @@ export function GlobalContextBar() {
                     {refs.map(ref => {
                       const cfg = typeConfig[ref.type];
                       const Icon = cfg?.icon ?? IconFileText;
+                      // Construct URL if missing but inferable from type + title
+                      let url = ref.url;
+                      if (!url) {
+                        const ticketMatch = ref.title.match(/([A-Z]+-\d+)/);
+                        if (ref.type === "linear" && ticketMatch) url = `https://linear.app/issue/${ticketMatch[1]}`;
+                      }
+                      // Clean up title: strip duplicate # prefixes, raw channel IDs
+                      let title = ref.title.replace(/^#+\s*/, "#");
+                      // If title is just a channel ID like "C0AMSV2SK4Z", prefix with #
+                      if (/^[CDG][A-Z0-9]{8,}$/.test(title)) title = `#${title}`;
                       return (
                         <Group
                           key={ref.id}
@@ -119,12 +129,12 @@ export function GlobalContextBar() {
                           px={8}
                           py={5}
                           wrap="nowrap"
-                          style={{ cursor: ref.url ? "pointer" : undefined }}
-                          onClick={() => { if (ref.url) window.deck.openExternal(ref.url); }}
+                          style={{ cursor: url ? "pointer" : undefined }}
+                          onClick={() => { if (url) window.deck.openExternal(url); }}
                         >
                           <Icon size={11} color={cfg?.color ?? "#6b7280"} style={{ flexShrink: 0 }} />
-                          <Text size="xs" truncate style={{ color: ref.url ? "var(--mantine-color-blue-4)" : undefined }}>
-                            {ref.title}
+                          <Text size="xs" truncate style={{ color: url ? "var(--mantine-color-blue-4)" : undefined }}>
+                            {title}
                           </Text>
                         </Group>
                       );
