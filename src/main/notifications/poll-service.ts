@@ -595,6 +595,10 @@ RULES:
     try {
       rawData = await askFetchBridge(fetchPrompt);
       logPoll(`  Fetch complete (Haiku): ${rawData.length} chars`);
+      // Log headers found in raw data for debugging diff system
+      const headers = rawData.match(/^## .+$/gm) ?? [];
+      logPoll(`  Headers in raw data: ${headers.length > 0 ? headers.join(", ") : "NONE — all data goes to PREAMBLE"}`);
+      logPoll(`  Raw data start: ${rawData.slice(0, 300).replace(/\n/g, "\\n")}`);
       emitThought(`fetched ${Math.round(rawData.length / 1000)}K chars — computing diff...`);
       addDebugEntry("out", `✅ All sources: ${rawData.length} chars`, "fetch");
     } catch (err) {
@@ -614,6 +618,7 @@ RULES:
     } catch {}
 
     const diff = computeDiff(rawData, previousHashes);
+    logPoll(`  Diff: hasChanges=${diff.hasChanges}, changed=[${diff.changedSources.join(",")}], unchanged=[${diff.unchangedSources.join(",")}], prevHashes=${previousHashes.length}, delta=${diff.delta.length} chars`);
 
     if (!diff.hasChanges) {
       logPoll("No changes detected since last poll — skipping triage");
