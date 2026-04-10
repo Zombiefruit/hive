@@ -1,4 +1,4 @@
-import { Badge, Group, Stack, Text, UnstyledButton, Loader, Tooltip } from "@mantine/core";
+import { Badge, Group, Stack, Text, TextInput, UnstyledButton, Loader, Tooltip } from "@mantine/core";
 import {
   IconBulb, IconAlertTriangle, IconTrendingUp,
   IconRocket, IconTools, IconCheck, IconX, IconExternalLink,
@@ -135,6 +135,9 @@ export default function InsightsPage() {
   const [initialLoading, setInitialLoading] = useState(true);
   const { isRefreshing } = useGlobalRefresh();
   const [filter, setFilter] = useState<string | null>(null);
+  const [impactFilter, setImpactFilter] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [showAll, setShowAll] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Load insights on mount and whenever global refresh triggers
@@ -174,45 +177,23 @@ export default function InsightsPage() {
   const filtered = insights
     .filter(i => i.status === "new" || i.status === "acknowledged")
     .filter(i => !filter || i.type === filter)
+    .filter(i => !impactFilter || i.impactEstimate === impactFilter)
+    .filter(i => !search || i.title.toLowerCase().includes(search.toLowerCase()) || i.description.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
       const impactDiff = (IMPACT_ORDER[a.impactEstimate] ?? 1) - (IMPACT_ORDER[b.impactEstimate] ?? 1);
       if (impactDiff !== 0) return impactDiff;
       return b.relevanceScore - a.relevanceScore;
     });
+  const displayedItems = showAll ? filtered : filtered.slice(0, 25);
 
   // Group by impact for section headers
   const high = filtered.filter(i => i.impactEstimate === "high");
   const medium = filtered.filter(i => i.impactEstimate === "medium");
   const low = filtered.filter(i => i.impactEstimate === "low");
 
-  const renderGroup = (items: Insight[]) => items.map(insight => (
-    <InsightRow
-      key={insight.id}
-      insight={insight}
-      expanded={expandedId === insight.id}
-      onToggle={() => setExpandedId(expandedId === insight.id ? null : insight.id)}
-      onAcknowledge={() => handleUpdateStatus(insight.id, "acknowledged")}
-      onDismiss={() => handleUpdateStatus(insight.id, "dismissed")}
-      onConvert={() => handleConvert(insight.id)}
-    />
-  ));
-
   const filterTypes = Object.entries(TYPE_CONFIG);
 
-  // Compute top trends for the summary card
-  const topTrends: string[] = [];
-  if (filtered.length > 0) {
-    if (high.length > 0) {
-      const topHigh = high[0];
-      topTrends.push(`${high.length} high-impact finding${high.length !== 1 ? "s" : ""} — top: "${topHigh.title}"`);
-    }
-    const typeCounts = Object.entries(
-      filtered.reduce<Record<string, number>>((acc, i) => { acc[i.type] = (acc[i.type] ?? 0) + 1; return acc; }, {}),
-    ).sort((a, b) => b[1] - a[1]);
-    if (typeCounts.length > 0) {
-      topTrends.push(`Most common: ${typeCounts.slice(0, 2).map(([t, c]) => `${TYPE_CONFIG[t]?.label ?? t} (${c})`).join(", ")}`);
-    }
-  }
+  // (top trends removed — replaced with interactive impact/type badges above)
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--aegen-void)" }}>
@@ -226,53 +207,45 @@ export default function InsightsPage() {
       } />
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", paddingTop: 8 }}>
-        {/* Filter chips */}
-        <Group gap={6} mb={12}>
-          <UnstyledButton
-            onClick={() => setFilter(null)}
-            style={{
-              padding: "4px 10px", borderRadius: 6, fontSize: "0.7rem", fontWeight: 500,
-              backgroundColor: !filter ? "rgba(74, 125, 255, 0.08)" : "transparent",
-              color: !filter ? "var(--aegen-star-white)" : "var(--aegen-dust-gray)",
-            }}
-          >
-            All ({filtered.length})
-          </UnstyledButton>
-          {filterTypes.map(([key, cfg]) => {
-            const count = insights.filter(i => i.type === key && (i.status === "new" || i.status === "acknowledged")).length;
-            if (count === 0) return null;
-            return (
-              <UnstyledButton
-                key={key}
-                onClick={() => setFilter(filter === key ? null : key)}
-                style={{
-                  padding: "4px 10px", borderRadius: 6, fontSize: "0.7rem", fontWeight: 500,
-                  backgroundColor: filter === key ? "rgba(74, 125, 255, 0.08)" : "transparent",
-                  color: filter === key ? "var(--aegen-star-white)" : "var(--aegen-dust-gray)",
-                }}
-              >
-                {cfg.label} ({count})
-              </UnstyledButton>
-            );
-          })}
-        </Group>
+        {/* Summary breakdown */}
+        {filtered.length > 0 && (
+          <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+            <Badge size="sm" color="red" variant={impactFilter === "high" ? "filled" : "light"} style={{ cursor: "pointer" }} onClick={() => setImpactFilter(impactFilter === "high" ? null : "high")}>
+              {high.length} high
+            </Badge>
+            <Badge size="sm" color="yellow" variant={impactFilter === "medium" ? "filled" : "light"} style={{ cursor: "pointer" }} onClick={() => setImpactFilter(impactFilter === "medium" ? null : "medium")}>
+              {medium.length} medium
+            </Badge>
+            <Badge size="sm" color="gray" variant={impactFilter === "low" ? "filled" : "light"} style={{ cursor: "pointer" }} onClick={() => setImpactFilter(impactFilter === "low" ? null : "low")}>
+              {low.length} low
+            </Badge>
+            <div style={{ width: 1, height: 16, background: "var(--aegen-glass-border)", margin: "0 4px" }} />
+            {filterTypes.map(([key, cfg]) => {
+              const count = filtered.filter(i => i.type === key).length;
+              if (count === 0) return null;
+              return (
+                <Badge key={key} size="sm" color={cfg.color} variant={filter === key ? "filled" : "light"} style={{ cursor: "pointer" }} onClick={() => setFilter(filter === key ? null : key)}>
+                  {count} {cfg.label}
+                </Badge>
+              );
+            })}
+          </div>
+        )}
 
-        {/* Explainer + trends card */}
-        <div style={{
-          padding: "12px 14px", borderRadius: 8, marginBottom: 12,
-          background: "var(--aegen-glass-bg)", border: "1px solid var(--aegen-glass-border)",
-        }}>
-          <Text size="xs" c="dimmed" style={{ lineHeight: 1.6 }}>
-            Relay scans your Slack channels, Linear tickets, and Gong calls to surface proactive insights — feature ideas, customer pain points, emerging trends, and optimization opportunities. Click Refresh to scan now, or insights update automatically each poll cycle.
-          </Text>
-          {topTrends.length > 0 && (
-            <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--aegen-glass-border)" }}>
-              {topTrends.map((t, i) => (
-                <Text key={i} size="xs" fw={500} style={{ lineHeight: 1.6 }}>{t}</Text>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Search */}
+        <TextInput
+          placeholder="Search insights..."
+          size="xs"
+          value={search}
+          onChange={(e) => setSearch(e.currentTarget.value)}
+          mb={12}
+          style={{ maxWidth: 300 }}
+        />
+
+        {/* Explainer (compact) */}
+        <Text size="xs" c="dimmed" mb={8} style={{ lineHeight: 1.5 }}>
+          Proactive insights from Slack, Linear, and Gong — feature ideas, customer signals, and trends.
+        </Text>
 
         {/* Loading state */}
         {(initialLoading || isRefreshing) && filtered.length === 0 && (
@@ -291,30 +264,38 @@ export default function InsightsPage() {
           </Stack>
         )}
 
-        {/* Grouped by impact */}
-        {high.length > 0 && (
-          <>
-            <Text size="xs" fw={700} c="red.5" mb={4} mt={4} style={{ textTransform: "uppercase", letterSpacing: "0.5px", fontSize: 10 }}>
-              High Impact ({high.length})
-            </Text>
-            {renderGroup(high)}
-          </>
+        {/* Results count */}
+        {filtered.length > 0 && (
+          <Text size="xs" c="dimmed" mb={8}>
+            Showing {displayedItems.length} of {filtered.length} insights
+          </Text>
         )}
-        {medium.length > 0 && (
-          <>
-            <Text size="xs" fw={700} c="yellow.5" mb={4} mt={8} style={{ textTransform: "uppercase", letterSpacing: "0.5px", fontSize: 10 }}>
-              Medium Impact ({medium.length})
-            </Text>
-            {renderGroup(medium)}
-          </>
-        )}
-        {low.length > 0 && (
-          <>
-            <Text size="xs" fw={700} c="dimmed" mb={4} mt={8} style={{ textTransform: "uppercase", letterSpacing: "0.5px", fontSize: 10 }}>
-              Low Impact ({low.length})
-            </Text>
-            {renderGroup(low)}
-          </>
+
+        {/* Insight list */}
+        {displayedItems.map(insight => (
+          <InsightRow
+            key={insight.id}
+            insight={insight}
+            expanded={expandedId === insight.id}
+            onToggle={() => setExpandedId(expandedId === insight.id ? null : insight.id)}
+            onAcknowledge={() => handleUpdateStatus(insight.id, "acknowledged")}
+            onDismiss={() => handleUpdateStatus(insight.id, "dismissed")}
+            onConvert={() => handleConvert(insight.id)}
+          />
+        ))}
+
+        {/* Show more */}
+        {!showAll && filtered.length > 25 && (
+          <UnstyledButton
+            onClick={() => setShowAll(true)}
+            style={{
+              display: "block", margin: "12px auto", padding: "6px 16px",
+              borderRadius: 6, fontSize: "0.75rem", fontWeight: 500,
+              border: "1px solid var(--aegen-glass-border)", color: "var(--aegen-dust-gray)",
+            }}
+          >
+            Show all {filtered.length} insights
+          </UnstyledButton>
         )}
       </div>
     </div>

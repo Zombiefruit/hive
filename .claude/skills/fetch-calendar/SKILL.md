@@ -6,7 +6,7 @@ user-invocable: false
 
 # Fetch Calendar Data
 
-Use `mcp__claude_ai_Google_Calendar__gcal_list_events` for the next 48 hours from {{CURRENT_TIME}}.
+Use `mcp__claude_ai_Google_Calendar__gcal_list_events` for the next 7 days from {{CURRENT_TIME}}.
 
 Return for each event: title, start time, end time, attendees, location or meeting link.
 

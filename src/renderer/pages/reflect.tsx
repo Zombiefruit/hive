@@ -158,9 +158,12 @@ export default function ReflectPage() {
                 <Text size="xs" fw={600} c="dimmed" mb={8} style={{ textTransform: "uppercase", letterSpacing: "0.5px" }}>
                   Manager's Take
                 </Text>
-                <Text size="sm">
-                  {managerTake.summary}
-                </Text>
+                {/* Split summary into paragraphs for readability */}
+                {managerTake.summary.split(/\n\n|\n(?=[A-Z])/).filter(Boolean).map((para, i) => (
+                  <Text key={i} size="sm" mb={8} style={{ lineHeight: 1.6 }}>
+                    {para.trim()}
+                  </Text>
+                ))}
               </div>
 
               {/* Categorized feedback sections */}
@@ -176,11 +179,11 @@ export default function ReflectPage() {
                         {config.label}
                       </Text>
                     </Group>
-                    {items.map((c, i) => (
-                      <Text key={i} size="sm" mb={i < items.length - 1 ? 6 : 0} style={{ paddingLeft: 20 }}>
-                        {c}
-                      </Text>
-                    ))}
+                    <ul style={{ margin: 0, paddingLeft: 24, display: "flex", flexDirection: "column", gap: 4 }}>
+                      {items.map((c, i) => (
+                        <li key={i}><Text size="sm" component="span" style={{ lineHeight: 1.5 }}>{c}</Text></li>
+                      ))}
+                    </ul>
                   </div>
                 );
               })}
