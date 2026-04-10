@@ -43,9 +43,9 @@ export function useGlobalRefresh() {
     return () => { listeners.delete(setLocal); };
   }, []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (lookbackHours?: number) => {
     setGlobalRefreshing(true);
-    try { await window.deck?.globalRefresh?.(); } catch {}
+    try { await window.deck?.globalRefresh?.(lookbackHours); } catch {}
     // Don't set false here — polling-finished event handles it
   }, []);
 

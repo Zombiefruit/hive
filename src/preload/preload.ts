@@ -222,7 +222,7 @@ const api = {
   },
 
   // Global refresh — triggers all data sources
-  globalRefresh: () => ipcRenderer.invoke("global:refresh"),
+  globalRefresh: (lookbackHours?: number) => ipcRenderer.invoke("global:refresh", lookbackHours),
   onGlobalRefreshStart: (callback: () => void) => {
     const listener = () => callback();
     ipcRenderer.on("global:refresh-start", listener);

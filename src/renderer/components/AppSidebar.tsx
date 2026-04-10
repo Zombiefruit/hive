@@ -1,4 +1,4 @@
-import { Loader, Text, Tooltip, UnstyledButton, useMantineColorScheme, useComputedColorScheme } from "@mantine/core";
+import { Loader, Menu, Text, Tooltip, UnstyledButton, useMantineColorScheme, useComputedColorScheme } from "@mantine/core";
 import {
   IconSparkles,
   IconInbox,
@@ -288,23 +288,32 @@ export function AppSidebar() {
             </UnstyledButton>
           </Tooltip>
 
-          <Tooltip label="Refresh all data sources" position="right" withArrow>
-            <UnstyledButton
-              onClick={refresh}
-              disabled={isRefreshing}
-              aria-label="Refresh all data sources"
-              style={{
-                padding: 6,
-                borderRadius: 6,
-                color: isRefreshing
-                  ? "var(--aegen-cosmic-blue)"
-                  : "var(--aegen-dust-gray)",
-                transition: "color 0.15s ease",
-              }}
-            >
-              {isRefreshing ? <Loader size={14} /> : <IconRefresh size={16} />}
-            </UnstyledButton>
-          </Tooltip>
+          <Menu shadow="md" width={160} position="right-end">
+            <Menu.Target>
+              <Tooltip label="Refresh data sources" position="right" withArrow>
+                <UnstyledButton
+                  disabled={isRefreshing}
+                  aria-label="Refresh data sources"
+                  style={{
+                    padding: 6,
+                    borderRadius: 6,
+                    color: isRefreshing
+                      ? "var(--aegen-cosmic-blue)"
+                      : "var(--aegen-dust-gray)",
+                    transition: "color 0.15s ease",
+                  }}
+                >
+                  {isRefreshing ? <Loader size={14} /> : <IconRefresh size={16} />}
+                </UnstyledButton>
+              </Tooltip>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item onClick={() => refresh()} style={{ fontSize: "0.8rem" }}>Refresh (default)</Menu.Item>
+              <Menu.Item onClick={() => refresh(24)} style={{ fontSize: "0.8rem" }}>Last 24 hours</Menu.Item>
+              <Menu.Item onClick={() => refresh(72)} style={{ fontSize: "0.8rem" }}>Last 3 days</Menu.Item>
+              <Menu.Item onClick={() => refresh(168)} style={{ fontSize: "0.8rem" }}>Last 7 days</Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
 
           <Tooltip
             label={collapsed ? "Expand sidebar" : "Collapse sidebar"}

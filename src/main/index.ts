@@ -663,7 +663,7 @@ app.whenReady().then(() => {
   ipcMain.handle("projects:get", (_event, id: string) => getProject(id));
 
   // Global refresh
-  ipcMain.handle("global:refresh", async () => {
+  ipcMain.handle("global:refresh", async (_event, lookbackHours?: number) => {
     const results: Record<string, string> = {};
 
     // Broadcast global refresh start
@@ -673,7 +673,7 @@ app.whenReady().then(() => {
 
     try {
       const { forcePoll } = await import("./notifications/poll-service");
-      forcePoll();
+      forcePoll(lookbackHours);
       results.notifications = "triggered";
     } catch { results.notifications = "failed"; }
     try {
