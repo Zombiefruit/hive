@@ -290,9 +290,8 @@ export function AppSidebar() {
 
           <Menu shadow="md" width={160} position="right-end">
             <Menu.Target>
-              <Tooltip label="Refresh data sources" position="right" withArrow>
+              <Tooltip label={isRefreshing ? "Refreshing..." : "Refresh data sources"} position="right" withArrow>
                 <UnstyledButton
-                  disabled={isRefreshing}
                   aria-label="Refresh data sources"
                   style={{
                     padding: 6,
@@ -308,10 +307,12 @@ export function AppSidebar() {
               </Tooltip>
             </Menu.Target>
             <Menu.Dropdown>
-              <Menu.Item onClick={() => refresh()} style={{ fontSize: "0.8rem" }}>Refresh (default)</Menu.Item>
-              <Menu.Item onClick={() => refresh(24)} style={{ fontSize: "0.8rem" }}>Last 24 hours</Menu.Item>
-              <Menu.Item onClick={() => refresh(72)} style={{ fontSize: "0.8rem" }}>Last 3 days</Menu.Item>
-              <Menu.Item onClick={() => refresh(168)} style={{ fontSize: "0.8rem" }}>Last 7 days</Menu.Item>
+              <Menu.Item onClick={() => refresh()} disabled={isRefreshing} style={{ fontSize: "0.8rem" }}>Refresh now</Menu.Item>
+              <Menu.Divider />
+              <Menu.Label style={{ fontSize: "0.7rem" }}>Catch-up</Menu.Label>
+              <Menu.Item onClick={() => refresh(24)} disabled={isRefreshing} style={{ fontSize: "0.8rem" }}>Last 24 hours</Menu.Item>
+              <Menu.Item onClick={() => refresh(72)} disabled={isRefreshing} style={{ fontSize: "0.8rem" }}>Last 3 days</Menu.Item>
+              <Menu.Item onClick={() => refresh(168)} disabled={isRefreshing} style={{ fontSize: "0.8rem" }}>Last 7 days</Menu.Item>
             </Menu.Dropdown>
           </Menu>
 
