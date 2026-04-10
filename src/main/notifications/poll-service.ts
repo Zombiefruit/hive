@@ -557,7 +557,7 @@ async function poll(): Promise<void> {
         if (mergedPrs.length > 0) sections.push(`### My recently merged PRs\n${mergedPrs.map((p: { number: number; title: string; repository: { nameWithOwner: string }; closedAt: string; url: string }) => `- PR #${p.number}: ${p.title} (${p.repository.nameWithOwner}) merged ${p.closedAt} — ${p.url}`).join("\n")}`);
 
         if (sections.length > 0) {
-          githubContext = `\n\n## GITHUB (ground truth — PR states from GitHub API)\n${sections.join("\n\n")}\n\nIMPORTANT: Use this GitHub data as the SOURCE OF TRUTH for PR states. If a PR appears here as MERGED or CLOSED, do NOT create a review task for it — it's done. If a Slack thread mentions a PR that's not in the open review list above, the review is likely already handled.`;
+          githubContext = `\n\n## GITHUB (PR states from GitHub API)\n${sections.join("\n\n")}\n\nIMPORTANT:\n- If a PR appears here as MERGED or CLOSED, do NOT create a review task — it's done.\n- If a Slack thread (especially #ui-ux-prs) requests a review for a PR that's NOT in the 'awaiting my review' list, still create a review task — the review was requested informally via Slack, not via GitHub's review system.\n- The GitHub list only shows FORMAL review requests. Slack posts asking for reviews are equally valid signals.`;
           logPoll(`  GitHub context: ${reviewPrs.length} review requests, ${authoredPrs.length} authored, ${mergedPrs.length} merged`);
         }
       } catch (err) {
