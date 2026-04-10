@@ -1,5 +1,5 @@
 import { app, BrowserWindow } from "electron";
-import { askFetchBridge, isFetchBridgeReady, restartFetchBridge, addDebugEntry, askEphemeralProcess } from "../mcp-bridge";
+import { askBridge, isBridgeReady, restartBridge, askFetchBridge, isFetchBridgeReady, restartFetchBridge, addDebugEntry, askEphemeralProcess } from "../mcp-bridge";
 import { computeDiff, computeSectionHashes } from "../../shared/poll-diff";
 import { getConfig } from "../config";
 import { getPlan } from "./work-dispatcher";
@@ -384,11 +384,11 @@ async function poll(): Promise<void> {
     if (!win.isDestroyed()) win.webContents.send("notifications:polling-started");
   }
 
-  if (!isFetchBridgeReady()) {
-    logPoll("Fetch bridge not ready, waiting up to 60s...");
+  if (!isBridgeReady()) {
+    logPoll("Bridge not ready, waiting up to 60s...");
     emitThought("waiting for MCP tools to connect...");
     const waitStart = Date.now();
-    while (!isFetchBridgeReady() && Date.now() - waitStart < 60000) {
+    while (!isBridgeReady() && Date.now() - waitStart < 60000) {
       const elapsed = Math.round((Date.now() - waitStart) / 1000);
       for (const win of BrowserWindow.getAllWindows()) {
         if (!win.isDestroyed()) win.webContents.send("notifications:polling-progress", {
@@ -397,20 +397,20 @@ async function poll(): Promise<void> {
       }
       await new Promise(r => setTimeout(r, 2000));
     }
-    if (!isFetchBridgeReady()) {
-      logPoll("Fetch bridge still not ready after 60s — restarting and retrying");
+    if (!isBridgeReady()) {
+      logPoll("Bridge still not ready after 60s — restarting and retrying");
       try {
-        await restartFetchBridge();
+        await restartBridge();
         // Wait another 60s for the restarted bridge
         const retryStart = Date.now();
-        while (!isFetchBridgeReady() && Date.now() - retryStart < 60000) {
+        while (!isBridgeReady() && Date.now() - retryStart < 60000) {
           await new Promise(r => setTimeout(r, 1000));
         }
       } catch (err) {
-        logPoll(`Fetch bridge restart failed: ${String(err)}`);
+        logPoll(`Bridge restart failed: ${String(err)}`);
       }
-      if (!isFetchBridgeReady()) {
-        logPoll("Fetch bridge still not ready after restart — aborting poll");
+      if (!isBridgeReady()) {
+        logPoll("Bridge still not ready after restart — aborting poll");
         isPolling = false;
         for (const win of BrowserWindow.getAllWindows()) {
           if (!win.isDestroyed()) win.webContents.send("notifications:polling-finished");
@@ -593,18 +593,13 @@ RULES:
 
     let rawData = "";
     try {
-      // Use a FRESH process for each fetch — the persistent bridge accumulates
-      // conversation context and stops executing tools after the first request.
-      const { askMcpPlanningAgent } = await import("../mcp-bridge");
-      rawData = await askMcpPlanningAgent(fetchPrompt, undefined, (event) => {
-        if (event.type === "tool_use") {
-          logPoll(`  Tool: ${event.content.slice(0, 80)}`);
-        }
-      }, "claude-haiku-4-5-20251001");
-      logPoll(`  Fetch complete (Haiku, fresh process): ${rawData.length} chars`);
+      // Use the poll bridge — same approach that worked on main.
+      // The bridge is restarted between fetch and triage to clear context.
+      rawData = await askBridge(fetchPrompt);
+      logPoll(`  Fetch complete: ${rawData.length} chars`);
       const headers = rawData.match(/^## .+$/gm) ?? [];
-      logPoll(`  Headers in raw data: ${headers.length > 0 ? headers.join(", ") : "NONE — all data goes to PREAMBLE"}`);
-      if (rawData.length < 100) logPoll(`  Raw data: ${rawData.replace(/\n/g, "\\n")}`);
+      logPoll(`  Headers: ${headers.length > 0 ? headers.join(", ") : "NONE"}`);
+      if (rawData.length < 200) logPoll(`  Raw: ${rawData.slice(0, 200).replace(/\n/g, "\\n")}`);
       emitThought(`fetched ${Math.round(rawData.length / 1000)}K chars — computing diff...`);
       addDebugEntry("out", `✅ All sources: ${rawData.length} chars`, "fetch");
     } catch (err) {
@@ -614,7 +609,10 @@ RULES:
     clearInterval(fetchTicker);
 
     const fetchElapsed = Date.now() - fetchStart;
-    logPoll(`Pass 1 complete (Haiku): ${rawData.length} chars in ${(fetchElapsed / 1000).toFixed(1)}s`);
+    logPoll(`Pass 1 complete: ${rawData.length} chars in ${(fetchElapsed / 1000).toFixed(1)}s`);
+
+    // Restart bridge to clear conversation context before triage
+    try { await restartBridge(); } catch {}
 
     // ── DIFF: detect changes since last poll ──
     const hashPath = path.join(os.homedir(), "Library", "Application Support", "claude-deck", "fetch-hashes.json");
@@ -640,7 +638,7 @@ RULES:
       isPolling = false;
       hasCompletedFirstPoll = true;
       // Restart fetch bridge to clear context for next poll
-      await restartFetchBridge();
+      await restartBridge();
       return;
     }
 
@@ -1520,7 +1518,7 @@ ${coworkerRules || "- Manager direct ask = critical priority, confidence 10"}
     }
 
     // Restart the fetch bridge to clear conversation context for next poll
-    await restartFetchBridge();
+    await restartBridge();
 
     // If a refresh was queued while we were polling, run again
     if (pendingRefresh) {
