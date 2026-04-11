@@ -688,7 +688,7 @@ export function Notifications() {
                                   color={n.source === "manual" ? "violet" : "gray"}
                                   radius="sm"
                                   style={{ fontSize: "0.55rem" }}
-                                  leftSection={n.source === "manual" ? <IconPencil size={9} /> : undefined}
+                                  leftSection={(() => { const I = sourceIcons[n.source]; return I ? <I size={9} /> : undefined; })()}
                                 >
                                   {n.source}
                                 </Badge>
