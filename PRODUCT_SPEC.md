@@ -82,7 +82,7 @@ Priority assignment is context-aware: who asked matters (manager → critical, l
 
 #### Agent-as-Judge Verification
 - **Three judge types:** Triage (checks missed items, wrong priorities), Planning (feasibility, completeness), Work (plan adherence, completion)
-- **All judges use Sonnet** via `askJudgeProcess()` — lightweight, no MCP tools, ~3s startup
+- **All judges use Haiku** via `askJudgeProcess()` — lightweight, no MCP tools, ~3s startup
 - **Triage judge** runs in parallel with parsing, applies corrections automatically
 - **Planning judge** verifies plans before showing to user, auto-iterates once on rejection
 - **Work judge** runs post-exit, broadcasts verdict, holds stage on rejection
@@ -203,7 +203,7 @@ Priority assignment is context-aware: who asked matters (manager → critical, l
 
 ### Skills System (.claude/skills/)
 
-24 specialized skills:
+29 specialized skills:
 - **Fetch:** fetch-slack, fetch-linear, fetch-github, fetch-gmail, fetch-calendar, fetch-notion, fetch-gong
 - **Parse:** parse-implementation, parse-review, parse-response, parse-meeting-prep
 - **Execute:** execute-implementation, execute-review
@@ -258,7 +258,7 @@ Electron Main Process
     └── agent-monitor.ts         — Monitor agent events
 
 Renderer Process (React 19 + Mantine 8.x)
-├── pages/ (9 routes)
+├── pages/ (15 routes)
 ├── components/ (28 components)
 ├── hooks/useIpcSync.ts
 ├── stores/ (agent-store, manager-store)
