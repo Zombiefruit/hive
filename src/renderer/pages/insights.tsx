@@ -197,14 +197,7 @@ export default function InsightsPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--aegen-void)" }}>
-      <AppHeader rightContent={
-        isRefreshing ? (
-          <Group gap={6}>
-            <Loader size={12} />
-            <Text size="xs" c="dimmed">Refreshing...</Text>
-          </Group>
-        ) : undefined
-      } />
+      {/* No header bar — refresh state shown via sidebar spinner */}
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", paddingTop: 8 }}>
         {/* Summary breakdown */}
@@ -242,10 +235,21 @@ export default function InsightsPage() {
           style={{ maxWidth: 300 }}
         />
 
-        {/* Explainer (compact) */}
-        <Text size="xs" c="dimmed" mb={8} style={{ lineHeight: 1.5 }}>
-          Proactive insights from Slack, Linear, and Gong — feature ideas, customer signals, and trends.
-        </Text>
+        {/* Summary card */}
+        {filtered.length > 0 && (
+          <div style={{
+            padding: "12px 14px", borderRadius: 8, marginBottom: 12,
+            background: "var(--aegen-glass-bg)", border: "1px solid var(--aegen-glass-border)",
+          }}>
+            <Text size="xs" fw={600} c="dimmed" mb={6} style={{ textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              Overview
+            </Text>
+            <Text size="sm" style={{ lineHeight: 1.6 }}>
+              {filtered.length} insights across {Object.entries(filtered.reduce<Record<string, number>>((acc, i) => { acc[i.type] = (acc[i.type] ?? 0) + 1; return acc; }, {})).sort((a, b) => b[1] - a[1]).map(([t, c]) => `${c} ${TYPE_CONFIG[t]?.label ?? t}`).join(", ").replace(/, ([^,]*)$/, " and $1")}.
+              {high.length > 0 ? ` ${high.length} high-impact — top: "${high[0].title}".` : " No high-impact findings."}
+            </Text>
+          </div>
+        )}
 
         {/* Loading state */}
         {(initialLoading || isRefreshing) && filtered.length === 0 && (

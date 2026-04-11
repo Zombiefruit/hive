@@ -459,7 +459,7 @@ export function DetailDrawer({
         )}
         <Text size="sm" fw={600} mb={2}>{n.title}</Text>
         <Group gap={6} mb={4}>
-          {n.author && <Text size="xs" c="dimmed">{n.author}</Text>}
+          {n.author && n.author !== "Unknown" && <Text size="xs" c="dimmed">{n.author}</Text>}
           <Text size="xs" c="dimmed" style={{ fontSize: "0.55rem", fontFamily: "var(--mantine-font-family-monospace)", opacity: 0.5 }}>{n.id}</Text>
         </Group>
         {n.summary && <Text size="xs" c="dimmed" mb={4} lineClamp={2}>{n.summary}</Text>}

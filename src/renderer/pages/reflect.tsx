@@ -113,14 +113,7 @@ export default function ReflectPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--aegen-void)" }}>
-      <AppHeader rightContent={
-        loadingTake ? (
-          <Group gap={6}>
-            <Loader size={12} />
-            <Text size="xs" c="dimmed">Loading...</Text>
-          </Group>
-        ) : undefined
-      } />
+      {/* No header bar — loading state shown inline via skeleton */}
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", paddingTop: 8 }}>
         {/* Empty state */}

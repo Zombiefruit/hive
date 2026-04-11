@@ -1,7 +1,7 @@
 import { Badge, Group, Loader, Stack, Text, Tooltip, UnstyledButton } from "@mantine/core";
 import {
   IconInbox, IconSparkles, IconPlayerPlay, IconGitPullRequest, IconCircleCheck,
-  IconBrandGithub, IconHash, IconMail, IconFileText, IconChevronRight, IconChevronDown,
+  IconBrandGithub, IconBrandSlack, IconMail, IconFileText, IconChevronRight, IconChevronDown,
   IconGripVertical, IconEyeOff, IconPlus, IconPencil, IconArchive, IconEye,
   IconShieldCheck, IconAlertTriangle, IconShieldX,
 } from "@tabler/icons-react";
@@ -85,7 +85,7 @@ const HUMAN_ROW: StageConfig[] = [...SHARED_STAGES, ...HUMAN_STAGES, ...END_STAG
 
 const sourceIcons: Record<string, React.FC<{ size?: number; color?: string }>> = {
   linear: SiLinear as React.FC<{ size?: number; color?: string }>,
-  slack: IconHash,
+  slack: IconBrandSlack,
   github: IconBrandGithub,
   notion: SiNotion as React.FC<{ size?: number; color?: string }>,
   email: IconMail,
@@ -649,7 +649,7 @@ export function Notifications() {
                                     </UnstyledButton>
                                   )}
                                   <SrcIcon size={12} color={srcColor} />
-                                  {n.author && n.author !== "Unknown" && <Text size="xs" c="dimmed" truncate style={{ maxWidth: 90 }}>{n.author}</Text>}
+                                  {n.author && n.author !== "Unknown" ? <Text size="xs" c="dimmed" truncate style={{ maxWidth: 90 }}>{n.author}</Text> : <Text size="xs" c="dimmed" truncate style={{ maxWidth: 90 }}>{n.source}</Text>}
                                 </Group>
                                 <Group gap={4}>
                                   <Tooltip label={n.id} position="left" withArrow>
@@ -851,7 +851,7 @@ export function Notifications() {
                               <Group gap={6} mb={2} justify="space-between">
                                 <Group gap={4}>
                                   <SrcIcon size={12} color={srcColor} />
-                                  {n.author && n.author !== "Unknown" && <Text size="xs" c="dimmed" truncate style={{ maxWidth: 90 }}>{n.author}</Text>}
+                                  {n.author && n.author !== "Unknown" ? <Text size="xs" c="dimmed" truncate style={{ maxWidth: 90 }}>{n.author}</Text> : <Text size="xs" c="dimmed" truncate style={{ maxWidth: 90 }}>{n.source}</Text>}
                                 </Group>
                                 <Group gap={4}>
                                   <Tooltip label={n.id} position="left" withArrow>

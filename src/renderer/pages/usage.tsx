@@ -331,7 +331,7 @@ export default function UsagePage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--aegen-void)" }}>
       <style>{`@keyframes pipeline-pulse { 0%,100%{opacity:1} 50%{opacity:0.85} }`}</style>
-      <AppHeader />
+      {/* No header bar needed */}
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", paddingTop: 8 }}>
         {/* Pipeline Flow — full width */}

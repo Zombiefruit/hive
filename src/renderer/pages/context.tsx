@@ -1,4 +1,4 @@
-import { Accordion, Avatar, Badge, Button, Group, Loader, Progress, SimpleGrid, Stack, Text, Tooltip, Paper } from "@mantine/core";
+import { Accordion, Avatar, Badge, Group, Loader, Progress, SimpleGrid, Stack, Text, Tooltip, Paper, UnstyledButton } from "@mantine/core";
 import { IconBuilding, IconRefresh, IconTarget, IconCode, IconUsers, IconMessageCircle, IconChevronRight } from "@tabler/icons-react";
 import { useState, useEffect, useCallback } from "react";
 import { AppHeader } from "../components/AppHeader";
@@ -67,12 +67,13 @@ export default function BusinessContextPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--aegen-void)" }}>
       <AppHeader rightContent={
-        <Button size="xs" variant="filled" color="blue"
-          leftSection={localRefreshing ? <Loader size={12} color="white" /> : <IconRefresh size={14} />}
+        <UnstyledButton
           onClick={handleRefresh} disabled={localRefreshing}
+          style={{ padding: "4px 10px", borderRadius: 6, fontSize: "0.7rem", fontWeight: 500, display: "flex", alignItems: "center", gap: 4, backgroundColor: "rgba(74, 125, 255, 0.08)", color: "var(--mantine-color-blue-4)", opacity: localRefreshing ? 0.6 : 1 }}
         >
+          {localRefreshing ? <Loader size={10} /> : <IconRefresh size={12} />}
           {localRefreshing ? "Scanning..." : (context || raw) ? "Refresh" : "Generate"}
-        </Button>
+        </UnstyledButton>
       } />
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", paddingTop: 8 }}>

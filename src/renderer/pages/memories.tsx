@@ -90,7 +90,7 @@ export default function MemoriesPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--aegen-void)" }}>
-      <AppHeader />
+      {/* No header bar needed */}
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", paddingTop: 8 }}>
         {/* Stats header */}
