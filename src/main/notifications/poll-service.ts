@@ -1,4 +1,4 @@
-import { app, BrowserWindow, powerSaveBlocker } from "electron";
+import { app, BrowserWindow, Notification, powerSaveBlocker } from "electron";
 import { askBridge, isBridgeReady, restartBridge, askFetchBridge, isFetchBridgeReady, restartFetchBridge, addDebugEntry, askEphemeralProcess } from "../mcp-bridge";
 import { computeDiff, computeSectionHashes } from "../../shared/poll-diff";
 import { getConfig } from "../config";
@@ -649,6 +649,10 @@ RULES:
     emitThought(`changes in ${diff.changedSources.join(", ")} — triaging with Sonnet...`);
 
     logPoll("Pass 2: Triaging changed data (Sonnet ephemeral)");
+    // Re-broadcast polling-started so the UI shows loading during triage too
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send("notifications:polling-started");
+    }
     const triageStart = Date.now();
     const triageTicker = setInterval(() => broadcastElapsed("Triaging", triageStart), 10000);
     broadcastElapsed("Triaging", triageStart);
@@ -1514,6 +1518,17 @@ Read between the lines. If ${userName} is tagged in a context that implies actio
     lastPollTimestamp = new Date().toISOString();
     saveCacheToFile();
     broadcastNotifications();
+
+    // Native macOS notification summarizing what was found
+    const newItems = notifications.filter(n => n.pollCycle === currentPollCycle && n.stage === "new");
+    if (newItems.length > 0 && Notification.isSupported()) {
+      const high = newItems.filter(n => n.priority === "critical" || n.priority === "high");
+      const title = `${newItems.length} new item${newItems.length !== 1 ? "s" : ""} in Relay`;
+      const body = high.length > 0
+        ? `${high.length} high priority: ${high.slice(0, 2).map(n => n.title.slice(0, 40)).join(", ")}${high.length > 2 ? "..." : ""}`
+        : newItems.slice(0, 2).map(n => n.title.slice(0, 40)).join(", ");
+      new Notification({ title, body }).show();
+    }
   } catch (err) {
     logPoll(`poll ERROR: ${String(err)}`);
   } finally {
