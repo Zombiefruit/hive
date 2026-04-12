@@ -67,7 +67,7 @@ const getConnectorGeometry = (slot: ThoughtSlot) => {
   };
 };
 
-export function OrchestratorOrbiter() {
+export function OrchestratorOrbiter({ hidden }: { hidden?: boolean } = {}) {
   const [thoughts, setThoughts] = useState<ThoughtEntry[]>([]);
   const [floatingThought, setFloatingThought] = useState<{ id: string; text: string; slot: ThoughtSlot } | null>(null);
   const [intensity, setIntensity] = useState(0);
@@ -203,6 +203,8 @@ export function OrchestratorOrbiter() {
   useEffect(() => {
     if (isOpenFromStore && !panelOpen) setPanelOpen(true);
   }, [isOpenFromStore]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (hidden) return null;
 
   return (
     <>

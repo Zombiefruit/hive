@@ -3,7 +3,7 @@ import {
   IconInbox, IconSparkles, IconPlayerPlay, IconGitPullRequest, IconCircleCheck,
   IconBrandGithub, IconBrandSlack, IconMail, IconFileText, IconChevronRight, IconChevronDown,
   IconGripVertical, IconEyeOff, IconPlus, IconPencil, IconArchive, IconEye,
-  IconShieldCheck, IconAlertTriangle, IconShieldX,
+  IconShieldCheck, IconAlertTriangle, IconShieldX, IconCalendarEvent, IconHeadset,
 } from "@tabler/icons-react";
 import { SiLinear, SiNotion } from "@icons-pack/react-simple-icons";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -90,6 +90,8 @@ const sourceIcons: Record<string, React.FC<{ size?: number; color?: string }>> =
   notion: SiNotion as React.FC<{ size?: number; color?: string }>,
   email: IconMail,
   manual: IconPencil,
+  calendar: IconCalendarEvent,
+  gong: IconHeadset,
 };
 
 const sourceColors = SOURCE_COLORS;
@@ -145,12 +147,15 @@ export function Notifications() {
   });
   const [authStatus, setAuthStatus] = useState<{ installed: boolean; version: string | null; authenticated: boolean } | null>(null);
   const [config, setConfig] = useState<{ repoMappings?: Array<{ pattern: string; repoPath: string }>; name?: string; linearUsername?: string } | null>(null);
+  const [connectorIssues, setConnectorIssues] = useState<Array<{ source: string; message: string }>>([]);
 
   // Track recent local moves to prevent server broadcasts from reverting optimistic updates
   const recentMoves = useRef<Map<string, { stage: string; ts: number }>>(new Map());
 
   useEffect(() => {
     window.deck.checkAuth?.().then(setAuthStatus).catch(() => {});
+    const unsub = window.deck?.onConnectorIssues?.((issues: Array<{ source: string; message: string }>) => setConnectorIssues(issues));
+    return () => { unsub?.(); };
   }, []);
 
   // Poll for running skill IDs to show in-progress indicators on cards
@@ -503,6 +508,23 @@ export function Notifications() {
         .section-chevron { transition: transform 0.15s ease; display: inline-flex; }
         .section-chevron--open { transform: rotate(90deg); }
       `}</style>
+      {/* Connector issues banner */}
+      {connectorIssues.length > 0 && (
+        <div style={{
+          padding: "6px 16px", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+          background: "rgba(250, 82, 82, 0.1)", borderBottom: "1px solid rgba(250, 82, 82, 0.2)",
+          fontSize: "0.7rem", color: "var(--mantine-color-red-4)",
+        }}>
+          <IconAlertTriangle size={14} />
+          <span style={{ fontWeight: 600 }}>Connector issues:</span>
+          {connectorIssues.map((issue, i) => (
+            <Badge key={i} size="xs" variant="light" color="red" style={{ fontSize: "0.6rem" }}>
+              {issue.source} — {issue.message.slice(0, 60)}
+            </Badge>
+          ))}
+          <Text size="xs" c="dimmed" ml="auto">Reconnect in Settings → Integrations</Text>
+        </div>
+      )}
       {/* Header with tabs */}
       <AppHeader
         rightContent={
@@ -608,8 +630,9 @@ export function Notifications() {
                           </div>
                         )}
                         {items.map(n => {
-                          const SrcIcon = sourceIcons[n.source] ?? IconFileText;
-                          const srcColor = sourceColors[n.source] ?? "#6b7280";
+                          const src = n.source?.toLowerCase() ?? "unknown";
+                          const SrcIcon = sourceIcons[src] ?? IconFileText;
+                          const srcColor = sourceColors[src] ?? "#6b7280";
                           const isDragging = draggingId === n.id;
                           const isParent = (n.subtaskIds?.length ?? 0) > 0;
                           const isExpanded = expandedParents.has(n.id);
@@ -649,7 +672,7 @@ export function Notifications() {
                                     </UnstyledButton>
                                   )}
                                   <SrcIcon size={12} color={srcColor} />
-                                  {n.author && n.author !== "Unknown" ? <Text size="xs" c="dimmed" truncate style={{ maxWidth: 90 }}>{n.author}</Text> : <Text size="xs" c="dimmed" truncate style={{ maxWidth: 90 }}>{n.source}</Text>}
+                                  {n.author && n.author !== "Unknown" ? <Text size="xs" c="dimmed" truncate style={{ maxWidth: 90 }}>{n.author}</Text> : <Text size="xs" c="dimmed" truncate style={{ maxWidth: 90 }}>{src.charAt(0).toUpperCase() + src.slice(1)}</Text>}
                                 </Group>
                                 <Group gap={4}>
                                   <Tooltip label={n.id} position="left" withArrow>
@@ -657,7 +680,7 @@ export function Notifications() {
                                       {n.id.slice(-6)}
                                     </Text>
                                   </Tooltip>
-                                  <AddToManagerButton id={n.id} label={n.title} type="notification" data={{ source: n.source, summary: n.summary }} />
+                                  <AddToManagerButton id={n.id} label={n.title} type="notification" data={{ source: src, summary: n.summary }} />
                                 </Group>
                               </Group>
                               <Group gap={4} mb={4}>
@@ -685,12 +708,12 @@ export function Notifications() {
                                 <Badge
                                   size="xs"
                                   variant="light"
-                                  color={n.source === "manual" ? "violet" : "gray"}
+                                  color={src === "manual" ? "violet" : "gray"}
                                   radius="sm"
                                   style={{ fontSize: "0.55rem" }}
-                                  leftSection={(() => { const I = sourceIcons[n.source]; return I ? <I size={9} /> : undefined; })()}
+                                  leftSection={(() => { const I = sourceIcons[src]; return I ? <I size={9} /> : undefined; })()}
                                 >
-                                  {n.source}
+                                  {src.charAt(0).toUpperCase() + src.slice(1)}
                                 </Badge>
                                 {n.taskType && (
                                   <Badge size="xs" variant="outline" color="gray" radius="sm" style={{ fontSize: "0.55rem" }}>
@@ -728,16 +751,6 @@ export function Notifications() {
                                 <Group gap={4} mt={2}>
                                   <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#22c55e" }} />
                                   <Text size="xs" c="#22c55e" fw={500} style={{ fontSize: "0.6rem" }}>Plan ready</Text>
-                                </Group>
-                              )}
-                              {!isParent && stage.key !== "done" && stage.key !== "skipped" && stage.key !== "start_work" && stage.key !== "hack" && (
-                                <Group gap={4} mt={2}>
-                                  <UnstyledButton
-                                    onClick={(e) => { e.stopPropagation(); moveCardToStage(n.id, "done"); executeStageTransition(n.id, "done"); }}
-                                    style={{ padding: "2px 4px", borderRadius: 4, color: "var(--mantine-color-dimmed)", opacity: 0.5 }}
-                                  >
-                                    <IconCircleCheck size={12} />
-                                  </UnstyledButton>
                                 </Group>
                               )}
                             </div>
@@ -826,8 +839,9 @@ export function Notifications() {
                           </div>
                         )}
                         {items.map(n => {
-                          const SrcIcon = sourceIcons[n.source] ?? IconFileText;
-                          const srcColor = sourceColors[n.source] ?? "#6b7280";
+                          const src = n.source?.toLowerCase() ?? "unknown";
+                          const SrcIcon = sourceIcons[src] ?? IconFileText;
+                          const srcColor = sourceColors[src] ?? "#6b7280";
                           return (
                             <div
                               key={n.id}
@@ -850,8 +864,9 @@ export function Notifications() {
                             >
                               <Group gap={6} mb={2} justify="space-between">
                                 <Group gap={4}>
+                                  <IconGripVertical size={10} color="var(--mantine-color-dimmed)" style={{ opacity: 0.3 }} />
                                   <SrcIcon size={12} color={srcColor} />
-                                  {n.author && n.author !== "Unknown" ? <Text size="xs" c="dimmed" truncate style={{ maxWidth: 90 }}>{n.author}</Text> : <Text size="xs" c="dimmed" truncate style={{ maxWidth: 90 }}>{n.source}</Text>}
+                                  {n.author && n.author !== "Unknown" ? <Text size="xs" c="dimmed" truncate style={{ maxWidth: 90 }}>{n.author}</Text> : <Text size="xs" c="dimmed" truncate style={{ maxWidth: 90 }}>{src.charAt(0).toUpperCase() + src.slice(1)}</Text>}
                                 </Group>
                                 <Group gap={4}>
                                   <Tooltip label={n.id} position="left" withArrow>
@@ -859,7 +874,7 @@ export function Notifications() {
                                       {n.id.slice(-6)}
                                     </Text>
                                   </Tooltip>
-                                  <AddToManagerButton id={n.id} label={n.title} type="notification" data={{ source: n.source, summary: n.summary }} />
+                                  <AddToManagerButton id={n.id} label={n.title} type="notification" data={{ source: src, summary: n.summary }} />
                                 </Group>
                               </Group>
                               <Group gap={4} mb={4}>
@@ -876,12 +891,12 @@ export function Notifications() {
                                 <Badge
                                   size="xs"
                                   variant="light"
-                                  color={n.source === "manual" ? "violet" : "gray"}
+                                  color={src === "manual" ? "violet" : "gray"}
                                   radius="sm"
                                   style={{ fontSize: "0.55rem" }}
-                                  leftSection={n.source === "manual" ? <IconPencil size={9} /> : undefined}
+                                  leftSection={(() => { const I = sourceIcons[src]; return I ? <I size={9} /> : undefined; })()}
                                 >
-                                  {n.source === "manual" ? "manual" : (n.taskType ?? n.source)}
+                                  {src.charAt(0).toUpperCase() + src.slice(1)}
                                 </Badge>
                               </Group>
                               <Group gap={6} mb={4} wrap="nowrap">
@@ -901,14 +916,6 @@ export function Notifications() {
                                 <Group gap={4} mt={2}>
                                   <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#22c55e" }} />
                                   <Text size="xs" c="#22c55e" fw={500} style={{ fontSize: "0.6rem" }}>Ready</Text>
-                                </Group>
-                              )}
-                              {stage.key !== "done" && stage.key !== "ready" && stage.key !== "skipped" && (
-                                <Group gap={4} mt={2}>
-                                  <UnstyledButton onClick={(e) => { e.stopPropagation(); moveCardToStage(n.id, "done"); executeStageTransition(n.id, "done"); }}
-                                    style={{ padding: "2px 4px", borderRadius: 4, color: "var(--mantine-color-dimmed)", opacity: 0.5 }}>
-                                    <IconCircleCheck size={12} />
-                                  </UnstyledButton>
                                 </Group>
                               )}
                             </div>

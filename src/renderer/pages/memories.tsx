@@ -92,7 +92,7 @@ export default function MemoriesPage() {
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--aegen-void)" }}>
       {/* No header bar needed */}
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", paddingTop: 8 }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
         {/* Stats header */}
         {stats && (
           <Group gap={16} mb={12}>

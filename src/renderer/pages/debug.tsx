@@ -80,34 +80,9 @@ export function Debug() {
   }, []);
 
   return (
-    <div style={{ minHeight: "100%", background: "var(--aegen-void)" }}>
-      <div
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 10,
-          display: "flex",
-          alignItems: "center",
-          padding: "8px 24px",
-          paddingLeft: 80,
-          gap: 12,
-          borderBottom: "1px solid var(--aegen-glass-border)",
-          background: "var(--aegen-glass-bg)",
-          backdropFilter: "var(--aegen-glass-blur)",
-          WebkitAppRegion: "drag",
-        }}
-      >
-        <UnstyledButton onClick={() => navigate("/")} aria-label="Back to inbox" style={{ WebkitAppRegion: "no-drag", padding: 4 }}>
-          <IconArrowLeft size={16} />
-        </UnstyledButton>
-        <Title order={4}>Debug</Title>
-        <div style={{ flex: 1 }} />
-        <UnstyledButton onClick={() => { fetchLog(); fetchStats(); }} aria-label="Refresh debug data" style={{ WebkitAppRegion: "no-drag", padding: 4 }}>
-          <IconRefresh size={14} />
-        </UnstyledButton>
-      </div>
-
-      <div style={{ maxWidth: 1000, margin: "0 auto", padding: 16 }}>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", background: "var(--aegen-void)" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
+        <div style={{ maxWidth: 1000, margin: "0 auto" }}>
         {/* ── Process Stats ── */}
         <div style={{ marginBottom: 24 }}>
           <Group gap="xs" mb="sm">
@@ -221,6 +196,7 @@ export function Debug() {
             ))}
           </Stack>
         )}
+        </div>
       </div>
     </div>
   );

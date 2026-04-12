@@ -154,6 +154,14 @@ export function DetailDrawer({
           setLoading(true);
         }
       } catch {}
+      // If stage is preparing/start_work and no plan was loaded, show loading state
+      // (planning agent may be running — live events listener will clear loading on result)
+      if (!cancelled && (n.stage === "preparing" || n.stage === "start_work")) {
+        const hasPlan = await window.deck.getPlan?.(n.id);
+        if (!cancelled && !hasPlan?.plan) {
+          setLoading(true);
+        }
+      }
       // Auto-discover PR if task has a branch but no PR link
       const hasPrLink = (n.links ?? []).some(l => l.type === "github_pr");
       if (n.branch && !hasPrLink) {
@@ -605,7 +613,7 @@ export function DetailDrawer({
             </Tabs.Panel>
 
             <Tabs.Panel value="plan" style={{ flex: 1, overflow: "auto" }}>
-              <PlanTab planText={planText} verdict={planVerdict as import("../../shared/judge-types").PlanVerdict | null} />
+              <PlanTab planText={planText} verdict={planVerdict as import("../../shared/judge-types").PlanVerdict | null} isPlanning={n.stage === "preparing" && !planText} />
             </Tabs.Panel>
 
             <Tabs.Panel value="work" style={{ flex: 1, overflow: "auto" }}>

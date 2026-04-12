@@ -45,8 +45,14 @@ const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
   { value: "frontend_dev", label: "Frontend Dev" },
   { value: "backend_dev", label: "Backend Dev" },
   { value: "fullstack_dev", label: "Fullstack Dev" },
-  { value: "pm", label: "PM" },
+  { value: "data_engineer", label: "Data Engineer" },
+  { value: "data_scientist", label: "Data Scientist" },
+  { value: "devops_sre", label: "DevOps / SRE" },
+  { value: "engineering_manager", label: "Engineering Manager" },
+  { value: "pm", label: "Product Manager" },
   { value: "designer", label: "Designer" },
+  { value: "marketing", label: "Marketing" },
+  { value: "sales_cs", label: "Sales / CS" },
   { value: "other", label: "Other" },
 ];
 
@@ -97,6 +103,7 @@ export function Settings() {
 
   // Role
   const [role, setRole] = useState<UserRole>("fullstack_dev");
+  const [customRole, setCustomRole] = useState("");
 
   // Team
   const [managerName, setManagerName] = useState("");
@@ -156,14 +163,27 @@ export function Settings() {
         if (result.teamName) setTeamName(result.teamName);
         if (result.role) setRole(result.role as UserRole);
         if (result.coworkers?.length) {
-          setCoworkers(result.coworkers.map((c: { name: string; role: string; slackUserId?: string }) => ({
-            name: c.name,
-            role: c.role as CoworkerRole,
-            slackUserId: c.slackUserId,
-          })));
+          setCoworkers(prev => {
+            const existing = new Set(prev.map(c => c.name.toLowerCase()));
+            const merged = [...prev];
+            for (const c of result.coworkers!) {
+              if (!existing.has(c.name.toLowerCase())) {
+                merged.push({ name: c.name, role: c.role as CoworkerRole, slackUserId: c.slackUserId });
+              }
+            }
+            return merged;
+          });
         }
         if (result.slackChannels?.length) {
-          setChannels(result.slackChannels);
+          // Merge — don't replace existing channels
+          setChannels(prev => {
+            const existing = new Set(prev.map(c => c.id));
+            const merged = [...prev];
+            for (const ch of result.slackChannels!) {
+              if (!existing.has(ch.id)) merged.push(ch);
+            }
+            return merged;
+          });
         }
         if (result.integrations) {
           setIntegrations(prev => ({ ...prev, ...result.integrations }));
@@ -228,6 +248,7 @@ export function Settings() {
           setSlackUserId(config.slackUserId ?? "");
           setLinearUsername(config.linearUsername ?? "");
           setRole(config.role ?? "fullstack_dev");
+          setCustomRole(config.customRole ?? "");
           setManagerName(config.managerName ?? "");
           setTeamName(config.teamName ?? "");
           setCoworkers(config.coworkers ?? []);
@@ -263,6 +284,7 @@ export function Settings() {
         slackUserId: slackUserId.trim() || undefined,
         linearUsername: linearUsername.trim() || undefined,
         role,
+        customRole: role === "other" && customRole.trim() ? customRole.trim() : undefined,
         managerName: managerName.trim(),
         teamName: teamName.trim(),
         coworkers: coworkers.length > 0 ? coworkers : undefined,
@@ -428,22 +450,25 @@ export function Settings() {
               "Role & Team",
               "Helps prioritize and triage incoming work.",
             )}
-            <Radio.Group value={role} onChange={(val) => setRole(val as UserRole)}>
-              <Group gap={8} mt={4}>
-                {ROLE_OPTIONS.map((opt) => (
-                  <Radio
-                    key={opt.value}
-                    value={opt.value}
-                    label={opt.label}
-                    size="sm"
-                    styles={{
-                      radio: { cursor: "pointer" },
-                      label: { cursor: "pointer" },
-                    }}
-                  />
-                ))}
-              </Group>
-            </Radio.Group>
+            <Group grow>
+              <Select
+                label="Role"
+                data={ROLE_OPTIONS}
+                value={role}
+                onChange={(val) => val && setRole(val as UserRole)}
+                size="sm"
+                allowDeselect={false}
+              />
+              {role === "other" && (
+                <TextInput
+                  label="Custom role"
+                  placeholder="e.g. Solutions Engineer..."
+                  value={customRole}
+                  onChange={(e) => setCustomRole(e.currentTarget.value)}
+                  size="sm"
+                />
+              )}
+            </Group>
             <Group grow>
               <TextInput
                 label="Manager name"
@@ -521,8 +546,21 @@ export function Settings() {
                       try {
                         const result = await window.deck.searchUsers("slack", val);
                         if (result.ok && result.data) {
-                          const users = JSON.parse(result.data) as Array<{ id: string; title: string }>;
-                          setCoworkerSearchResults(users.map(u => ({ label: u.title, slackId: u.id })));
+                          // Try JSON first, fall back to text parsing
+                          let users: Array<{ label: string; slackId: string }> = [];
+                          try {
+                            const parsed = JSON.parse(result.data) as Array<{ id: string; title?: string; name?: string; display_name?: string }>;
+                            users = parsed.map(u => ({ label: u.display_name ?? u.name ?? u.title ?? "Unknown", slackId: u.id }));
+                          } catch {
+                            // Parse plain text: "Name (U...) — Title" or "- Name (U...)"
+                            const lines = result.data.split("\n").filter((l: string) => l.includes("U0") || l.includes("U_"));
+                            users = lines.map((line: string) => {
+                              const idMatch = line.match(/(U[A-Z0-9]{8,})/);
+                              const nameMatch = line.match(/(?:^[-*•]\s*)?([A-Z][a-z]+ [A-Z][a-z]+)/);
+                              return { label: nameMatch?.[1] ?? line.trim().slice(0, 40), slackId: idMatch?.[1] ?? "" };
+                            }).filter((u: { label: string; slackId: string }) => u.label && u.slackId);
+                          }
+                          setCoworkerSearchResults(users);
                         }
                       } catch { setCoworkerSearchResults([]); }
                     }, 300);
@@ -940,7 +978,7 @@ export function Settings() {
             {sectionDivider}
 
             {/* ── Danger Zone ── */}
-            <div style={{ padding: "16px 20px", borderRadius: 8, border: "1px solid rgba(255, 107, 61, 0.2)" }}>
+            <div style={{ padding: "16px 20px", borderRadius: 8, border: "1px solid rgba(255, 107, 61, 0.2)", marginBottom: 24 }}>
               <Text size="sm" fw={600} c="red.4" mb={12}>Danger Zone</Text>
               <Group gap={8}>
                 <Button
@@ -983,7 +1021,7 @@ export function Settings() {
           bottom: 0,
           padding: "12px 24px",
           borderTop: "1px solid var(--aegen-glass-border)",
-          backgroundColor: "rgba(5, 8, 16, 0.9)",
+          backgroundColor: "var(--aegen-glass-bg)",
           backdropFilter: "blur(8px)",
           display: "flex",
           alignItems: "center",

@@ -20,6 +20,7 @@ Execute ALL of these. If a tool fails with an auth error, mark that integration 
 - Search for the user: `mcp__claude_ai_Slack__slack_search_users` with query "{{USER_NAME}}" or "{{USER_EMAIL}}"
 - Extract: Slack user ID (U...), display name, workspace domain
 - If the user has a profile, note their title/role
+- **IMPORTANT**: Also read the user's profile with `mcp__claude_ai_Slack__slack_read_user_profile` to get their **timezone** (e.g. "America/New_York", "Asia/Jerusalem"). Include it as `"timezone"` in the output.
 
 ### 2. Slack Channels
 - Use `mcp__claude_ai_Slack__slack_search_channels` to find channels the user is likely in
@@ -40,9 +41,14 @@ Execute ALL of these. If a tool fails with an auth error, mark that integration 
 - From Slack workspace and Linear team, identify:
   - Manager (if discoverable from org chart or team structure)
   - Team lead
-  - PM
+  - PM (Product Manager, Program Manager, TPM — any of these = role `"pm"`)
   - Direct peers (same team/channels)
-- For each coworker: name, role (manager/lead/pm/peer), Slack user ID if available
+- **For EVERY coworker**: use `mcp__claude_ai_Slack__slack_search_users` with their name to get their Slack user ID (U...). Do NOT leave slackUserId blank if the person is findable in Slack.
+- **Role mapping from Slack/Linear profiles**:
+  - Title contains "Product Manager" / "PM" / "Program Manager" / "TPM" → `"pm"`
+  - Title contains "Lead" / "Principal" / "Staff" / "Senior Staff" → `"lead"`
+  - Title contains "Manager" / "Director" / "VP" / "Head of" (and manages the user) → `"manager"`
+  - Otherwise → `"peer"`
 
 ### 5. Gmail Intelligence
 - Read recent emails to discover:
@@ -85,6 +91,7 @@ Return ONLY a JSON object:
   "managerName": "Manager Name or null",
   "teamName": "Team Name or null",
   "role": "frontend_dev|backend_dev|fullstack_dev|pm|designer|other",
+  "timezone": "America/New_York (from Slack profile tz field)",
   "coworkers": [
     {"name": "Person Name", "role": "manager|lead|pm|peer", "slackUserId": "U..."}
   ],

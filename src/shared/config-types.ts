@@ -17,8 +17,14 @@ export type UserRole =
   | "frontend_dev"
   | "backend_dev"
   | "fullstack_dev"
+  | "data_engineer"
+  | "data_scientist"
+  | "devops_sre"
+  | "engineering_manager"
   | "pm"
   | "designer"
+  | "marketing"
+  | "sales_cs"
   | "other";
 
 export type FetchCadence = "manual" | "15min" | "30min" | "1hr";
@@ -43,6 +49,7 @@ export interface DeckConfig {
 
   /** Step 2 — Role */
   role: UserRole;
+  customRole?: string;
 
   /** Step 3 — Team */
   managerName: string;

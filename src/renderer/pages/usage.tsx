@@ -333,7 +333,7 @@ export default function UsagePage() {
       <style>{`@keyframes pipeline-pulse { 0%,100%{opacity:1} 50%{opacity:0.85} }`}</style>
       {/* No header bar needed */}
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", paddingTop: 8 }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
         {/* Pipeline Flow — full width */}
         <div style={{ ...glass, marginBottom: 12 }}>
           <Text size="xs" fw={600} c="dimmed" mb={8} style={sectionLabel}>Pipeline — Today's Activity</Text>

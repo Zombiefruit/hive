@@ -563,13 +563,20 @@ export function runSkill(
 
             log(`[skill] Result: ${finalText.length} chars (result=${resultText.length}, assistant=${assistantText.length})`);
             try {
+              const inTok = msg.usage?.input_tokens ?? 0;
+              const outTok = msg.usage?.output_tokens ?? 0;
+              const reportedCost = msg.total_cost_usd ?? 0;
+              // Estimate cost from tokens if Claude Code didn't report total_cost_usd
+              const estModel = "claude-sonnet-4-6"; // skill runner defaults to Sonnet
+              // Sonnet: $3/M input, $15/M output
+              const cost = reportedCost > 0 ? reportedCost : (inTok * 3 + outTok * 15) / 1_000_000;
               recordUsage({
                 timestamp: new Date().toISOString(),
                 source: "skill-runner",
-                model: "unknown",
-                inputTokens: msg.usage?.input_tokens ?? 0,
-                outputTokens: msg.usage?.output_tokens ?? 0,
-                costUsd: msg.total_cost_usd ?? 0,
+                model: estModel,
+                inputTokens: inTok,
+                outputTokens: outTok,
+                costUsd: cost,
                 durationMs: Date.now() - startTs,
                 label: skillLabel,
                 notificationId: invocation.notificationId,

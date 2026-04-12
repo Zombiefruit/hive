@@ -102,6 +102,11 @@ const api = {
     ipcRenderer.on("notifications:polling-progress", listener);
     return () => ipcRenderer.removeListener("notifications:polling-progress", listener);
   },
+  onConnectorIssues: (callback: (issues: Array<{ source: string; message: string }>) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, issues: Array<{ source: string; message: string }>) => callback(issues);
+    ipcRenderer.on("notifications:connector-issues", listener);
+    return () => ipcRenderer.removeListener("notifications:connector-issues", listener);
+  },
 
   // Store sync — renderer subscribes to state updates from main
   onStoreUpdate: (callback: (state: unknown) => void) => {

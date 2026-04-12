@@ -33,12 +33,14 @@ export const STAGE_META: Record<Stage, StageMeta> = {
 // ── Source colors ──
 
 export const SOURCE_COLORS: Record<string, string> = {
-  linear:  "#5E6AD2",
-  slack:   "#E01E5A",
-  github:  "#FFFFFF",
-  notion:  "#FFFFFF",
-  email:   "#EA4335",
-  manual:  "#A78BFA",
+  linear:   "#5E6AD2",
+  slack:    "#E01E5A",
+  github:   "currentColor",
+  notion:   "currentColor",
+  email:    "#EA4335",
+  manual:   "#A78BFA",
+  calendar: "#4285F4",
+  gong:     "#7C3AED",
 };
 
 // ── Priority colors ──

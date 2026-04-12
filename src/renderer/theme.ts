@@ -261,13 +261,9 @@ const aeGenTheme = createTheme({
       }),
     },
 
-    // Radio — Aegen styled
+    // Radio — Aegen styled (no custom radio background — let Mantine handle checked state)
     Radio: {
       styles: () => ({
-        radio: {
-          borderColor: "var(--aegen-dim-gray)",
-          backgroundColor: "var(--aegen-glass-bg)",
-        },
         label: {
           color: "var(--aegen-star-white)",
         },

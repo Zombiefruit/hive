@@ -452,7 +452,7 @@ async function poll(): Promise<void> {
     const teamName = config?.teamName ?? "";
     const tz = config?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
     const channels = config?.slackChannels ?? [];
-    const integrations = config?.integrations ?? { slack: true, linear: true, gmail: false, calendar: false, notion: false, github: true, gong: false };
+    const integrations = config?.integrations ?? { slack: true, linear: true, gmail: true, calendar: true, notion: true, github: true, gong: false };
     const coworkers = config?.coworkers ?? [];
 
     // Build manager Slack search if we know the manager's Slack ID
@@ -627,6 +627,29 @@ RULES:
     const diff = computeDiff(rawData, previousHashes);
     logPoll(`  Diff: hasChanges=${diff.hasChanges}, changed=[${diff.changedSources.join(",")}], unchanged=[${diff.unchangedSources.join(",")}], prevHashes=${previousHashes.length}, delta=${diff.delta.length} chars`);
 
+    // Log per-section content length + first 200 chars for debugging (helps identify empty/error sections)
+    const { splitSections } = await import("../../shared/poll-diff");
+    const debugSections = splitSections(rawData);
+    const connectorIssues: Array<{ source: string; message: string }> = [];
+    const ERROR_PATTERNS = /permission not granted|not yet granted|authentication required|access denied|auth error|requires authentication|connect.*failed/i;
+    for (const [src, content] of debugSections) {
+      if (src === "PREAMBLE") continue;
+      logPoll(`  Section ${src}: ${content.length} chars — ${content.slice(0, 200).replace(/\n/g, " ").trim()}`);
+      // Detect connector auth/permission failures
+      if (ERROR_PATTERNS.test(content) && content.length < 500) {
+        connectorIssues.push({ source: src, message: content.replace(/^##\s*\w+\s*\n?/, "").trim().slice(0, 150) });
+        logPoll(`  ⚠️ CONNECTOR ISSUE: ${src} — ${content.slice(0, 100).replace(/\n/g, " ")}`);
+      }
+    }
+    // Broadcast connector issues to UI so user can reconnect
+    if (connectorIssues.length > 0) {
+      for (const win of BrowserWindow.getAllWindows()) {
+        if (!win.isDestroyed()) {
+          win.webContents.send("notifications:connector-issues", connectorIssues);
+        }
+      }
+    }
+
     if (!diff.hasChanges) {
       logPoll("No changes detected since last poll — skipping triage");
       emitThought("no new data since last poll");
@@ -676,8 +699,10 @@ RULES:
     // Load triage skills from .claude/skills/
     const triageSkills = loadSkills(["triage-rules", "triage-output-format", "triage-linking"]);
 
-    // Use only the changed data for triage (smaller input = cheaper Sonnet call)
-    const triageData = diff.delta;
+    // Clean the delta before triage: strip error sections, normalize formatting, truncate oversized sections
+    const { cleanDeltaWithReport } = await import("../../shared/poll-cleanup");
+    const { cleaned: triageData, report: cleanupReport } = cleanDeltaWithReport(diff.delta);
+    logPoll(`  Cleanup: ${cleanupReport.totalOriginalChars} → ${cleanupReport.totalCleanedChars} chars (removed: ${cleanupReport.removedSources.join(", ") || "none"}, truncated: ${cleanupReport.truncatedSources.join(", ") || "none"})`);
     const changedSourcesLabel = diff.changedSources.join(", ");
 
     const triagePrompt = `You are ${userName}'s personal assistant. Current time: ${now.toISOString()} (${localTime} ${tz}).
@@ -990,7 +1015,7 @@ Read between the lines. If ${userName} is tagged in a context that implies actio
           subtaskIds.push(subId);
           notifications.unshift({
             id: subId,
-            source: item.source as PollNotification["source"],
+            source: (item.source?.toLowerCase() ?? "unknown") as PollNotification["source"],
             priority: normalizePriority(item.priority),
             status: "new",
             stage: "new",
@@ -1014,7 +1039,7 @@ Read between the lines. If ${userName} is tagged in a context that implies actio
         // Create parent task
         notifications.unshift({
           id: parentId,
-          source: item.source as PollNotification["source"],
+          source: (item.source?.toLowerCase() ?? "unknown") as PollNotification["source"],
           priority: normalizePriority(item.priority),
           status: "new",
           stage: "new",
@@ -1038,7 +1063,7 @@ Read between the lines. If ${userName} is tagged in a context that implies actio
 
       notifications.unshift({
         id: `poll-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        source: item.source as PollNotification["source"],
+        source: (item.source?.toLowerCase() ?? "unknown") as PollNotification["source"],
         priority: normalizePriority(item.priority),
         status: "new",
         stage: "new",
@@ -1075,7 +1100,7 @@ Read between the lines. If ${userName} is tagged in a context that implies actio
 
       notifications.push({
         id: `poll-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        source: item.source as PollNotification["source"],
+        source: (item.source?.toLowerCase() ?? "unknown") as PollNotification["source"],
         priority: normalizePriority(item.priority),
         status: "new",
         title: item.title,
@@ -1114,7 +1139,7 @@ Read between the lines. If ${userName} is tagged in a context that implies actio
 
       notifications.push({
         id: `poll-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        source: (s.source ?? "unknown") as PollNotification["source"],
+        source: (s.source?.toLowerCase() ?? "unknown") as PollNotification["source"],
         priority: "backlog" as PollNotification["priority"],
         status: "new",
         title,

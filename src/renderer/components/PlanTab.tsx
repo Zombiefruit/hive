@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Badge, Group, Stack, Text } from "@mantine/core";
+import { Badge, Group, Loader, Stack, Text } from "@mantine/core";
 import { IconFileText, IconShieldCheck, IconAlertTriangle, IconShieldX } from "@tabler/icons-react";
 import { PlanView } from "./PlanView";
 import { Markdown } from "./Markdown";
@@ -10,6 +10,7 @@ import type { PlanVerdict } from "../../shared/judge-types";
 interface PlanTabProps {
   planText: string | null;
   verdict?: PlanVerdict | null;
+  isPlanning?: boolean;
 }
 
 function VerdictPanel({ verdict }: { verdict: PlanVerdict }) {
@@ -92,9 +93,20 @@ function VerdictPanel({ verdict }: { verdict: PlanVerdict }) {
   );
 }
 
-export function PlanTab({ planText, verdict }: PlanTabProps) {
+export function PlanTab({ planText, verdict, isPlanning }: PlanTabProps) {
   const parsedPlan = useMemo(() => (planText ? parsePlanMd(planText) : null), [planText]);
   const hasPhases = parsedPlan && parsedPlan.phases.length > 0;
+
+  // Planning in progress — show loading
+  if (!planText && isPlanning) {
+    return (
+      <Stack align="center" justify="center" gap="sm" style={{ flex: 1, padding: "40px 20px" }}>
+        <Loader size={20} />
+        <Text size="sm" c="dimmed">Generating plan...</Text>
+        <Text size="xs" c="dimmed">Fetching context from Slack, Linear, GitHub...</Text>
+      </Stack>
+    );
+  }
 
   // No plan text at all → empty state
   if (!planText) {

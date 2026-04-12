@@ -15,6 +15,7 @@ export interface DiscoveredConfig {
   managerName?: string;
   teamName?: string;
   role?: string;
+  timezone?: string;
   coworkers?: Array<{ name: string; role: string; slackUserId?: string }>;
   slackChannels?: Array<{ id: string; name: string }>;
   integrations?: Record<string, boolean>;

@@ -42,6 +42,8 @@ The "---" separator on its own line is REQUIRED between sections.
 - Do NOT explore the local filesystem or assume the task is about the current directory.
 - If a fetch fails, note it and plan with what you have.
 - You MUST produce a plan with SECTION 1 and SECTION 2. Never return just a status update or question.
+- **For PR reviews**: Check the pre-fetched GitHub context for review status. If `reviews` shows an APPROVED state, the PR is already approved — note this and recommend merging instead of reviewing. A ✅ (checkmark/white_check_mark) reaction on Slack also indicates approval.
+- **GitHub PR context is pre-fetched** — look for "## Pre-fetched GitHub Context" in the prompt. This includes reviews, state, files, and comments. Do NOT re-fetch it via MCP tools. Analyze it for: approval status, CI checks, review comments, requested changes.
 
 ## Structured Actions
 

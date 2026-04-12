@@ -76,7 +76,7 @@ export default function BusinessContextPage() {
         </UnstyledButton>
       } />
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", paddingTop: 8 }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
         {!context && !raw && !localRefreshing && (
           <Stack align="center" py="xl" gap="sm">
             <IconBuilding size={32} color="var(--aegen-dust-gray)" />

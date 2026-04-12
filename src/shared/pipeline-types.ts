@@ -7,7 +7,6 @@ export interface PipelineStage {
 
 export const PIPELINE_STAGES: PipelineStage[] = [
   { id: "fetch", label: "Fetch", model: "haiku", description: "MCP tools fetch Slack, Linear, Calendar" },
-  { id: "diff", label: "Diff", model: "none", description: "TypeScript hash comparison" },
   { id: "triage", label: "Triage", model: "sonnet", description: "Classify, prioritize, create tasks" },
   { id: "judge", label: "Judge", model: "haiku", description: "Verify triage quality" },
   { id: "plan", label: "Plan", model: "opus", description: "Multi-source context + implementation plan" },

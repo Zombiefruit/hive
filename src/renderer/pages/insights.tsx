@@ -4,7 +4,8 @@ import {
   IconRocket, IconTools, IconCheck, IconX, IconExternalLink,
   IconChevronDown, IconChevronRight,
 } from "@tabler/icons-react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip } from "recharts";
 import { AppHeader } from "../components/AppHeader";
 import { useGlobalRefresh } from "../hooks/useGlobalRefresh";
 import type { Insight } from "../../shared/insight-types";
@@ -22,6 +23,28 @@ const IMPACT_DOTS: Record<string, string> = {
   medium: "var(--mantine-color-yellow-5)",
   low: "var(--mantine-color-gray-5)",
 };
+
+/* Chart colors — hardcoded hex because recharts doesn't resolve CSS vars */
+const IMPACT_CHART_COLORS: Record<string, string> = { high: "#fa5252", medium: "#fab005", low: "#868e96" };
+const TYPE_CHART_COLORS: Record<string, string> = {
+  feature_idea: "#339af0", customer_pain: "#fa5252", trend: "#845ef7",
+  proactive_task: "#40c057", optimization: "#fd7e14",
+};
+
+/* Custom tooltip for recharts that matches Aegen glass style */
+function ChartTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; payload: { fill: string } }> }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0];
+  return (
+    <div style={{
+      padding: "6px 10px", borderRadius: 6, fontSize: 12,
+      background: "rgba(20,20,30,0.9)", border: "1px solid rgba(255,255,255,0.1)",
+      color: "#e0e0e0",
+    }}>
+      <span style={{ color: d.payload.fill, fontWeight: 600 }}>{d.name}</span>: {d.value}
+    </div>
+  );
+}
 
 /** Compact insight row — title, type dot, impact dot, and actions. Expandable for details. */
 function InsightRow({ insight, expanded, onToggle, onAcknowledge, onDismiss, onConvert }: {
@@ -193,35 +216,142 @@ export default function InsightsPage() {
 
   const filterTypes = Object.entries(TYPE_CONFIG);
 
-  // (top trends removed — replaced with interactive impact/type badges above)
+  // Chart data — memoized to avoid recalculation on every render
+  const impactChartData = useMemo(() => [
+    { name: "High", value: high.length, fill: IMPACT_CHART_COLORS.high },
+    { name: "Medium", value: medium.length, fill: IMPACT_CHART_COLORS.medium },
+    { name: "Low", value: low.length, fill: IMPACT_CHART_COLORS.low },
+  ].filter(d => d.value > 0), [high.length, medium.length, low.length]);
+
+  const typeChartData = useMemo(() =>
+    Object.entries(TYPE_CONFIG).map(([key, cfg]) => ({
+      name: cfg.label,
+      value: filtered.filter(i => i.type === key).length,
+      fill: TYPE_CHART_COLORS[key] ?? "#868e96",
+      key,
+    })).filter(d => d.value > 0).sort((a, b) => b.value - a.value),
+  [filtered]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--aegen-void)" }}>
       {/* No header bar — refresh state shown via sidebar spinner */}
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", paddingTop: 8 }}>
-        {/* Summary breakdown */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
+        {/* Visual summary — charts + filter badges */}
         {filtered.length > 0 && (
-          <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
-            <Badge size="sm" color="red" variant={impactFilter === "high" ? "filled" : "light"} style={{ cursor: "pointer" }} onClick={() => setImpactFilter(impactFilter === "high" ? null : "high")}>
-              {high.length} high
-            </Badge>
-            <Badge size="sm" color="yellow" variant={impactFilter === "medium" ? "filled" : "light"} style={{ cursor: "pointer" }} onClick={() => setImpactFilter(impactFilter === "medium" ? null : "medium")}>
-              {medium.length} medium
-            </Badge>
-            <Badge size="sm" color="gray" variant={impactFilter === "low" ? "filled" : "light"} style={{ cursor: "pointer" }} onClick={() => setImpactFilter(impactFilter === "low" ? null : "low")}>
-              {low.length} low
-            </Badge>
-            <div style={{ width: 1, height: 16, background: "var(--aegen-glass-border)", margin: "0 4px" }} />
-            {filterTypes.map(([key, cfg]) => {
-              const count = filtered.filter(i => i.type === key).length;
-              if (count === 0) return null;
-              return (
-                <Badge key={key} size="sm" color={cfg.color} variant={filter === key ? "filled" : "light"} style={{ cursor: "pointer" }} onClick={() => setFilter(filter === key ? null : key)}>
-                  {count} {cfg.label}
-                </Badge>
-              );
-            })}
+          <div style={{
+            display: "flex", gap: 16, marginBottom: 12, flexWrap: "wrap",
+            padding: "14px 16px", borderRadius: 10,
+            background: "var(--aegen-glass-bg)", backdropFilter: "var(--aegen-glass-blur)",
+            border: "1px solid var(--aegen-glass-border)",
+          }}>
+            {/* Impact donut */}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 120 }}>
+              <Text size="xs" fw={600} c="dimmed" mb={4} style={{ textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                Impact
+              </Text>
+              <div style={{ width: 100, height: 100, position: "relative" }}>
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                  <PieChart>
+                    <Pie
+                      data={impactChartData}
+                      cx="50%" cy="50%"
+                      innerRadius={28} outerRadius={44}
+                      dataKey="value" stroke="none"
+                      style={{ cursor: "pointer" }}
+                      onClick={(_, idx) => {
+                        const level = ["high", "medium", "low"].filter(l =>
+                          (l === "high" && high.length > 0) || (l === "medium" && medium.length > 0) || (l === "low" && low.length > 0)
+                        )[idx];
+                        if (level) setImpactFilter(impactFilter === level ? null : level);
+                      }}
+                    >
+                      {impactChartData.map((d, i) => (
+                        <Cell key={i} fill={d.fill} opacity={!impactFilter || impactFilter === ["high", "medium", "low"].filter(l =>
+                          (l === "high" && high.length > 0) || (l === "medium" && medium.length > 0) || (l === "low" && low.length > 0)
+                        )[i] ? 1 : 0.3} />
+                      ))}
+                    </Pie>
+                    <RTooltip content={<ChartTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div style={{
+                  position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+                  textAlign: "center", pointerEvents: "none",
+                }}>
+                  <Text size="lg" fw={700} lh={1}>{filtered.length}</Text>
+                  <Text size="8px" c="dimmed">total</Text>
+                </div>
+              </div>
+              {/* Impact legend */}
+              <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                {impactChartData.map(d => (
+                  <Text key={d.name} size="10px" c="dimmed" style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: d.fill, display: "inline-block" }} />
+                    {d.value}
+                  </Text>
+                ))}
+              </div>
+            </div>
+
+            {/* Type bar chart */}
+            <div style={{ flex: 1, minWidth: 200, maxWidth: 400 }}>
+              <Text size="xs" fw={600} c="dimmed" mb={4} style={{ textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                By Type
+              </Text>
+              <div style={{ width: "100%", height: 100 }}>
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                  <BarChart data={typeChartData} layout="vertical" margin={{ left: 0, right: 8, top: 0, bottom: 0 }}>
+                    <XAxis type="number" hide />
+                    <YAxis type="category" dataKey="name" width={65} tick={{ fontSize: 11, fill: "#868e96" }} axisLine={false} tickLine={false} />
+                    <RTooltip content={<ChartTooltip />} cursor={false} />
+                    <Bar
+                      dataKey="value" radius={[0, 4, 4, 0]} barSize={14}
+                      style={{ cursor: "pointer" }}
+                      onClick={(_d, idx) => {
+                        const key = typeChartData[idx]?.key;
+                        if (key) setFilter(filter === key ? null : key);
+                      }}
+                    >
+                      {typeChartData.map((d, i) => (
+                        <Cell key={i} fill={d.fill} opacity={!filter || filter === d.key ? 1 : 0.3} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Top insight callout */}
+            {high.length > 0 && (
+              <div style={{ flex: 1, minWidth: 180, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                <Text size="xs" fw={600} c="dimmed" mb={4} style={{ textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  Top Insight
+                </Text>
+                <Text size="sm" fw={500} lineClamp={2}>{high[0].title}</Text>
+                <Text size="xs" c="dimmed" lineClamp={2} mt={2}>{high[0].description}</Text>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Active filters */}
+        {(impactFilter || filter) && (
+          <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+            {impactFilter && (
+              <Badge size="sm" color={impactFilter === "high" ? "red" : impactFilter === "medium" ? "yellow" : "gray"}
+                variant="filled" style={{ cursor: "pointer" }} onClick={() => setImpactFilter(null)}
+                rightSection={<IconX size={10} />}>
+                {impactFilter} impact
+              </Badge>
+            )}
+            {filter && (
+              <Badge size="sm" color={TYPE_CONFIG[filter]?.color ?? "gray"}
+                variant="filled" style={{ cursor: "pointer" }} onClick={() => setFilter(null)}
+                rightSection={<IconX size={10} />}>
+                {TYPE_CONFIG[filter]?.label ?? filter}
+              </Badge>
+            )}
           </div>
         )}
 
@@ -234,22 +364,6 @@ export default function InsightsPage() {
           mb={12}
           style={{ maxWidth: 300 }}
         />
-
-        {/* Summary card */}
-        {filtered.length > 0 && (
-          <div style={{
-            padding: "12px 14px", borderRadius: 8, marginBottom: 12,
-            background: "var(--aegen-glass-bg)", border: "1px solid var(--aegen-glass-border)",
-          }}>
-            <Text size="xs" fw={600} c="dimmed" mb={6} style={{ textTransform: "uppercase", letterSpacing: "0.5px" }}>
-              Overview
-            </Text>
-            <Text size="sm" style={{ lineHeight: 1.6 }}>
-              {filtered.length} insights across {Object.entries(filtered.reduce<Record<string, number>>((acc, i) => { acc[i.type] = (acc[i.type] ?? 0) + 1; return acc; }, {})).sort((a, b) => b[1] - a[1]).map(([t, c]) => `${c} ${TYPE_CONFIG[t]?.label ?? t}`).join(", ").replace(/, ([^,]*)$/, " and $1")}.
-              {high.length > 0 ? ` ${high.length} high-impact — top: "${high[0].title}".` : " No high-impact findings."}
-            </Text>
-          </div>
-        )}
 
         {/* Loading state */}
         {(initialLoading || isRefreshing) && filtered.length === 0 && (

@@ -3,7 +3,6 @@ import {
   Badge,
   Button,
   Group,
-  Radio,
   Select,
   Stack,
   Stepper,
@@ -31,6 +30,7 @@ import { useNavigate } from "react-router-dom";
 import { IconSparkles } from "@tabler/icons-react";
 import type {
   DeckConfig,
+  Coworker,
   UserRole,
   FetchCadence,
   IntegrationToggles,
@@ -48,8 +48,14 @@ const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
   { value: "frontend_dev", label: "Frontend Dev" },
   { value: "backend_dev", label: "Backend Dev" },
   { value: "fullstack_dev", label: "Fullstack Dev" },
-  { value: "pm", label: "PM" },
+  { value: "data_engineer", label: "Data Engineer" },
+  { value: "data_scientist", label: "Data Scientist" },
+  { value: "devops_sre", label: "DevOps / SRE" },
+  { value: "engineering_manager", label: "Engineering Manager" },
+  { value: "pm", label: "Product Manager" },
   { value: "designer", label: "Designer" },
+  { value: "marketing", label: "Marketing" },
+  { value: "sales_cs", label: "Sales / CS" },
   { value: "other", label: "Other" },
 ];
 
@@ -90,10 +96,12 @@ export function Onboarding() {
 
   // Step 2 — Role
   const [role, setRole] = useState<UserRole>("fullstack_dev");
+  const [customRole, setCustomRole] = useState("");
 
   // Step 3 — Team
   const [managerName, setManagerName] = useState("");
   const [teamName, setTeamName] = useState("");
+  const [coworkers, setCoworkers] = useState<Coworker[]>([]);
 
   // Step 4 — Slack Channels
   const [channels, setChannels] = useState<SlackChannel[]>(DEFAULT_CHANNELS);
@@ -139,7 +147,7 @@ export function Onboarding() {
         if (result.managerName) setManagerName(result.managerName);
         if (result.teamName) setTeamName(result.teamName);
         if (result.role) setRole(result.role as UserRole);
-        // Coworkers are stored in config directly at save time (onboarding doesn't have a coworker editor)
+        if (result.coworkers?.length) setCoworkers(result.coworkers as Coworker[]);
         if (result.slackChannels?.length) {
           setChannels(result.slackChannels);
           setSelectedChannelIds(new Set(result.slackChannels.map((c: { id: string }) => c.id)));
@@ -147,6 +155,7 @@ export function Onboarding() {
         if (result.integrations) {
           setIntegrations(prev => ({ ...prev, ...result.integrations }));
         }
+        if (result.timezone) setTimezone(result.timezone);
         if (result.discoveredContext?.workingHours) {
           setWorkStart(result.discoveredContext.workingHours.start);
           setWorkEnd(result.discoveredContext.workingHours.end);
@@ -208,8 +217,10 @@ export function Onboarding() {
         slackUserId: slackUserId.trim() || undefined,
         linearUsername: linearUsername.trim() || undefined,
         role,
+        customRole: role === "other" && customRole.trim() ? customRole.trim() : undefined,
         managerName: managerName.trim(),
         teamName: teamName.trim(),
+        coworkers: coworkers.length > 0 ? coworkers : undefined,
         slackChannels: channels.filter((c) => selectedChannelIds.has(c.id)),
         integrations,
         fetchCadence,
@@ -421,26 +432,24 @@ export function Onboarding() {
                     This helps prioritize and triage incoming work.
                   </Text>
                 </div>
-                <Radio.Group value={role} onChange={(val) => setRole(val as UserRole)}>
-                  <Stack gap="sm" mt={8}>
-                    {ROLE_OPTIONS.map((opt) => (
-                      <Radio
-                        key={opt.value}
-                        value={opt.value}
-                        label={opt.label}
-                        size="sm"
-                        styles={{
-                          radio: {
-                            cursor: "pointer",
-                          },
-                          label: {
-                            cursor: "pointer",
-                          },
-                        }}
-                      />
-                    ))}
-                  </Stack>
-                </Radio.Group>
+                <Select
+                  data={ROLE_OPTIONS}
+                  value={role}
+                  onChange={(val) => val && setRole(val as UserRole)}
+                  size="sm"
+                  allowDeselect={false}
+                  mt={8}
+                />
+                {role === "other" && (
+                  <TextInput
+                    label="Your role"
+                    placeholder="e.g. Solutions Engineer, Technical Writer..."
+                    value={customRole}
+                    onChange={(e) => setCustomRole(e.currentTarget.value)}
+                    size="sm"
+                    mt={8}
+                  />
+                )}
               </Stack>
             )}
 

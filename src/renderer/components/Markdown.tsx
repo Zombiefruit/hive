@@ -135,11 +135,16 @@ const MARKDOWN_STYLES = `
   margin: 8px 0;
   font-size: 0.8rem;
   width: 100%;
+  display: block;
+  overflow-x: auto;
+  word-break: break-word;
 }
 .md-content th, .md-content td {
   border: 1px solid var(--aegen-glass-border);
   padding: 4px 8px;
   text-align: left;
+  max-width: 300px;
+  overflow-wrap: break-word;
 }
 .md-content th {
   background: var(--mantine-color-default-hover);

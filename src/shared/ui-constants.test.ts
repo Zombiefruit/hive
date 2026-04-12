@@ -36,17 +36,28 @@ describe("STAGE_META", () => {
 
 describe("SOURCE_COLORS", () => {
   it("should have colors for all standard sources", () => {
-    expect(SOURCE_COLORS.linear).toBeDefined();
-    expect(SOURCE_COLORS.slack).toBeDefined();
-    expect(SOURCE_COLORS.github).toBeDefined();
-    expect(SOURCE_COLORS.notion).toBeDefined();
-    expect(SOURCE_COLORS.email).toBeDefined();
+    const expected = ["linear", "slack", "github", "notion", "email", "manual", "calendar", "gong"];
+    for (const src of expected) {
+      expect(SOURCE_COLORS[src]).toBeDefined();
+    }
   });
 
   it("should have color values", () => {
     for (const color of Object.values(SOURCE_COLORS)) {
       expect(color).toBeTruthy();
       expect(typeof color).toBe("string");
+    }
+  });
+
+  it("should use currentColor for github and notion (theme-aware)", () => {
+    // Regression: was #FFFFFF which is invisible on light themes
+    expect(SOURCE_COLORS.github).toBe("currentColor");
+    expect(SOURCE_COLORS.notion).toBe("currentColor");
+  });
+
+  it("should not use hardcoded white for any source", () => {
+    for (const [, color] of Object.entries(SOURCE_COLORS)) {
+      expect(color.toLowerCase()).not.toBe("#ffffff");
     }
   });
 });

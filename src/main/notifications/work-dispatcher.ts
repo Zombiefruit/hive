@@ -298,7 +298,7 @@ export async function prepareWorkPlan(notification: {
   const plan: WorkPlan = {
     notificationId: notification.id,
     title: notification.title,
-    context: ghContext ? `GitHub context: ${ghContext.slice(0, 200)}` : "",
+    context: ghContext ? `GitHub context: ${ghContext}` : "",
     plan: response,
     estimatedModel: "",
     estimatedCost: "",

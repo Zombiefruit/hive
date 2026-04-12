@@ -327,10 +327,6 @@ export default function ProjectsPage() {
 
       {showDetail ? renderDetail(selectedProject) : (
         <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
-          <Group justify="space-between" mb={16}>
-            <Text size="lg" fw={600}>Projects</Text>
-          </Group>
-
           {/* Explainer + stats card */}
           <div style={{
             padding: "12px 14px", borderRadius: 8, marginBottom: 12,

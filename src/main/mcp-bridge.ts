@@ -108,6 +108,7 @@ export function clearBridgeDebugLog(): void { debugLog.length = 0; }
 
 const DISALLOWED_TOOLS = [
   "Write", "Edit", "Bash", "NotebookEdit", "Agent", "EnterWorktree", "ExitWorktree",
+  "Read", "Glob", "Grep", // Prevent fetch agent from exploring local filesystem
   "mcp__claude_ai_Slack__slack_send_message", "mcp__claude_ai_Slack__slack_send_message_draft",
   "mcp__claude_ai_Slack__slack_schedule_message", "mcp__claude_ai_Slack__slack_create_canvas",
   "mcp__claude_ai_Slack__slack_update_canvas",
@@ -132,7 +133,52 @@ const DISALLOWED_TOOLS = [
   "mcp__claude_ai_Google_Calendar__gcal_respond_to_event",
 ];
 
-const SYSTEM_PROMPT = "You are a READ-ONLY data fetcher. Rules: (1) ONLY read and search data — never write, edit, or send anything. (2) Each message is INDEPENDENT — never reference prior messages. (3) Return ONLY the requested data as plain text. NO commentary, NO narration. Just the raw results. (4) If a tool call fails, include a one-line error note and move on.";
+const SYSTEM_PROMPT = "You are a READ-ONLY data fetcher. Rules: (1) ONLY use MCP tools (Slack, Linear, Gmail, Calendar, Notion, Gong) — never Read, Grep, Glob, or explore local files. (2) Each message is INDEPENDENT — never reference prior messages. (3) Return ONLY the requested data as plain text sections. NO commentary, NO narration, NO filesystem exploration. (4) If a tool call fails, include a one-line error note and move on. (5) If MCP tool output is large, summarize the key items — do NOT try to read the raw JSON from temp files.";
+
+// ── Pre-approved read-only MCP tools (auto-approved, no user prompt needed) ──
+// These are all read/search operations from remote MCP servers that require
+// tool-permission approval in Claude Code. Without pre-approval, headless bridge
+// processes silently fail because nobody can click "approve" on the permission prompt.
+const ALLOWED_TOOLS = [
+  // Slack (read-only)
+  "mcp__claude_ai_Slack__slack_read_channel", "mcp__claude_ai_Slack__slack_read_thread",
+  "mcp__claude_ai_Slack__slack_read_user_profile", "mcp__claude_ai_Slack__slack_read_canvas",
+  "mcp__claude_ai_Slack__slack_search_channels", "mcp__claude_ai_Slack__slack_search_users",
+  "mcp__claude_ai_Slack__slack_search_public", "mcp__claude_ai_Slack__slack_search_public_and_private",
+  // Linear (read-only)
+  "mcp__claude_ai_Linear__get_issue", "mcp__claude_ai_Linear__get_project",
+  "mcp__claude_ai_Linear__get_team", "mcp__claude_ai_Linear__get_user",
+  "mcp__claude_ai_Linear__get_document", "mcp__claude_ai_Linear__get_initiative",
+  "mcp__claude_ai_Linear__get_milestone", "mcp__claude_ai_Linear__get_attachment",
+  "mcp__claude_ai_Linear__get_issue_status", "mcp__claude_ai_Linear__get_status_updates",
+  "mcp__claude_ai_Linear__list_issues", "mcp__claude_ai_Linear__list_projects",
+  "mcp__claude_ai_Linear__list_teams", "mcp__claude_ai_Linear__list_users",
+  "mcp__claude_ai_Linear__list_documents", "mcp__claude_ai_Linear__list_cycles",
+  "mcp__claude_ai_Linear__list_initiatives", "mcp__claude_ai_Linear__list_milestones",
+  "mcp__claude_ai_Linear__list_issue_labels", "mcp__claude_ai_Linear__list_issue_statuses",
+  "mcp__claude_ai_Linear__list_project_labels", "mcp__claude_ai_Linear__list_comments",
+  "mcp__claude_ai_Linear__list_customers", "mcp__claude_ai_Linear__research",
+  "mcp__claude_ai_Linear__search_documentation",
+  // Google Calendar (read-only)
+  "mcp__claude_ai_Google_Calendar__gcal_list_events", "mcp__claude_ai_Google_Calendar__gcal_list_calendars",
+  "mcp__claude_ai_Google_Calendar__gcal_get_event", "mcp__claude_ai_Google_Calendar__gcal_find_meeting_times",
+  "mcp__claude_ai_Google_Calendar__gcal_find_my_free_time",
+  // Gmail (read-only)
+  "mcp__claude_ai_Gmail__gmail_search_messages", "mcp__claude_ai_Gmail__gmail_read_message",
+  "mcp__claude_ai_Gmail__gmail_read_thread", "mcp__claude_ai_Gmail__gmail_list_labels",
+  "mcp__claude_ai_Gmail__gmail_list_drafts", "mcp__claude_ai_Gmail__gmail_get_profile",
+  // Notion (read-only)
+  "mcp__claude_ai_Notion__notion-search", "mcp__claude_ai_Notion__notion-fetch",
+  "mcp__claude_ai_Notion__notion-get-comments", "mcp__claude_ai_Notion__notion-get-teams",
+  "mcp__claude_ai_Notion__notion-get-users", "mcp__claude_ai_Notion__notion-query-data-sources",
+  "mcp__claude_ai_Notion__notion-query-meeting-notes",
+  // Gong (read-only)
+  "mcp__claude_ai_Gong__list_calls", "mcp__claude_ai_Gong__get_call_details",
+  "mcp__claude_ai_Gong__get_call_transcript", "mcp__claude_ai_Gong__get_call_stats",
+  "mcp__claude_ai_Gong__list_users", "mcp__claude_ai_Gong__search_calls",
+  // ToolSearch needed to discover MCP tools
+  "ToolSearch",
+];
 
 const MIN_EXPECTED_MCP_TOOLS = 85;
 
@@ -239,6 +285,7 @@ export function createBridge(label: string, model = "claude-opus-4-6[1m]"): Brid
         "--no-chrome",
         "--model", model,
         "--no-session-persistence",
+        "--allowedTools", ALLOWED_TOOLS.join(","),
         "--disallowedTools", DISALLOWED_TOOLS.join(","),
         "--system-prompt", SYSTEM_PROMPT,
       ], {
@@ -433,6 +480,7 @@ export function askMcpPlanningAgent(
       "--no-chrome",
       "--model", model,
       "--no-session-persistence",
+      "--allowedTools", ALLOWED_TOOLS.join(","),
       "--disallowedTools", DISALLOWED_TOOLS.join(","),
       "--system-prompt", "You are a READ-ONLY planning agent. You have MCP tools to fetch context from Slack, Linear, Notion, Gmail, and Google Calendar. Use them to gather all relevant information, then produce a work plan. NEVER write, edit, or send anything. NEVER explore the local filesystem — the task is NOT about the current directory.",
     ], {
